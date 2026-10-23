@@ -103,7 +103,7 @@ def check_bundle(root=ROOT):
     print(f'Bundle verified: {len(manifest["files"])} files; no model downloaded or server started.')
     return manifest
 
-def make_config(root, models, manifest, workers, numa):
+def make_config(root, models, manifest, workers, numa, port=8093):
     weights = [models / e['name'] for e in manifest['files'] if e['kind'] == 'model']
     projector = next(models / e['name'] for e in manifest['files'] if e['kind'] == 'vision')
     pack = root / 'packs/davidau-iq3_s'; mtp = root / 'mtp/rt'
@@ -118,7 +118,7 @@ def make_config(root, models, manifest, workers, numa):
               '--spec','3','--spec-min-p','0.25','--prompt-cache','6','--prompt-cache-every','16384',
               '--prompt-cache-root','2048','--vision','--vram-reserve-mib','1216','--mtp',str(mtp),
               '--suffix-draft','0','--lookup-chain','0','--ple-io','ram','--adapt-async','1','--pool-tasks','0'],
-        model_name='davidau-qwen3.8-flash-next-iq3_s',host='127.0.0.1',port=8093,
+        model_name='davidau-qwen3.8-flash-next-iq3_s',host='127.0.0.1',port=port,
         log=str(root/'logs/engine.log'),mtp=True,open_browser=False,env=env,
         reasoning_effort='high',sampling=dict(temperature=1.0,top_p=0.95,top_k=64,min_p=0.05,repetition_penalty=1.0),
         vision=dict(exe=str(root/'runtime/vision/strata-vision.exe'),model=str(weights[0]),mmproj=str(projector),
@@ -167,9 +167,10 @@ def install(args):
             if not all((pack/n).is_file() and (pack/n).stat().st_size for n in names): raise RuntimeError('Incomplete pack')
             atomic(ready, {'downloads_sha256':fingerprint,'files':{n:sha(pack/n) for n in names}})
         path = root/'strata-davidau.json'
-        if not path.exists(): atomic(path, make_config(root,models,manifest,args.workers,args.numa_node))
+        if not path.exists(): atomic(path, make_config(root,models,manifest,args.workers,args.numa_node,args.port))
         atomic(root/'runtime/active.json',dict(id=bundle['release_tag'],source='app',engine='runtime/engine/strata.exe',vision='runtime/vision/strata-vision.exe',source_sha=bundle['source_sha']))
-    print('Ready. Run START.cmd. API: http://127.0.0.1:8093/v1. No API key is shipped or required for this localhost preset.')
+    port=json.loads(path.read_text(encoding='utf8'))['port']
+    print(f'Ready. Run START.cmd. API: http://127.0.0.1:{port}/v1. No API key is shipped or required for this localhost preset.')
     print('NUMA preference:',args.numa_node,'; choose node0 only after confirming your GPU is local to it.')
 
 def main():
@@ -177,11 +178,13 @@ def main():
     p.add_argument('--check-bundle',action='store_true',help='Verify package hashes only; no downloads, config edits or server')
     p.add_argument('--models-dir',help='Optional directory for GGUF/mmproj; default is inside the portable folder')
     p.add_argument('--workers',type=int,default=max(1,min(14,(os.cpu_count() or 2)-2)))
+    p.add_argument('--port',type=int,default=8093,help='Local API port; choose a free port for a separate installation')
     p.add_argument('--numa-node',choices=['off','0','1'],default='off',help='Reference machine used node0; generic default leaves NUMA allocation unchanged')
     args=p.parse_args()
     if args.check_bundle: check_bundle(); return 0
     if os.name!='nt' or sys.maxsize<=2**32: p.error('Windows x64 required')
     if not 1<=args.workers<=256: p.error('workers must be1..256')
+    if not 1024<=args.port<=65535: p.error('port must be1024..65535')
     install(args); return 0
 
 if __name__=='__main__':

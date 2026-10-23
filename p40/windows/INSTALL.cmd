@@ -11,6 +11,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0p40\windows\prereq
 if errorlevel 1 goto failed
 "%~dp0runtime\python\python.exe" -I -s -B "%~dp0p40\windows\installer.py" %*
 if errorlevel 1 goto failed
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0p40\windows\autostart.ps1"
+if errorlevel 1 goto failed
 echo Installation complete. Run START.cmd.
 pause
 exit /b 0

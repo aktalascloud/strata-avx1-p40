@@ -14,11 +14,13 @@ The packaged engine is **0.1.47**, based on upstream commit [`011c9e600a93`](htt
 
 1. Download the portable ZIP and `SHA256SUMS.txt` from [Releases](https://github.com/aktalascloud/strata-avx1-p40/releases).
 2. Verify the ZIP with `Get-FileHash -Algorithm SHA256`, then extract it to a short, writable path, such as `C:\Strata-P40`.
-3. Run **`INSTALL.cmd`**. It checks prerequisites, downloads the pinned GGUF, vision projector, and MTP files from Hugging Face with **resume support and SHA-256 verification**, then builds a local pack directly from the GGUF. The original checkpoint is not required.
+3. Run **`INSTALL.cmd`**. It checks prerequisites, downloads the pinned GGUF, vision projector, and MTP files from Hugging Face with **resume support and SHA-256 verification**, then builds a local pack directly from the GGUF. The original checkpoint is not required. Approve the Windows administrator prompt to register this installation's boot and control tasks; no password is stored.
 4. Run **`START.cmd`**. It starts Strata through a separate Windows scheduled task. Use **`STOP.cmd`** for a verified graceful shutdown; if a request is busy, let it finish and retry.
 5. Open `http://127.0.0.1:8093/`. The OpenAI-compatible API base URL is `http://127.0.0.1:8093/v1`.
 
 Use the CMD files from the release archive for this AVX1/P40 build. `CHECK.cmd` verifies the package without downloading a model, starting a server, or registering a task.
+
+Autostart runs through Task Scheduler **45 seconds after Windows boots**, even before interactive logon. It does not require Codex or an open terminal. `AUTOSTART.cmd` can register the tasks again after a completed installation. A different folder gets different task names. No installer or startup script reboots Windows or force-stops another service.
 
 No model weights, generated packs, API keys, personal configurations, logs, caches, compilers, or SDKs are included. Microsoft Visual C++ Runtime is downloaded directly from Microsoft if needed, and its signature is checked. Install a P40-compatible NVIDIA driver with CUDA 12.9 support separately.
 
@@ -31,6 +33,8 @@ INSTALL.cmd --workers 14 --numa-node 0
 ```
 
 Confirm your GPU's NUMA node before selecting it. The generic installer leaves NUMA preference **off** by default. You can choose a separate directory for the downloaded weights with `--models-dir`.
+
+For a separate installation, choose an unused localhost port with `--port 8094` before its first installation. The default is **8093**. Existing configurations are retained; changing a flag does not overwrite them. If you move an installed folder, regenerate its local preset and register its tasks for the new path before starting it.
 
 ## Measured performance
 
@@ -75,6 +79,8 @@ PGO, ThinLTO, extra CUDA vectorization, and I128 were tested separately and in c
 The reference build passed **22 numerical and graph checks**, including the full 5,201-case DenseF32 sweep. Other GPUs and backends are not qualified by this Windows release. The preset does not change CPU affinity, clocks, power limits, fans, or thermal protection.
 
 [Patch descriptions and individual comparisons](p40/PATCHES.md) · [Reviewed external sources](p40/RESEARCH.md)
+
+[Portable installation verification and its limits](p40/INSTALLATION-VERIFICATION.md)
 
 ## Licenses and credits
 
