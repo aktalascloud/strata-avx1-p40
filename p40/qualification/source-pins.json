@@ -1,0 +1,5 @@
+{
+  "src/kernels/b6_mmvq_bench.cpp": "5363a5842616f2c9eeed1df780b09eadf7dc4c2f1966116a25fa408850c8c60e",
+  "src/kernels/expdec_bench.cpp": "a8e975c48003a5b4488d50fc67957d238c23d9bf26ea3fa3c2557549f1f39e88",
+  "tests/cuda/pascallama_mmq_screen.cpp": "3aec4268c94cf51e56c60d267970a5e93bc619136e2d96e4f1c5e197e46eacfe"
+}

@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "allowed_repositories": [
+    "DavidAU/Qwen3.8-Flash-Next-Abliterated-Uncensored-Turbo-Brilliance-50x-Reasoning-Instruct-GSQ-RCO-GGUF",
+    "Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata"
+  ],
+  "files": [
+    {
+      "kind": "model",
+      "name": "Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00001-of-00002.gguf",
+      "remote": "Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00001-of-00002.gguf",
+      "repo": "DavidAU/Qwen3.8-Flash-Next-Abliterated-Uncensored-Turbo-Brilliance-50x-Reasoning-Instruct-GSQ-RCO-GGUF",
+      "revision": "b7f9593a6e25d6b4db950f6d0a2cc08ced014cfa",
+      "size": 55063664928,
+      "sha256": "78706315c2fe912777c006b4ae18be1024c9f4353bd25d33b8a306c9c55f9e34"
+    },
+    {
+      "kind": "model",
+      "name": "Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00002-of-00002.gguf",
+      "remote": "Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_S-00002-of-00002.gguf",
+      "repo": "DavidAU/Qwen3.8-Flash-Next-Abliterated-Uncensored-Turbo-Brilliance-50x-Reasoning-Instruct-GSQ-RCO-GGUF",
+      "revision": "b7f9593a6e25d6b4db950f6d0a2cc08ced014cfa",
+      "size": 28800138432,
+      "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113"
+    },
+    {
+      "kind": "vision",
+      "name": "mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+      "remote": "mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+      "repo": "DavidAU/Qwen3.8-Flash-Next-Abliterated-Uncensored-Turbo-Brilliance-50x-Reasoning-Instruct-GSQ-RCO-GGUF",
+      "revision": "b7f9593a6e25d6b4db950f6d0a2cc08ced014cfa",
+      "size": 907543008,
+      "sha256": "b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0"
+    },
+    {
+      "kind": "mtp",
+      "name": "dense.bin",
+      "remote": "mtp/dense.bin",
+      "repo": "Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata",
+      "revision": "379ff0b8a39f83dfd93d2122cc91dd4029cf9602",
+      "size": 116099072,
+      "sha256": "c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a"
+    },
+    {
+      "kind": "mtp",
+      "name": "dense.txt",
+      "remote": "mtp/dense.txt",
+      "repo": "Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata",
+      "revision": "379ff0b8a39f83dfd93d2122cc91dd4029cf9602",
+      "size": 1880,
+      "sha256": "8773c81ebb0986e37fe94a8a9933e87be48b1fabc6889a0106bcdab179d1c2ac"
+    },
+    {
+      "kind": "mtp",
+      "name": "draft_vocab.bin",
+      "remote": "mtp/draft_vocab.bin",
+      "repo": "Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata",
+      "revision": "379ff0b8a39f83dfd93d2122cc91dd4029cf9602",
+      "size": 235852,
+      "sha256": "25d7fd1670a2e0ec885868d1718d410a3baab03bceeacf0a156cf93ffe4e1ef4"
+    },
+    {
+      "kind": "mtp",
+      "name": "experts.bin",
+      "remote": "mtp/experts.bin",
+      "repo": "Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata",
+      "revision": "379ff0b8a39f83dfd93d2122cc91dd4029cf9602",
+      "size": 707788800,
+      "sha256": "09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f"
+    }
+  ]
+}

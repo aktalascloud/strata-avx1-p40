@@ -45,6 +45,7 @@
 #include "strata/kernels/cpu/expert.hpp"
 #include "strata/kernels/cpu/pool.hpp"
 #include "strata/platform/aux_cpus.hpp"
+#include "strata/platform/cpu_pinning.hpp"
 #include "strata/kernels/cpu/expert_layout.hpp"
 #include "strata/kernels/cpu/hadamard.hpp"
 #include "strata/kernels/ngram.hpp"
@@ -5866,6 +5867,8 @@ int main(int argc, char** argv) {
         }
     }
 #endif
+    if (strata::no_cpu_pin())
+        std::fprintf(stderr, "strata generate: CPU pinning disabled (STRATA_NO_CPU_PIN=1); inherited masks and CPU Sets kept\n");
     if (o.pool_measure)
         o.pool_affinity = measure_pool_affinity(srcp, o.pool_workers, !o.no_host_worker, o.pool_tasks);
     strata::kernels::cpu::ExpertPool pool(o.pool_workers, /*pin=*/true, /*host_works=*/!o.no_host_worker,
@@ -13433,7 +13436,8 @@ int main(int argc, char** argv) {
                         return v == nullptr || std::atoi(v) != 0;
                     }();
 #if defined(_WIN32)
-                    static const bool conc_on_host = std::getenv("STRATA_TEST_CONC_ON_HOST_CPU") != nullptr;
+                    static const bool conc_on_host = !strata::no_cpu_pin() &&
+                        std::getenv("STRATA_TEST_CONC_ON_HOST_CPU") != nullptr;
                     std::vector<ULONG> host_cpu_sets;
                     if (conc_on_host) {
                         const HANDLE self = GetCurrentThread();
@@ -13461,6 +13465,7 @@ int main(int argc, char** argv) {
                             std::fprintf(stderr, "strata batch: %d threads that ran on the host thread's core moved off "
                                                  "it, for reads beside the slots\n", moved);
                     auto conc_thread_cpus = [&] {
+                        if (strata::no_cpu_pin()) return;
                         strata::aux_cpus::pin_current_thread();
 #if defined(_WIN32)
                         const HANDLE self = GetCurrentThread();

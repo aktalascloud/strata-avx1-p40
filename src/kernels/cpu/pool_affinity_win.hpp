@@ -9,13 +9,14 @@
 #include <cstdio>
 #include <cstddef>
 #include <vector>
+#include "strata/platform/cpu_pinning.hpp"
 
 namespace strata::kernels::cpu::detail {
 
 // Hard affinity is only for pool-owned threads, which terminate with the pool. A caller's implicit
 // all-group affinity cannot be restored from PreviousGroupAffinity, so the host uses CPU Sets below.
 inline bool set_thread_group_affinity(int core, int worker) {
-    if (core < 0) return false;
+    if (core < 0 || strata::no_cpu_pin()) return false;
     GROUP_AFFINITY target{};
     target.Group = (WORD) (core / 64);
     target.Mask = KAFFINITY(1) << (core & 63);

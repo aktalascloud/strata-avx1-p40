@@ -21,6 +21,7 @@
 #include "strata/kernels/cpu/expert_layout.hpp"
 #include "strata/kernels/cpu/iq_avx2.hpp"
 #include "strata/kernels/cpu/native_expert.hpp"
+#include "strata/platform/cpu_pinning.hpp"
 
 #include "ggml.h"
 #include "ggml-cpu.h"
@@ -198,6 +199,7 @@ unsigned core_type() {   // CPUID 1Ah of the calling thread: 40h performance cor
 }
 
 bool pin_to(int cpu_index) {
+    if (strata::no_cpu_pin()) return false;
 #if defined(_WIN32)
     if (cpu_index < 0 || cpu_index >= 64) return false;
     return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;

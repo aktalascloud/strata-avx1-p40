@@ -343,7 +343,7 @@
    "tools": [
     "terminal"
    ],
-   "input": "I'm noticing the plugin already handles max_tokens in mem0.json, so I should check how LlmConfig is set up around lines 360-380 and look for any max_t\n\n\n<tool_call>\n<function=terminal>\n<parameter=command>\nsed -n 300,470p \"C:/Users/Ai/AppData/Local/hermes/plugins/mem0-local/__init__.py\"\n</parameter>\n</function>\n</tool_call>",
+   "input": "I'm noticing the plugin already handles max_tokens in mem0.json, so I should check how LlmConfig is set up around lines 360-380 and look for any max_t\n\n\n<tool_call>\n<function=terminal>\n<parameter=command>\nsed -n 300,470p \"C:/Users/Example/AppData/Local/hermes/plugins/mem0-local/__init__.py\"\n</parameter>\n</function>\n</tool_call>",
    "calls": [
     "terminal"
    ]
@@ -354,7 +354,7 @@
    "tools": [
     "terminal"
    ],
-   "input": "So the root cause is becoming clear: mem0 sends a chat completion request with `response_format` set to JSON object and `max_tokens` capped at 2000 by\n\n\n<tool_call>\n<function=terminal>\n<parameter=command>\ngrep -n \"_get_supported_params\" -A 40 \"C:/Users/Ai/AppData/Local/hermes/installs/d54dbf11f …\n</parameter>\n</function>\n</tool_call>\n<tool_call>\n<function=terminal>\n<parameter=command>\nssh -o ConnectTimeout=8 <host> \"cat <private-path>\n</parameter>\n</function>\n</tool_call>",
+   "input": "So the root cause is becoming clear: mem0 sends a chat completion request with `response_format` set to JSON object and `max_tokens` capped at 2000 by\n\n\n<tool_call>\n<function=terminal>\n<parameter=command>\ngrep -n \"_get_supported_params\" -A 40 \"C:/Users/Example/AppData/Local/hermes/installs/d54dbf11f …\n</parameter>\n</function>\n</tool_call>\n<tool_call>\n<function=terminal>\n<parameter=command>\nssh -o ConnectTimeout=8 <host> \"cat <private-path>\n</parameter>\n</function>\n</tool_call>",
    "calls": [
     "terminal",
     "terminal"

@@ -1,0 +1,15 @@
+{
+  "source_sha": "011c9e600a93bbc9fd451c563501b5831c32bbca",
+  "ggml_sha": "3cf03257f219afbe7334045ff7c6a06ac68c627d",
+  "pascallama_sha": "e6a28bcba735f702584520362a96f670224ae5ea",
+  "patches": [
+    {
+      "path": "p40/patches/native-ivybridge-p40.patch",
+      "sha256": "38bc48d5a35a939fcbf4c9905b915a66ba09808828d23ad3d14459f1fcaabdbc"
+    },
+    {
+      "path": "p40/patches/pascallama-sm61.patch",
+      "sha256": "83ed5d94cd23ee01a61b70e50888f2332affbe4d83d4c60477cd4ab5bed6ea8a"
+    }
+  ]
+}

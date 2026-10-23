@@ -2,6 +2,7 @@
 #include "strata/kernels/cpu/pool.hpp"
 #include "strata/core/progress.hpp"
 #include "strata/platform/aux_cpus.hpp"
+#include "strata/platform/cpu_pinning.hpp"
 #include "strata/kernels/cpu/expert_layout.hpp"
 #include "strata/kernels/cpu/numa_pool.hpp"
 
@@ -578,7 +579,7 @@ std::vector<int> physical_cores(bool skip_first, PoolAffinity affinity) {
 namespace {
 
 bool pin_this_thread(int core, [[maybe_unused]] int worker = -1) {
-    if (core < 0) return false;
+    if (core < 0 || strata::no_cpu_pin()) return false;
 #if defined(_WIN32)
     return detail::set_thread_group_affinity(core, worker);
 #else
@@ -642,7 +643,7 @@ NumaSplitDecision decide_real_numa_split([[maybe_unused]] const std::vector<int>
 }  // namespace
 
 ThreadAffinity pin_current_thread(int core) {
-    if (core < 0) return {};
+    if (core < 0 || strata::no_cpu_pin()) return {};
 #if defined(_WIN32)
     ThreadAffinity previous;
     ULONG target = 0;
@@ -668,7 +669,7 @@ ThreadAffinity pin_current_thread(int core) {
 }
 
 void restore_thread_affinity(const ThreadAffinity& previous) {
-    if (!previous.valid) return;
+    if (!previous.valid || strata::no_cpu_pin()) return;
 #if defined(_WIN32)
     // Clearing an originally empty selection restores process-default/all-group eligibility without
     // turning the caller's implicit Windows 11 affinity into an explicit single-group hard mask.
@@ -743,6 +744,7 @@ void ExpertPool::diag(std::FILE* f) const {
 ExpertPool::ExpertPool(int n_workers, bool pin, bool host_works, PoolAffinity affinity, int tasks)
     : tasks_(tasks), host_works_(host_works), affinity_(affinity), topo_(detect_cpu_topology(true, affinity)) {
     if (tasks < 0 || tasks > kMaxTasks) throw std::invalid_argument("expert pool tasks must be in 0..4096");
+    pin = pin && !strata::no_cpu_pin();
     pinned_ = pin;
     layout_ = logical_cpu_layout();   // now, before anything pins the caller (Linux reads the calling thread's allowed CPUs)
     if (const char* e = std::getenv("STRATA_POOL_SPIN_US"))   // a test knob; see kSpinBeforeSleep

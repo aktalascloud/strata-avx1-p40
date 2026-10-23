@@ -25,3 +25,11 @@ docker/compose/* text eol=lf
 
 # Apple tools (codesign, plutil) read these: LF only, wherever the repository is cloned
 *.plist text eol=lf
+
+# P40 canonical text and exact patch/license bytes
+p40/** text eol=lf
+p40/patches/*.patch -text
+p40/licenses/* -text
+src/kernels/b6_mmvq_bench.cpp text eol=lf
+src/kernels/expdec_bench.cpp text eol=lf
+tests/cuda/pascallama_mmq_screen.cpp text eol=lf

@@ -85,3 +85,27 @@ node_modules/
 # screenshots and checkpoints from the Mac rebuild live outside git (StrataSplit\evidence-archive)
 /apps/host/docs/evidence/
 /apps/host/docs/checkpoints/
+
+# P40 portable runtime and private/generated artifacts (never commit)
+/runtime/
+/packs/
+/models/
+/mtp/
+/logs/
+/downloads/
+/work/
+/.p40-deps/
+/bench/results/
+/data/experimental-speed-projection/*.gguf
+/strata-davidau.json
+/strata-server-launch.json
+/*.lock
+/bundle-manifest.json
+*.pyc
+__pycache__/
+*.profraw
+*.profdata
+*.pdb
+*.log
+*.gguf
+*.part

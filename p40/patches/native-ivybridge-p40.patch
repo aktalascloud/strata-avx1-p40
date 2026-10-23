@@ -1,0 +1,1157 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7c68676..4c49f45 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -88,6 +88,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
+ # HIP a code object loads on first use, so they cost other models nothing there (R9700: the same slots).  Used at run
+ # time with STRATA_MMQ_KQ=1 (opt-in: it changes the prompt's rounding against the FP16 path).
+ option(STRATA_MMQ_TQ_OVERLAY "Gyro trellis MMQ prompt kernels on an upstream llama.cpp: an overlay of its ggml-cuda headers written at configure time (cmake/strata_ggml_tq_overlay.cmake)" ON)
++option(STRATA_PASCALLAMA "Experimental complete pascallama P40 MMQ J96/unroll overlay" OFF)
++if(STRATA_PASCALLAMA)
++  if(NOT STRATA_ENABLE_CUDA OR NOT STRATA_EXPERIMENTAL_SM60 OR NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "61" OR NOT STRATA_MMQ_TQ_OVERLAY)
++    message(FATAL_ERROR "Pascallama qualification requires native CUDA sm_61, experimental Pascal support and the private MMQ overlay")
++  endif()
++endif()
+ option(STRATA_MMQ_KQUANTS "Build the MMQ prompt kernels for Q4_K / Q5_K / Q5_1 / Q6_K: the experts of Unsloth's K-quant files, and on HIP the dense GGUF projections (STRATA_DENSE_MMQ)" ON)
+ # Q6_K gate/up in the grouped expert kernels (Unsloth's UD-Q6_K_XL, and layer 2 of UD-Q5_K_XL; docs/QUANTS.md).  On by
+ # default since MODEL-UPDATE Phase 1: one more instance per grouped kernel in iq_kernels.cu, +19 KB of sm_60 code,
+@@ -1488,6 +1494,9 @@ endif()
+ include(CheckCXXSourceCompiles)
+ if(MSVC)
+   set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
++  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++    set(CMAKE_REQUIRED_FLAGS "/arch:AVX2 /clang:-mavx2 /clang:-mfma /clang:-mf16c")
++  endif()
+ else()
+   set(CMAKE_REQUIRED_FLAGS "-mavx2 -mfma -mf16c")
+ endif()
+@@ -1681,6 +1690,11 @@ if(STRATA_NATIVE_EXPERTS)
+       set(_strata_tq_llama "${strata_llamacpp_SOURCE_DIR}")
+     endif()
+     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/strata_ggml_tq_overlay.cmake)
++    if(STRATA_PASCALLAMA)
++      include(cmake/strata_pascallama_overlay.cmake)
++      strata_pascallama_overlay("${_strata_tq_llama}" "${CMAKE_BINARY_DIR}/ggml-pascallama-source" "${STRATA_PASCALLAMA_PATCH}" "${STRATA_PRIVATE_GIT}")
++      set(_strata_tq_llama "${CMAKE_BINARY_DIR}/ggml-pascallama-source")
++    endif()
+     set(_strata_tq_overlay_dir "${CMAKE_BINARY_DIR}/ggml-tq-overlay")
+     strata_ggml_tq_overlay("${_strata_tq_llama}" "${_strata_tq_overlay_dir}")
+     if(STRATA_TQ_OVERLAY_OK)
+@@ -1709,6 +1723,10 @@ if(STRATA_NATIVE_EXPERTS)
+       set(_strata_gg ${strata_llamacpp_SOURCE_DIR}/ggml)
+     endif()
+     set(_strata_mmq ${_strata_gg}/src/ggml-cuda)
++    if(STRATA_PASCALLAMA)
++      # Relative ../mmq.cuh in original template instances must resolve to the patched private copy too.
++      set(_strata_mmq "${CMAKE_BINARY_DIR}/ggml-pascallama-source/ggml/src/ggml-cuda")
++    endif()
+     set(_strata_quantize_cu ${_strata_mmq}/quantize.cu)   # the overlay's copy when the trellis overlay is on: it includes mmq.cuh
+     if(_strata_mmq_tq_overlay)
+       set(_strata_quantize_cu ${_strata_tq_overlay_dir}/quantize.cu)
+@@ -2071,7 +2089,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
+ endif()
+ 
+ if(STRATA_BUILD_TESTS)
++  if(STRATA_NATIVE_EXPERTS)
++    add_executable(cpu_format_parity tests/platform/cpu_format_parity.cpp)
++    if(STRATA_GGML_DIR)
++      target_include_directories(cpu_format_parity PRIVATE ${STRATA_GGML_DIR}/ggml/src)
++    else()
++      target_include_directories(cpu_format_parity PRIVATE ${strata_llamacpp_SOURCE_DIR}/ggml/src)
++    endif()
++    target_link_libraries(cpu_format_parity PRIVATE strata_kernels_cpu)
++    add_test(NAME cpu_format_parity COMMAND cpu_format_parity)
++  endif()
+   if(WIN32)
++    add_executable(no_cpu_pin_test tests/platform/no_cpu_pin_test.cpp)
++    target_include_directories(no_cpu_pin_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/cpu)
++    target_link_libraries(no_cpu_pin_test PRIVATE strata_kernels_cpu)
++    add_test(NAME no_cpu_pin_test COMMAND no_cpu_pin_test)
++    add_test(NAME no_cpu_pin_positive_control COMMAND no_cpu_pin_test --positive-control)
+     add_executable(pool_affinity_test src/kernels/cpu/pool_affinity_test.cpp)
+     target_link_libraries(pool_affinity_test PRIVATE strata_kernels_cpu)
+     add_test(NAME pool_affinity_test COMMAND pool_affinity_test)
+@@ -2238,3 +2271,19 @@ if(STRATA_HIP_GFX906)
+   add_executable(gfx906_qsa_query_swizzle_probe bench/gfx906_qsa_query_swizzle_probe.cpp)
+   target_link_libraries(gfx906_qsa_query_swizzle_probe PRIVATE strata_kernels ${_strata_gpu_runtime_target})
+ endif()
++
++if(STRATA_PASCALLAMA AND STRATA_BUILD_TESTS)
++  add_executable(sm61_graph_parity tests/cuda/sm61_graph_parity.cu)
++  target_link_libraries(sm61_graph_parity PRIVATE ${_strata_gpu_runtime_target})
++  add_executable(pascallama_mmq_screen tests/cuda/pascallama_mmq_screen.cpp)
++  target_link_libraries(pascallama_mmq_screen PRIVATE strata_mmq ggml-cpu ggml-base)
++  add_test(NAME sm61_graph_parity COMMAND sm61_graph_parity)
++  add_test(NAME pascallama_mmq_screen COMMAND pascallama_mmq_screen)
++endif()
++include(cmake/strata_ivybridge_o3.cmake)
++if(STRATA_BUILD_TESTS AND WIN32)
++  add_executable(windows_numa_arena_test tests/platform/windows_numa_arena_test.cpp)
++  target_include_directories(windows_numa_arena_test PRIVATE include)
++  target_link_libraries(windows_numa_arena_test PRIVATE psapi)
++  add_test(NAME windows_numa_arena_test COMMAND windows_numa_arena_test)
++endif()
+diff --git a/src/core/pinned.cu b/src/core/pinned.cu
+index 0c45c05..efa7027 100644
+--- a/src/core/pinned.cu
++++ b/src/core/pinned.cu
+@@ -28,6 +28,7 @@
+ 
+ #ifdef _WIN32
+ #include <windows.h>
++#include "strata/platform/win_numa_arena.hpp"
+ #else
+ #include <fcntl.h>
+ #include <sys/mman.h>
+@@ -99,6 +100,24 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
+         note = "shared-file arena backing is not implemented on Windows";
+         return nullptr;
+     }
++    // Explicit opt-in only. A single exposed NUMA node keeps ordinary allocation; no CPU affinity changes.
++    const char* numa_mode = std::getenv("STRATA_WIN_NUMA_NODE");
++    int gpu_node = -1;
++#if defined(CUDART_VERSION) && CUDART_VERSION >= 12090 && !defined(__HIP_PLATFORM_AMD__)
++    if (numa_mode != nullptr && (std::strcmp(numa_mode, "gpu") == 0 || std::strcmp(numa_mode, "auto") == 0)) {
++        int device = 0;
++        if (cudaGetDevice(&device) != cudaSuccess ||
++            cudaDeviceGetAttribute(&gpu_node, cudaDevAttrHostNumaId, device) != cudaSuccess) {
++            gpu_node = -1;
++            (void) cudaGetLastError();
++        }
++    }
++#endif
++    const auto numa = strata::platform::win_numa::probe(numa_mode, gpu_node, bytes);
++    std::string numa_note;
++    auto host_alloc = [&](SIZE_T n, DWORD flags) {
++        return strata::platform::win_numa::allocate(n, flags, numa, numa_note);
++    };
+     // MEM_LARGE_PAGES needs SeLockMemoryPrivilege.  Having it assigned to the account is not enough: the
+     // PROCESS must enable it in its own token (AdjustTokenPrivileges) before VirtualAlloc, or the call fails.
+     // An account without the assignment, or a failure to enable, leaves the process as it was: VirtualAlloc
+@@ -125,11 +144,11 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
+         // anything else is ERROR_INVALID_PARAMETER (87), which reads like a privilege problem but is not.
+         // Round up: the slack is under 2 MB and the tail stays unused.
+         const SIZE_T lbytes = (SIZE_T) (((SIZE_T) bytes + large - 1) / large * large);
+-        void* p = VirtualAlloc(nullptr, lbytes, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES,
+-                               PAGE_READWRITE);
++        void* p = host_alloc(lbytes, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES);
+         if (p) {
+             got = PageBacking::LargePages;
+             note = "large pages (" + std::to_string((unsigned long long) large) + " B)";
++            if (!numa_note.empty()) note += "; " + numa_note;
+             return p;
+         }
+         // 1450 (ERROR_NO_SYSTEM_RESOURCES) is the large-page pool saying no, 87 is a size that is not a
+@@ -142,7 +161,8 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
+     } else {
+         note = "this system has no large-page minimum; using 4 KB pages";
+     }
+-    void* p = VirtualAlloc(nullptr, (SIZE_T) bytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
++    void* p = host_alloc((SIZE_T) bytes, MEM_RESERVE | MEM_COMMIT);
++    if (!numa_note.empty()) note += "; " + numa_note;
+     got = PageBacking::NormalPages;
+     return p;
+ #else
+diff --git a/src/kernels/cpu/iq_avx2_parity.cpp b/src/kernels/cpu/iq_avx2_parity.cpp
+index 67544c9..46641b9 100644
+--- a/src/kernels/cpu/iq_avx2_parity.cpp
++++ b/src/kernels/cpu/iq_avx2_parity.cpp
+@@ -21,6 +21,7 @@
+ #include "strata/kernels/cpu/expert_layout.hpp"
+ #include "strata/kernels/cpu/iq_avx2.hpp"
+ #include "strata/kernels/cpu/native_expert.hpp"
++#include "strata/platform/cpu_pinning.hpp"
+ 
+ #include "ggml.h"
+ #include "ggml-cpu.h"
+@@ -198,6 +199,7 @@ unsigned core_type() {   // CPUID 1Ah of the calling thread: 40h performance cor
+ }
+ 
+ bool pin_to(int cpu_index) {
++    if (strata::no_cpu_pin()) return false;
+ #if defined(_WIN32)
+     if (cpu_index < 0 || cpu_index >= 64) return false;
+     return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;
+diff --git a/src/kernels/cpu/pool.cpp b/src/kernels/cpu/pool.cpp
+index cdcc8d7..e6daaa3 100644
+--- a/src/kernels/cpu/pool.cpp
++++ b/src/kernels/cpu/pool.cpp
+@@ -2,6 +2,7 @@
+ #include "strata/kernels/cpu/pool.hpp"
+ #include "strata/core/progress.hpp"
+ #include "strata/platform/aux_cpus.hpp"
++#include "strata/platform/cpu_pinning.hpp"
+ #include "strata/kernels/cpu/expert_layout.hpp"
+ #include "strata/kernels/cpu/numa_pool.hpp"
+ 
+@@ -578,7 +579,7 @@ std::vector<int> physical_cores(bool skip_first, PoolAffinity affinity) {
+ namespace {
+ 
+ bool pin_this_thread(int core, [[maybe_unused]] int worker = -1) {
+-    if (core < 0) return false;
++    if (core < 0 || strata::no_cpu_pin()) return false;
+ #if defined(_WIN32)
+     return detail::set_thread_group_affinity(core, worker);
+ #else
+@@ -642,7 +643,7 @@ NumaSplitDecision decide_real_numa_split([[maybe_unused]] const std::vector<int>
+ }  // namespace
+ 
+ ThreadAffinity pin_current_thread(int core) {
+-    if (core < 0) return {};
++    if (core < 0 || strata::no_cpu_pin()) return {};
+ #if defined(_WIN32)
+     ThreadAffinity previous;
+     ULONG target = 0;
+@@ -668,7 +669,7 @@ ThreadAffinity pin_current_thread(int core) {
+ }
+ 
+ void restore_thread_affinity(const ThreadAffinity& previous) {
+-    if (!previous.valid) return;
++    if (!previous.valid || strata::no_cpu_pin()) return;
+ #if defined(_WIN32)
+     // Clearing an originally empty selection restores process-default/all-group eligibility without
+     // turning the caller's implicit Windows 11 affinity into an explicit single-group hard mask.
+@@ -743,6 +744,7 @@ void ExpertPool::diag(std::FILE* f) const {
+ ExpertPool::ExpertPool(int n_workers, bool pin, bool host_works, PoolAffinity affinity, int tasks)
+     : tasks_(tasks), host_works_(host_works), affinity_(affinity), topo_(detect_cpu_topology(true, affinity)) {
+     if (tasks < 0 || tasks > kMaxTasks) throw std::invalid_argument("expert pool tasks must be in 0..4096");
++    pin = pin && !strata::no_cpu_pin();
+     pinned_ = pin;
+     layout_ = logical_cpu_layout();   // now, before anything pins the caller (Linux reads the calling thread's allowed CPUs)
+     if (const char* e = std::getenv("STRATA_POOL_SPIN_US"))   // a test knob; see kSpinBeforeSleep
+diff --git a/src/kernels/cpu/pool_affinity_win.hpp b/src/kernels/cpu/pool_affinity_win.hpp
+index 6f0e402..c5ac8e1 100644
+--- a/src/kernels/cpu/pool_affinity_win.hpp
++++ b/src/kernels/cpu/pool_affinity_win.hpp
+@@ -9,13 +9,14 @@
+ #include <cstdio>
+ #include <cstddef>
+ #include <vector>
++#include "strata/platform/cpu_pinning.hpp"
+ 
+ namespace strata::kernels::cpu::detail {
+ 
+ // Hard affinity is only for pool-owned threads, which terminate with the pool. A caller's implicit
+ // all-group affinity cannot be restored from PreviousGroupAffinity, so the host uses CPU Sets below.
+ inline bool set_thread_group_affinity(int core, int worker) {
+-    if (core < 0) return false;
++    if (core < 0 || strata::no_cpu_pin()) return false;
+     GROUP_AFFINITY target{};
+     target.Group = (WORD) (core / 64);
+     target.Mask = KAFFINITY(1) << (core & 63);
+diff --git a/src/program/generate.cpp b/src/program/generate.cpp
+index dbc0cf8..e6394c3 100644
+--- a/src/program/generate.cpp
++++ b/src/program/generate.cpp
+@@ -45,6 +45,7 @@
+ #include "strata/kernels/cpu/expert.hpp"
+ #include "strata/kernels/cpu/pool.hpp"
+ #include "strata/platform/aux_cpus.hpp"
++#include "strata/platform/cpu_pinning.hpp"
+ #include "strata/kernels/cpu/expert_layout.hpp"
+ #include "strata/kernels/cpu/hadamard.hpp"
+ #include "strata/kernels/ngram.hpp"
+@@ -5866,6 +5867,8 @@ int main(int argc, char** argv) {
+         }
+     }
+ #endif
++    if (strata::no_cpu_pin())
++        std::fprintf(stderr, "strata generate: CPU pinning disabled (STRATA_NO_CPU_PIN=1); inherited masks and CPU Sets kept\n");
+     if (o.pool_measure)
+         o.pool_affinity = measure_pool_affinity(srcp, o.pool_workers, !o.no_host_worker, o.pool_tasks);
+     strata::kernels::cpu::ExpertPool pool(o.pool_workers, /*pin=*/true, /*host_works=*/!o.no_host_worker,
+@@ -13433,7 +13436,8 @@ int main(int argc, char** argv) {
+                         return v == nullptr || std::atoi(v) != 0;
+                     }();
+ #if defined(_WIN32)
+-                    static const bool conc_on_host = std::getenv("STRATA_TEST_CONC_ON_HOST_CPU") != nullptr;
++                    static const bool conc_on_host = !strata::no_cpu_pin() &&
++                        std::getenv("STRATA_TEST_CONC_ON_HOST_CPU") != nullptr;
+                     std::vector<ULONG> host_cpu_sets;
+                     if (conc_on_host) {
+                         const HANDLE self = GetCurrentThread();
+@@ -13461,6 +13465,7 @@ int main(int argc, char** argv) {
+                             std::fprintf(stderr, "strata batch: %d threads that ran on the host thread's core moved off "
+                                                  "it, for reads beside the slots\n", moved);
+                     auto conc_thread_cpus = [&] {
++                        if (strata::no_cpu_pin()) return;
+                         strata::aux_cpus::pin_current_thread();
+ #if defined(_WIN32)
+                         const HANDLE self = GetCurrentThread();
+diff --git a/include/strata/platform/cpu_pinning.hpp b/include/strata/platform/cpu_pinning.hpp
+new file mode 100644
+--- /dev/null
++++ b/include/strata/platform/cpu_pinning.hpp
+@@ -0,0 +1,14 @@
++#pragma once
++
++#include <cstdlib>
++
++namespace strata {
++
++// Process-local opt-out for callers that require the OS to place every thread.
++// Only the exact value "1" opts out; an unset variable preserves the upstream path.
++inline bool no_cpu_pin() noexcept {
++    const char* value = std::getenv("STRATA_NO_CPU_PIN");
++    return value != nullptr && value[0] == '1' && value[1] == '\0';
++}
++
++}  // namespace strata
+diff --git a/tests/platform/no_cpu_pin_test.cpp b/tests/platform/no_cpu_pin_test.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/platform/no_cpu_pin_test.cpp
+@@ -0,0 +1,245 @@
++// Exercise production CPU placement with counted imports. No test path calls a Windows placement setter.
++#include "strata/kernels/cpu/pool.hpp"
++#include "strata/platform/cpu_pinning.hpp"
++#include "../../src/kernels/cpu/pool_affinity_win.hpp"
++
++#include <tlhelp32.h>
++#include <algorithm>
++#include <atomic>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <thread>
++#include <vector>
++
++namespace cpu = strata::kernels::cpu;
++
++namespace {
++std::atomic<unsigned> group_calls{0}, cpu_set_calls{0};
++int failures = 0;
++
++bool check(bool ok, const char* what) {
++    if (!ok) {
++        std::fprintf(stderr, "no_cpu_pin_test: %s (error %lu)\n", what, (unsigned long) GetLastError());
++        ++failures;
++    }
++    return ok;
++}
++
++BOOL WINAPI count_group(HANDLE, const GROUP_AFFINITY*, PGROUP_AFFINITY) {
++    ++group_calls;
++    SetLastError(ERROR_ACCESS_DENIED);
++    return FALSE;
++}
++
++BOOL WINAPI count_cpu_sets(HANDLE, const ULONG*, ULONG) {
++    ++cpu_set_calls;
++    SetLastError(ERROR_ACCESS_DENIED);
++    return FALSE;
++}
++
++// Hook only this test executable's two import slots. SDK import libraries can group
++// several imports in one object, so defining __imp_* symbols would cause duplicate symbols.
++struct ImportHooks {
++    struct Entry { void** slot; void* original; };
++    std::vector<Entry> entries;
++
++    bool install() {
++        auto* image = reinterpret_cast<unsigned char*>(GetModuleHandleW(nullptr));
++        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
++        if (dos->e_magic != IMAGE_DOS_SIGNATURE) return false;
++        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(image + dos->e_lfanew);
++        if (nt->Signature != IMAGE_NT_SIGNATURE) return false;
++        const DWORD rva = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
++        if (!rva) return false;
++        const auto* descriptor = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(image + rva);
++        for (; descriptor->Name; ++descriptor) {
++            if (!descriptor->OriginalFirstThunk) continue;
++            const auto* names = reinterpret_cast<const IMAGE_THUNK_DATA64*>(image + descriptor->OriginalFirstThunk);
++            auto* imports = reinterpret_cast<IMAGE_THUNK_DATA64*>(image + descriptor->FirstThunk);
++            for (; names->u1.AddressOfData; ++names, ++imports) {
++                if (IMAGE_SNAP_BY_ORDINAL64(names->u1.Ordinal)) continue;
++                const auto* named = reinterpret_cast<const IMAGE_IMPORT_BY_NAME*>(image + names->u1.AddressOfData);
++                void* replacement = nullptr;
++                if (std::strcmp(reinterpret_cast<const char*>(named->Name), "SetThreadGroupAffinity") == 0)
++                    replacement = reinterpret_cast<void*>(count_group);
++                else if (std::strcmp(reinterpret_cast<const char*>(named->Name), "SetThreadSelectedCpuSets") == 0)
++                    replacement = reinterpret_cast<void*>(count_cpu_sets);
++                if (!replacement) continue;
++                auto** slot = reinterpret_cast<void**>(&imports->u1.Function);
++                DWORD protection = 0;
++                if (!VirtualProtect(slot, sizeof(*slot), PAGE_READWRITE, &protection)) return false;
++                void* original = InterlockedExchangePointer(slot, replacement);
++                DWORD ignored = 0;
++                if (!VirtualProtect(slot, sizeof(*slot), protection, &ignored)) return false;
++                entries.push_back({slot, original});
++            }
++        }
++        return entries.size() == 2;
++    }
++
++    ~ImportHooks() {
++        for (const auto& entry : entries) {
++            DWORD protection = 0;
++            if (VirtualProtect(entry.slot, sizeof(*entry.slot), PAGE_READWRITE, &protection)) {
++                InterlockedExchangePointer(entry.slot, entry.original);
++                DWORD ignored = 0;
++                VirtualProtect(entry.slot, sizeof(*entry.slot), protection, &ignored);
++            }
++        }
++    }
++};
++
++struct Placement {
++    GROUP_AFFINITY thread{};
++    DWORD_PTR process_mask = 0, system_mask = 0;
++    std::vector<ULONG> selected, defaults;
++    std::vector<USHORT> groups;
++};
++
++bool read_placement(HANDLE thread, Placement& out) {
++    if (!GetThreadGroupAffinity(thread, &out.thread) ||
++        !GetProcessAffinityMask(GetCurrentProcess(), &out.process_mask, &out.system_mask)) return false;
++
++    ULONG count = 0;
++    if (!GetThreadSelectedCpuSets(thread, nullptr, 0, &count) &&
++        GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
++    out.selected.resize(count);
++    if (count && !GetThreadSelectedCpuSets(thread, out.selected.data(), count, &count)) return false;
++    out.selected.resize(count);
++
++    count = 0;
++    if (!GetProcessDefaultCpuSets(GetCurrentProcess(), nullptr, 0, &count) &&
++        GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
++    out.defaults.resize(count);
++    if (count && !GetProcessDefaultCpuSets(GetCurrentProcess(), out.defaults.data(), count, &count)) return false;
++    out.defaults.resize(count);
++
++    USHORT group_count = GetActiveProcessorGroupCount();
++    out.groups.resize(group_count);
++    if (!GetProcessGroupAffinity(GetCurrentProcess(), &group_count, out.groups.data())) return false;
++    out.groups.resize(group_count);
++    std::sort(out.selected.begin(), out.selected.end());
++    std::sort(out.defaults.begin(), out.defaults.end());
++    std::sort(out.groups.begin(), out.groups.end());
++    return true;
++}
++
++bool same(const Placement& a, const Placement& b) {
++    return a.thread.Group == b.thread.Group && a.thread.Mask == b.thread.Mask &&
++           a.process_mask == b.process_mask && a.system_mask == b.system_mask &&
++           a.selected == b.selected && a.defaults == b.defaults && a.groups == b.groups;
++}
++
++bool unchanged(HANDLE thread, const Placement& before, const char* what) {
++    Placement after;
++    return check(read_placement(thread, after) && same(before, after), what);
++}
++
++bool process_threads(std::vector<DWORD>& ids) {
++    const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
++    if (snapshot == INVALID_HANDLE_VALUE) return false;
++    THREADENTRY32 entry{};
++    entry.dwSize = sizeof(entry);
++    bool ok = Thread32First(snapshot, &entry) != 0;
++    if (ok) {
++        do {
++            if (entry.th32OwnerProcessID == GetCurrentProcessId()) ids.push_back(entry.th32ThreadID);
++            entry.dwSize = sizeof(entry);
++        } while (Thread32Next(snapshot, &entry));
++        ok = GetLastError() == ERROR_NO_MORE_FILES;
++    }
++    CloseHandle(snapshot);
++    std::sort(ids.begin(), ids.end());
++    return ok;
++}
++
++void exercise_caller(int core, bool disabled) {
++    Placement before;
++    if (!check(read_placement(GetCurrentThread(), before), "read inherited caller placement")) return;
++    const auto previous = cpu::pin_current_thread(core);
++    check(!previous.valid, "a disabled or rejected host pin must not return a restorable assignment");
++    unchanged(GetCurrentThread(), before, "host pin preserves inherited placement");
++    cpu::restore_thread_affinity(previous);
++    unchanged(GetCurrentThread(), before, "invalid restore preserves inherited placement");
++
++    // An otherwise valid snapshot must also do nothing when pinning is disabled.
++    cpu::ThreadAffinity synthetic;
++    synthetic.valid = true;
++    synthetic.cpu_sets.assign(before.selected.begin(), before.selected.end());
++    cpu::restore_thread_affinity(synthetic);
++    unchanged(GetCurrentThread(), before, "valid restore preserves inherited placement");
++
++    check(!cpu::detail::set_thread_group_affinity(core, 7), "disabled or rejected worker pin reports false");
++    unchanged(GetCurrentThread(), before, "worker helper preserves inherited placement");
++    if (disabled) check(group_calls.load() == 0 && cpu_set_calls.load() == 0,
++                        "disabled caller paths must make zero placement calls");
++}
++
++void exercise_pool(bool disabled) {
++    Placement caller;
++    std::vector<DWORD> before, during;
++    if (!check(read_placement(GetCurrentThread(), caller), "read caller before pool") ||
++        !check(process_threads(before), "enumerate threads before pool")) return;
++
++    {
++        cpu::ExpertPool pool(2, true, false);
++        check(pool.workers() == 2, "production pool creates requested workers");
++        if (check(process_threads(during), "enumerate production pool workers")) {
++            unsigned observed = 0;
++            for (DWORD id : during) {
++                if (std::binary_search(before.begin(), before.end(), id)) continue;
++                const HANDLE thread = OpenThread(THREAD_QUERY_INFORMATION, FALSE, id);
++                if (!check(thread != nullptr, "open own pool worker for readback")) continue;
++                Placement inherited;
++                if (check(read_placement(thread, inherited), "read own pool worker placement")) {
++                    check(inherited.process_mask == caller.process_mask &&
++                          inherited.system_mask == caller.system_mask && inherited.defaults == caller.defaults &&
++                          inherited.groups == caller.groups, "pool worker keeps inherited process scope");
++                    check(inherited.thread.Group == caller.thread.Group && inherited.thread.Mask == caller.thread.Mask &&
++                          inherited.selected == caller.selected, "pool worker keeps inherited thread mask and CPU Sets");
++                    unchanged(thread, inherited, "pool worker placement stays unchanged during readback");
++                    ++observed;
++                }
++                CloseHandle(thread);
++            }
++            check(observed == 2, "read back both production pool workers");
++        }
++    } // Join workers before checking counts, so every startup pin has finished.
++    unchanged(GetCurrentThread(), caller, "pool lifetime preserves caller placement");
++    if (disabled) check(group_calls.load() == 0 && cpu_set_calls.load() == 0,
++                        "production pool must make zero placement calls");
++}
++} // namespace
++
++int main(int argc, char** argv) {
++    const bool disabled = argc == 1;
++    if (!disabled && (argc != 2 || std::strcmp(argv[1], "--positive-control") != 0)) {
++        std::fprintf(stderr, "usage: no_cpu_pin_test [--positive-control]\n");
++        return 2;
++    }
++    ImportHooks hooks;
++    if (!check(hooks.install(), "replace both placement imports in this test process")) return 1;
++    if (!check(_putenv_s("STRATA_NO_CPU_PIN", disabled ? "1" : "0") == 0, "set process-local opt-in") ||
++        !check(strata::no_cpu_pin() == disabled, "read exact process-local opt-in")) return 1;
++
++    const auto cores = cpu::physical_cores(false);
++    if (!check(!cores.empty(), "find valid target CPU")) return 1;
++    ULONG id = 0;
++    if (!check(cpu::detail::cpu_set_for_core(cores.front(), id), "resolve valid target CPU Set")) return 1;
++
++    Placement original;
++    if (!check(read_placement(GetCurrentThread(), original), "read original placement")) return 1;
++    exercise_caller(cores.front(), disabled);
++    std::thread inherited([&] { exercise_caller(cores.front(), disabled); });
++    inherited.join();
++    exercise_pool(disabled);
++    unchanged(GetCurrentThread(), original, "final process/thread placement matches original");
++    if (disabled) check(group_calls.load() == 0 && cpu_set_calls.load() == 0, "zero placement calls overall");
++    else check(group_calls.load() >= 4 && cpu_set_calls.load() >= 4,
++               "positive control reaches both real production import paths");
++
++    std::printf("no_cpu_pin_test: %s: group calls=%u, CPU Set calls=%u, failures=%d; no OS placement setters executed\n",
++                disabled ? "disabled" : "positive control", group_calls.load(), cpu_set_calls.load(), failures);
++    return failures ? 1 : 0;
++}
+diff --git a/tests/platform/cpu_format_parity.cpp b/tests/platform/cpu_format_parity.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/platform/cpu_format_parity.cpp
+@@ -0,0 +1,181 @@
++// CPU arithmetic parity on valid GGML rows. No model, GPU, pinning, or unquantized-weight reference.
++#include "ggml.h"
++#include "ggml-cpu.h"
++#include "ggml-quants.h"
++
++#include <algorithm>
++#include <chrono>
++#include <cmath>
++#include <cstdint>
++#include <cstdio>
++#include <cstring>
++#include <vector>
++
++namespace {
++constexpr int kCases = 16;
++constexpr double kAbsTolerance = 1e-4, kRelTolerance = 1e-4;
++
++uint64_t random_bits(uint64_t& state) {
++    uint64_t value = (state += UINT64_C(0x9e3779b97f4a7c15));
++    value = (value ^ (value >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
++    value = (value ^ (value >> 27)) * UINT64_C(0x94d049bb133111eb);
++    return value ^ (value >> 31);
++}
++
++float uniform(uint64_t& state) {
++    return static_cast<float>(random_bits(state) >> 40) * (2.0f / 16777216.0f) - 1.0f;
++}
++
++void make_inputs(int which, int n, std::vector<float>& weights, std::vector<float>& activations) {
++    uint64_t state = UINT64_C(0x20261020c001d00d) + static_cast<uint64_t>(which) * 12347 + n;
++    weights.resize(n);
++    activations.resize(n);
++    for (int i = 0; i < n; ++i) {
++        const float u = uniform(state), v = uniform(state);
++        float w = 0.05f * u, y = v;
++        switch (which) {
++            case 0: w = 0; break;
++            case 1: y = 0; break;
++            case 2: w = 0.125f; y = 0.25f; break;
++            case 3: w = (i & 1) ? -0.125f : 0.125f; y = (i & 1) ? -0.25f : 0.25f; break;
++            case 4: w = i == n / 3 ? -0.75f : 0; break;
++            case 5: y = i == n - 1 ? 0.75f : 0; break;
++            case 6: y = 0.5f * u; break;
++            case 7: y = -0.5f * u; break;
++            case 8: w = static_cast<float>(i % 15 - 7) * 0.003f; y = static_cast<float>(i % 11 - 5) * 0.1f; break;
++            case 9: y = (i & 1) ? -1.0f : 1.0f; break;
++            case 10: w = 0.03f * u; y = 0.75f * v; break;
++            case 11: w = 0.25f * u; y = 2.0f * v; break;
++            case 12: w = 0.001f * u; y = 0.5f * v; break;
++            case 13: w *= (i % 7 == 0) ? 8.0f : 0.015625f; break;
++            case 14: w = 0.015f * (1.0f + u); y = 0.5f * (1.0f + v); break;
++            case 15: w = 0.125f * u; y = (i % 3 == 0) ? -2.0f * v : 0.125f * v; break;
++        }
++        weights[i] = w;
++        activations[i] = y;
++    }
++}
++
++// Allocation is aligned for float/half access, including types whose CPU trait is an identity conversion.
++struct Row {
++    explicit Row(size_t size) : bytes(size), storage((size + sizeof(uint64_t) - 1) / sizeof(uint64_t)) {}
++    void* data() { return storage.data(); }
++    const void* data() const { return storage.data(); }
++    size_t bytes;
++    std::vector<uint64_t> storage;
++};
++
++bool dequantize(ggml_type type, const Row& source, std::vector<float>& output) {
++    if (type == GGML_TYPE_Q8_K) {
++        dequantize_row_q8_K(static_cast<const block_q8_K*>(source.data()), output.data(),
++                            static_cast<int64_t>(output.size()));
++        return true;
++    }
++    if (type == GGML_TYPE_F32) {
++        if (source.bytes != output.size() * sizeof(float)) return false;
++        std::memcpy(output.data(), source.data(), source.bytes);
++        return true;
++    }
++    const auto* traits = ggml_get_type_traits(type);
++    if (traits == nullptr || traits->to_float == nullptr) return false;
++    traits->to_float(source.data(), output.data(), static_cast<int64_t>(output.size()));
++    return true;
++}
++
++int check_type(ggml_type type) {
++    const char* name = ggml_type_name(type);
++    const auto* traits = ggml_get_type_traits_cpu(type);
++    if (traits == nullptr || traits->vec_dot == nullptr) {
++        std::fprintf(stderr, "FAIL %s: CPU vec_dot is unavailable\n", name);
++        return 1;
++    }
++    const ggml_type activation_type = traits->vec_dot_type;
++    const auto* activation_traits = ggml_get_type_traits_cpu(activation_type);
++    if (activation_traits == nullptr || activation_traits->from_float == nullptr) {
++        std::fprintf(stderr, "FAIL %s: production activation converter is unavailable\n", name);
++        return 1;
++    }
++
++    std::printf("CPU parity: %s x %s: initialize quantizer\n", name, ggml_type_name(activation_type));
++    const auto started = std::chrono::steady_clock::now();
++    ggml_quantize_init(type);
++    int failures = 0, checks = 0;
++    double max_abs = 0, max_bound_fraction = 0, max_float_abs = 0;
++    for (int n : {256, 2560}) {
++        if (n % ggml_blck_size(type) != 0 || n % ggml_blck_size(activation_type) != 0) {
++            std::fprintf(stderr, "FAIL %s: n=%d violates a weight/activation block size\n", name, n);
++            ++failures;
++            continue;
++        }
++        std::vector<float> source, input, weight_ref(n), activation_ref(n), importance(n, 1.0f);
++        Row weight_row(ggml_row_size(type, n)), activation_row(ggml_row_size(activation_type, n));
++        for (int which = 0; which < kCases; ++which) {
++            make_inputs(which, n, source, input);
++            const size_t written = ggml_quantize_chunk(type, source.data(), weight_row.data(), 0, 1, n,
++                ggml_quantize_requires_imatrix(type) ? importance.data() : nullptr);
++            if (written != weight_row.bytes) {
++                std::fprintf(stderr, "FAIL %s n=%d case=%d: quantizer wrote %zu, expected %zu bytes\n",
++                             name, n, which, written, weight_row.bytes);
++                ++failures;
++                continue;
++            }
++            activation_traits->from_float(input.data(), activation_row.data(), n);
++
++            if (!dequantize(type, weight_row, weight_ref) ||
++                !dequantize(activation_type, activation_row, activation_ref)) {
++                std::fprintf(stderr, "FAIL %s n=%d case=%d: independent operand dequantizer unavailable\n",
++                             name, n, which);
++                ++failures;
++                continue;
++            }
++
++            // Quantization affects both operands. Compare arithmetic on their decoded values, never on source floats.
++            double reference = 0;
++            float float_reference = 0;
++            bool finite = true;
++            for (int i = 0; i < n; ++i) {
++                finite = finite && std::isfinite(weight_ref[i]) && std::isfinite(activation_ref[i]);
++                reference += static_cast<double>(weight_ref[i]) * static_cast<double>(activation_ref[i]);
++                float_reference += weight_ref[i] * activation_ref[i];
++            }
++            float got = 0;
++            traits->vec_dot(n, &got, 0, weight_row.data(), 0, activation_row.data(), 0, 1);
++            const double error = std::fabs(static_cast<double>(got) - reference);
++            const double bound = kAbsTolerance + kRelTolerance * std::fabs(reference);
++            const bool ok = finite && std::isfinite(reference) && std::isfinite(float_reference) &&
++                            std::isfinite(got) && error <= bound;
++            max_abs = std::fmax(max_abs, error);
++            max_bound_fraction = std::fmax(max_bound_fraction, error / bound);
++            max_float_abs = std::fmax(max_float_abs, std::fabs(static_cast<double>(float_reference) - reference));
++            ++checks;
++            if (!ok) {
++                std::fprintf(stderr,
++                    "FAIL %s n=%d case=%d: got=%.9g decoded-double=%.17g decoded-float=%.9g error=%.6g bound=%.6g finite=%d\n",
++                    name, n, which, got, reference, float_reference, error, bound, static_cast<int>(finite));
++                ++failures;
++            }
++        }
++    }
++    ggml_quantize_free(); // Keep only one IQ codebook allocation alive at a time.
++    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
++    std::printf("%s: %d checks, max_abs=%.6g, max_bound_fraction=%.6g, float_accum_abs=%.6g, %.3fs: %s\n",
++                name, checks, max_abs, max_bound_fraction, max_float_abs, elapsed, failures ? "FAIL" : "PASS");
++    return failures;
++}
++} // namespace
++
++int main() {
++    setvbuf(stdout, nullptr, _IONBF, 0);
++    ggml_cpu_init();
++    static_assert(static_cast<int>(GGML_TYPE_Q2_0) == 42, "DavidAU Q2_0 must retain GGUF type ID 42");
++    const ggml_type types[] = {
++        GGML_TYPE_Q2_0, GGML_TYPE_IQ2_S, GGML_TYPE_IQ3_XXS, GGML_TYPE_IQ3_S,
++        GGML_TYPE_IQ4_XS, GGML_TYPE_IQ4_NL, GGML_TYPE_Q4_K, GGML_TYPE_Q5_K,
++        GGML_TYPE_Q6_K, GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_BF16, GGML_TYPE_F32,
++    };
++    int failures = 0;
++    for (ggml_type type : types) failures += check_type(type);
++    std::printf("CPU format parity: 13 types x 2 lengths x %d cases; arithmetic tolerance %.1e + %.1e*abs(decoded-double); failures=%d\n",
++                kCases, kAbsTolerance, kRelTolerance, failures);
++    return failures ? 1 : 0;
++}
+diff --git a/cmake/strata_ivybridge_o3.cmake b/cmake/strata_ivybridge_o3.cmake
+new file mode 100644
+--- /dev/null
++++ b/cmake/strata_ivybridge_o3.cmake
+@@ -0,0 +1,19 @@
++# Local profile: genuine Clang O3 with an Ivy Bridge baseline. Preserve runtime-dispatched wider kernels.
++option(STRATA_IVYBRIDGE_O3 "Local Windows Clang O3/Ivy Bridge profile" OFF)
++if(STRATA_IVYBRIDGE_O3)
++  if(NOT MSVC OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++    message(FATAL_ERROR "STRATA_IVYBRIDGE_O3 requires clang-cl with the MSVC ABI")
++  endif()
++  set(_ivy_wide /clang:-mavx2 /clang:-mfma /clang:-mf16c /clang:-fno-vectorize /clang:-fno-slp-vectorize)
++  foreach(_src src/kernels/cpu/expert.cpp src/kernels/cpu/iq_avx512.cpp src/kernels/cpu/nvfp4_avx512.cpp src/kernels/cpu/tq_avx512.cpp)
++    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide}
++      /clang:-mavx512f /clang:-mavx512bw /clang:-mavx512vl /clang:-mavx512dq /clang:-mavx512vnni /clang:-mavx512vbmi)
++  endforeach()
++  foreach(_src src/kernels/cpu/q2_avx2.cpp src/kernels/cpu/iq_avx2.cpp src/kernels/cpu/kq_avx2.cpp src/kernels/cpu/nvfp4_avx2.cpp src/kernels/cpu/tq_avx2.cpp)
++    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide})
++  endforeach()
++  foreach(_src src/kernels/cpu/q2_avx1.cpp src/kernels/cpu/iq_avx1.cpp src/kernels/cpu/kq_avx1.cpp)
++    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS /clang:-mavx /clang:-mno-avx2 /clang:-mno-fma /clang:-mno-f16c)
++  endforeach()
++  message(STATUS "Local CPU profile: Clang -O3, Ivy Bridge tuning, AVX baseline, guarded wide kernels retained")
++endif()
+diff --git a/cmake/strata_pascallama_overlay.cmake b/cmake/strata_pascallama_overlay.cmake
+new file mode 100644
+--- /dev/null
++++ b/cmake/strata_pascallama_overlay.cmake
+@@ -0,0 +1,23 @@
++# The complete upstream pascallama patch is applied only to a private build-tree copy of pinned ggml.
++function(strata_pascallama_overlay original destination patch git)
++  if(NOT EXISTS "${patch}" OR NOT EXISTS "${git}")
++    message(FATAL_ERROR "Verified pascallama patch/private Git are required")
++  endif()
++  file(MAKE_DIRECTORY "${destination}")
++  file(COPY "${original}/ggml" DESTINATION "${destination}" FILES_MATCHING PATTERN "*.h" PATTERN "*.cuh" PATTERN "*.cu")
++  foreach(_name mmq-config-pascal-dp4a.cuh mmq-vec-dot.cuh)
++    set(_file "${destination}/ggml/src/ggml-cuda/${_name}")
++    file(READ "${original}/ggml/src/ggml-cuda/${_name}" _text)
++    string(REPLACE "\r\n" "\n" _text "${_text}")
++    file(CONFIGURE OUTPUT "${_file}" CONTENT "${_text}" @ONLY NEWLINE_STYLE UNIX)
++  endforeach()
++  execute_process(COMMAND "${git}" -C "${destination}" apply --check "${patch}" RESULT_VARIABLE _check OUTPUT_VARIABLE _stdout ERROR_VARIABLE _stderr)
++  if(NOT _check EQUAL 0)
++    message(FATAL_ERROR "Pascallama patch does not match pinned ggml: ${_stdout}${_stderr}")
++  endif()
++  execute_process(COMMAND "${git}" -C "${destination}" apply "${patch}" RESULT_VARIABLE _apply OUTPUT_VARIABLE _stdout ERROR_VARIABLE _stderr)
++  if(NOT _apply EQUAL 0)
++    message(FATAL_ERROR "Pascallama private overlay failed: ${_stdout}${_stderr}")
++  endif()
++  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
++endfunction()
+diff --git a/tests/cuda/pascallama_mmq_screen.cpp b/tests/cuda/pascallama_mmq_screen.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/cuda/pascallama_mmq_screen.cpp
+@@ -0,0 +1,182 @@
++// Local Pascal MMQ screen derived from upstream prefill_mmq_kquant_test (MIT).
++// Covers full pascallama J96/unroll with current IQ3_S/IQ4_NL and Q2_0/Q8_0 types.
++#include "strata/prefill/moe_mmq.hpp"
++
++#include "ggml.h"
++
++#include <cuda_runtime.h>
++
++#include <algorithm>
++#include <cmath>
++#include <cstdint>
++#include <cstdio>
++#include <numeric>
++#include <stdexcept>
++#include <string>
++#include <vector>
++
++namespace {
++namespace mmq = strata::prefill::mmq;
++
++void ck(cudaError_t e, const char* what) {
++    if (e != cudaSuccess) throw std::runtime_error(std::string(what) + ": " + cudaGetErrorString(e));
++}
++
++struct Dev {
++    void* p = nullptr;
++    explicit Dev(size_t n) { ck(cudaMalloc(&p, n), "cudaMalloc"); }
++    ~Dev() { cudaFree(p); }
++    Dev(const Dev&) = delete;
++    Dev& operator=(const Dev&) = delete;
++};
++
++std::vector<uint8_t> make_matrix(ggml_type t, int64_t rows, int64_t cols, int expert, int trial) {
++    const auto* tr = ggml_get_type_traits(t);
++    if (tr == nullptr || tr->to_float == nullptr) throw std::runtime_error("no reference dequantizer");
++    const size_t rb = ggml_row_size(t, cols);
++    std::vector<uint8_t> out((size_t) rows * rb);
++    std::vector<float> row((size_t) cols);
++    for (int64_t r = 0; r < rows; ++r) {
++        for (int64_t k = 0; k < cols; ++k) {
++            const int code = (int) ((k * 37 + r * 19 + expert * 23 + trial * 11) % 101) - 50;
++            row[(size_t) k] = 0.025f * std::sin(0.013f * (float) (k + 1) + 0.17f * (float) r + 0.31f * (float) expert) +
++                              0.0015f * (float) code;
++        }
++        if (tr->from_float_ref != nullptr) tr->from_float_ref(row.data(), out.data() + (size_t) r * rb, cols);
++        else {
++            if (t != GGML_TYPE_IQ3_S) throw std::runtime_error("unsupported synthetic quant");
++            const size_t bs = ggml_type_size(t), blocks = rb / bs;
++            for (size_t block = 0; block < blocks; ++block) {
++                uint8_t* dst = out.data() + (size_t) r * rb + block * bs;
++                for (size_t k = 0; k < bs; ++k) dst[k] = (uint8_t) ((k * 37 + block * 19 + r * 11 + expert * 23 + trial * 7) & 255);
++                dst[0] = 0; dst[1] = 0x24; // finite positive fp16 block scale
++            }
++        }
++    }
++    return out;
++}
++
++std::vector<float> make_x(int rows, int64_t cols, int trial) {
++    std::vector<float> x((size_t) rows * (size_t) cols);
++    for (int r = 0; r < rows; ++r)
++        for (int64_t k = 0; k < cols; ++k)
++            x[(size_t) r * (size_t) cols + (size_t) k] =
++                0.45f * std::sin(0.009f * (float) (k + 1) + 0.23f * (float) r + 0.07f * (float) trial) +
++                0.17f * std::cos(0.021f * (float) (k + 3) - 0.19f * (float) r) +
++                0.002f * (float) (((k * 7 + r * 13 + trial * 5) % 19) - 9);
++    std::fill(x.end() - cols, x.end(), 0.0f);   // an all-zero row: exactly zero out
++    return x;
++}
++
++std::vector<int32_t> perm(int n, int shift, bool reverse) {
++    std::vector<int32_t> p((size_t) n);
++    for (int i = 0; i < n; ++i) p[(size_t) i] = (int32_t) (((reverse ? n - 1 - i : i) + shift) % n);
++    return p;
++}
++
++// one grouped product: experts side by side at one stride (a zeroed tail after them, as prefill.cpp stages them)
++void product(mmq::Context& ctx, cudaStream_t s, const char* name, ggml_type t, int64_t out_rows, int64_t cols,
++             const std::vector<int>& counts, int trial) {
++    if (!mmq::supported((int) t)) throw std::runtime_error(std::string(name) + ": not covered by this build");
++    const int n = (int) counts.size(), rows = std::accumulate(counts.begin(), counts.end(), 0);
++    std::vector<int32_t> bounds((size_t) n + 1, 0);
++    for (int e = 0; e < n; ++e) bounds[(size_t) e + 1] = bounds[(size_t) e] + counts[(size_t) e];
++    const auto src = perm(rows, trial + 1, false), dst = perm(rows, trial + 2, true);
++    const std::vector<float> x = make_x(rows, cols, trial);
++    const size_t eb = mmq::matrix_bytes((int) t, out_rows, cols);
++    if (eb != (size_t) out_rows * ggml_row_size(t, cols)) throw std::runtime_error(std::string(name) + ": matrix_bytes");
++    std::vector<std::vector<uint8_t>> ws;
++    std::vector<uint8_t> w((size_t) n * eb + 4096, 0);
++    for (int e = 0; e < n; ++e) {
++        ws.push_back(make_matrix(t, out_rows, cols, e, trial));
++        std::copy(ws.back().begin(), ws.back().end(), w.begin() + (ptrdiff_t) ((size_t) e * eb));
++    }
++    Dev dx(x.size() * 4), dsrc((size_t) rows * 4), ddst((size_t) rows * 4), db(bounds.size() * 4), dw(w.size()),
++        dxq(mmq::q8_bytes(rows, cols)), dy((size_t) rows * (size_t) out_rows * 4);
++    ck(cudaMemcpy(dx.p, x.data(), x.size() * 4, cudaMemcpyHostToDevice), "x");
++    ck(cudaMemcpy(dsrc.p, src.data(), src.size() * 4, cudaMemcpyHostToDevice), "src");
++    ck(cudaMemcpy(ddst.p, dst.data(), dst.size() * 4, cudaMemcpyHostToDevice), "dst");
++    ck(cudaMemcpy(db.p, bounds.data(), bounds.size() * 4, cudaMemcpyHostToDevice), "bounds");
++    ck(cudaMemcpy(dw.p, w.data(), w.size(), cudaMemcpyHostToDevice), "w");
++    ck(cudaMemset(dy.p, 0xff, (size_t) rows * (size_t) out_rows * 4), "sentinel");
++    // the copies and the sentinel above run on the legacy stream, which a non-blocking stream does not wait for: a
++    // pageable cudaMemcpy/cudaMemset can still be in flight when the kernels start (a 128-SM 4090 caught it)
++    ck(cudaDeviceSynchronize(), "inputs");
++    mmq::quantize((const float*) dx.p, (const int32_t*) dsrc.p, dxq.p, (int) t, cols, cols, rows, s);
++    mmq::Product p;
++    p.w = dw.p; p.type = (int) t; p.w_rows = out_rows; p.w_cols = cols; p.expert_bytes = eb; p.n = n;
++    p.xq = dxq.p; p.bounds = (const int32_t*) db.p; p.ids = (const int32_t*) ddst.p; p.total_rows = rows;
++    p.max_rows = *std::max_element(counts.begin(), counts.end()); p.dst = (float*) dy.p; p.ld_dst = out_rows;
++    ctx.run(p, s);
++    ck(cudaGetLastError(), "launch");
++    ck(cudaStreamSynchronize(s), "sync");
++    std::vector<float> got((size_t) rows * (size_t) out_rows);
++    ck(cudaMemcpy(got.data(), dy.p, got.size() * 4, cudaMemcpyDeviceToHost), "y");
++
++    const auto* tr = ggml_get_type_traits(t);
++    std::vector<float> ref(got.size(), 0.0f), wd((size_t) out_rows * (size_t) cols);
++    for (int e = 0; e < n; ++e) {
++        const size_t rb = ggml_row_size(t, cols);
++        for (int64_t o = 0; o < out_rows; ++o)
++            tr->to_float(ws[(size_t) e].data() + (size_t) o * rb, wd.data() + (size_t) o * (size_t) cols, cols);
++        for (int r = bounds[(size_t) e]; r < bounds[(size_t) e + 1]; ++r) {
++            const float* xr = x.data() + (size_t) src[(size_t) r] * (size_t) cols;
++            for (int64_t o = 0; o < out_rows; ++o) {
++                double acc = 0;
++                const float* wr = wd.data() + (size_t) o * (size_t) cols;
++                for (int64_t k = 0; k < cols; ++k) acc += (double) wr[k] * xr[k];
++                ref[(size_t) dst[(size_t) r] * (size_t) out_rows + (size_t) o] = (float) acc;
++            }
++        }
++    }
++    double err2 = 0, ref2 = 0, max_abs = 0, zero_max = 0;
++    for (size_t i = 0; i < got.size(); ++i) {
++        if (!std::isfinite(got[i])) throw std::runtime_error(std::string(name) + ": unwritten or non-finite output");
++        const double d = (double) got[i] - ref[i];
++        err2 += d * d; ref2 += (double) ref[i] * ref[i]; max_abs = std::max(max_abs, std::fabs(d));
++    }
++    for (int r = 0; r < rows; ++r)
++        if (src[(size_t) r] == rows - 1)   // the zero row
++            for (int64_t o = 0; o < out_rows; ++o)
++                zero_max = std::max(zero_max, (double) std::fabs(got[(size_t) dst[(size_t) r] * (size_t) out_rows + (size_t) o]));
++    const double rms = std::sqrt(ref2 / (double) ref.size()), rel = std::sqrt(err2 / (double) ref.size()) / rms;
++    std::printf("%-22s rows %2d experts %d  ref_rms %.4g  rel_l2 %.5f  max/rms %.4f  zero row %.3g\n", name, rows, n, rms,
++                rel, max_abs / rms, zero_max);
++    if (rel > 0.04 || max_abs / rms > 0.35 || zero_max > std::max(1e-5, 1e-4 * rms))
++        throw std::runtime_error(std::string(name) + ": outside the screen");
++}
++}  // namespace
++
++int main() {
++    try {
++        cudaDeviceProp prop{};
++        if(cudaGetDeviceProperties(&prop,0)!=cudaSuccess || prop.major!=6 || prop.minor!=1){std::puts("SKIP: real sm_61 required");return 77;}
++        if (!mmq::built()) { std::printf("no MMQ in this build\n"); return 1; }
++        // Reference IQ quantizers/dequantizers require their lookup tables.
++        // This is test setup; leave production quantization and error bounds unchanged.
++        for (ggml_type t : {GGML_TYPE_IQ3_S, GGML_TYPE_IQ4_NL, GGML_TYPE_Q2_0, GGML_TYPE_Q8_0})
++            ggml_quantize_init(t);
++        cudaStream_t s = nullptr;
++        ck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking), "stream");
++        {
++            mmq::Context ctx;
++            const std::vector<std::vector<int>> batches{{1,3,3},{4,1,2},{17},{63},{96},{129}};
++            int trial = 0;
++            for (const auto& counts : batches) {
++                const std::string tag = "-" + std::to_string(trial);
++                product(ctx,s,("IQ3_S"+tag).c_str(),GGML_TYPE_IQ3_S,128,256,counts,trial);
++                product(ctx,s,("IQ4_NL"+tag).c_str(),GGML_TYPE_IQ4_NL,130,256,counts,trial+3);
++                product(ctx,s,("Q2_0"+tag).c_str(),GGML_TYPE_Q2_0,128,256,counts,trial+7);
++                product(ctx,s,("Q8_0"+tag).c_str(),GGML_TYPE_Q8_0,130,256,counts,trial+11);
++                ++trial;
++            }
++        }
++        ck(cudaStreamDestroy(s), "destroy");
++        ggml_quantize_free();
++        std::printf("Pascallama sm_61 MMQ numerical screen passed\n");
++        return 0;
++    } catch (const std::exception& e) {
++        std::fprintf(stderr, "Pascallama sm_61 MMQ numerical screen failed: %s\n", e.what());
++        return 1;
++    }
++}
+diff --git a/tests/cuda/sm61_graph_parity.cu b/tests/cuda/sm61_graph_parity.cu
+new file mode 100644
+--- /dev/null
++++ b/tests/cuda/sm61_graph_parity.cu
+@@ -0,0 +1,25 @@
++// Local P40 qualification. No model, no ISA/SM guard bypass; mutable-buffer CUDA Graph replay vs direct kernels.
++#include <cuda_runtime.h>
++#include <cstdio>
++#include <vector>
++__global__ void transform(const float* x,float* y,int n){int i=(int)(blockIdx.x*blockDim.x+threadIdx.x);if(i<n)y[i]=x[i]*2.0f+1.0f;}
++int main(){
++  cudaDeviceProp prop{};if(cudaGetDeviceProperties(&prop,0)!=cudaSuccess||prop.major!=6||prop.minor!=1){std::puts("SKIP: this qualification targets real sm_61");return 77;}
++  const int n=4096;float *x=nullptr,*a=nullptr,*b=nullptr;cudaStream_t stream=nullptr;
++  if(cudaMalloc(&x,n*sizeof(float))||cudaMalloc(&a,n*sizeof(float))||cudaMalloc(&b,n*sizeof(float))||cudaStreamCreate(&stream))return 1;
++  cudaGraph_t graph=nullptr;cudaGraphExec_t exec=nullptr;
++  if(cudaStreamBeginCapture(stream,cudaStreamCaptureModeGlobal)!=cudaSuccess)return 1;
++  transform<<<16,256,0,stream>>>(x,b,n);
++  if(cudaStreamEndCapture(stream,&graph)!=cudaSuccess||cudaGraphInstantiate(&exec,graph,nullptr,nullptr,0)!=cudaSuccess)return 1;
++  std::vector<float> input(n),direct(n),captured(n);
++  for(int trial=0;trial<4;++trial){
++    for(int i=0;i<n;++i)input[i]=(float)(i+trial*17)/32.0f;
++    if(cudaMemcpyAsync(x,input.data(),n*sizeof(float),cudaMemcpyHostToDevice,stream)!=cudaSuccess)return 1;
++    transform<<<16,256,0,stream>>>(x,a,n);
++    if(cudaGraphLaunch(exec,stream)!=cudaSuccess||cudaStreamSynchronize(stream)!=cudaSuccess)return 1;
++    if(cudaMemcpy(direct.data(),a,n*sizeof(float),cudaMemcpyDeviceToHost)!=cudaSuccess||cudaMemcpy(captured.data(),b,n*sizeof(float),cudaMemcpyDeviceToHost)!=cudaSuccess)return 1;
++    for(int i=0;i<n;++i)if(direct[i]!=captured[i]||captured[i]!=input[i]*2.0f+1.0f)return 1;
++  }
++  cudaGraphExecDestroy(exec);cudaGraphDestroy(graph);cudaStreamDestroy(stream);cudaFree(x);cudaFree(a);cudaFree(b);
++  std::printf("PASS: %s sm_61 CUDA Graph capture/replay, changed inputs, bitwise direct parity\n",prop.name);return 0;
++}
+diff --git a/include/strata/platform/win_numa_arena.hpp b/include/strata/platform/win_numa_arena.hpp
+new file mode 100644
+--- /dev/null
++++ b/include/strata/platform/win_numa_arena.hpp
+@@ -0,0 +1,94 @@
++// Windows-only NUMA preference for the existing pinned arena. No CPU affinity changes.
++#pragma once
++#include <cstdint>
++#include <cstdlib>
++#include <limits>
++#include <string>
++#include <vector>
++
++namespace strata::platform::win_numa {
++struct Node { int id; uint64_t free_bytes; bool has_cpu; };
++struct Decision { int node = -1; bool requested = false; std::string why; };
++inline Decision choose(const char* mode, const std::vector<Node>& nodes, int gpu_node, uint64_t bytes) {
++    Decision d;
++    if (mode == nullptr || *mode == '\0' || std::string(mode) == "off") return d;
++    d.requested = true;
++    int wanted = -1;
++    if (std::string(mode) == "gpu" || std::string(mode) == "auto") {
++        wanted = gpu_node;
++        if (wanted < 0) { d.why = "GPU host NUMA node unknown; ordinary allocation"; return d; }
++    } else {
++        unsigned value = 0;
++        for (const char* p = mode; *p; ++p) {
++            if (*p < '0' || *p > '9' || value > (65535u - unsigned(*p-'0')) / 10u) {
++                d.why = "invalid STRATA_WIN_NUMA_NODE (off, gpu or a node number); ordinary allocation"; return d;
++            }
++            value = value * 10 + unsigned(*p-'0');
++        }
++        wanted = int(value);
++    }
++    int count = 0; const Node* selected = nullptr;
++    for (const Node& n : nodes) { if (n.has_cpu) ++count; if (n.has_cpu && n.id == wanted) selected = &n; }
++    if (count < 2) { d.why = "fewer than two CPU NUMA nodes; ordinary allocation"; return d; }
++    if (selected == nullptr) { d.why = "requested NUMA node has no CPUs; ordinary allocation"; return d; }
++    constexpr uint64_t headroom = 4ull << 30;
++    if (bytes > selected->free_bytes || selected->free_bytes - bytes < headroom) {
++        d.why = "preferred NUMA node lacks arena plus 4 GiB headroom; ordinary allocation"; return d;
++    }
++    d.node = wanted;
++    d.why = "NUMA node " + std::to_string(wanted) + " preferred (Windows may fall back); CPU placement unchanged";
++    return d;
++}
++} // namespace strata::platform::win_numa
++
++#if defined(_WIN32)
++#include <windows.h>
++#include <psapi.h>
++namespace strata::platform::win_numa {
++inline Decision probe(const char* mode, int gpu_node, uint64_t bytes) {
++    if (mode == nullptr || *mode == '\0' || std::string(mode) == "off") return {};
++    ULONG highest = 0; std::vector<Node> nodes;
++    if (!GetNumaHighestNodeNumber(&highest) || highest > 1024) {
++        return {-1, true, "Windows NUMA topology unavailable; ordinary allocation"};
++    }
++    for (ULONG n = 0; n <= highest; ++n) {
++        GROUP_AFFINITY mask{}; ULONGLONG available = 0;
++        if (GetNumaNodeProcessorMaskEx(USHORT(n), &mask) && mask.Mask != 0 &&
++            GetNumaAvailableMemoryNodeEx(USHORT(n), &available)) nodes.push_back({int(n), available, true});
++    }
++    return choose(mode, nodes, gpu_node, bytes);
++}
++inline std::string placement(void* base, SIZE_T bytes, int preferred) {
++    if (base == nullptr || bytes == 0 || preferred < 0) return {};
++    constexpr SIZE_T page = 4096;
++    const SIZE_T pages = (bytes - 1) / page + 1;
++    const SIZE_T count = pages < 128 ? pages : 128;
++    PSAPI_WORKING_SET_EX_INFORMATION info[128]{};
++    for (SIZE_T i = 0; i < count; ++i) {
++        const SIZE_T index = count == 1 ? 0 : ((pages - 1) / (count - 1)) * i;
++        info[i].VirtualAddress = static_cast<unsigned char*>(base) + index * page;
++    }
++    if (!QueryWorkingSetEx(GetCurrentProcess(), info, DWORD(count * sizeof(info[0]))))
++        return "NUMA page sample unavailable (error " + std::to_string(GetLastError()) + ")";
++    unsigned local = 0, remote = 0, not_resident = 0;
++    for (SIZE_T i = 0; i < count; ++i) {
++        if (!info[i].VirtualAttributes.Valid) ++not_resident;
++        else if (int(info[i].VirtualAttributes.Node) == preferred) ++local;
++        else ++remote;
++    }
++    return "NUMA page sample local/remote/not-resident=" + std::to_string(local) + "/" +
++        std::to_string(remote) + "/" + std::to_string(not_resident);
++}
++inline void* allocate(SIZE_T bytes, DWORD flags, const Decision& d, std::string& report) {
++    if (d.node >= 0) {
++        void* p = VirtualAllocExNuma(GetCurrentProcess(), nullptr, bytes, flags, PAGE_READWRITE, DWORD(d.node));
++        if (p != nullptr) { report = d.why + "; " + placement(p, bytes, d.node); return p; }
++        const DWORD error = GetLastError();
++        report = "NUMA allocation refused (error " + std::to_string(error) + "); ordinary allocation";
++    } else if (d.requested) report = d.why;
++    void* p = VirtualAlloc(nullptr, bytes, flags, PAGE_READWRITE);
++    // Preserve the ordinary allocation's last error for the existing large-page diagnostic.
++    const DWORD error = GetLastError(); SetLastError(error); return p;
++}
++} // namespace strata::platform::win_numa
++#endif
+diff --git a/tests/platform/windows_numa_arena_test.cpp b/tests/platform/windows_numa_arena_test.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/platform/windows_numa_arena_test.cpp
+@@ -0,0 +1,49 @@
++#include "strata/platform/win_numa_arena.hpp"
++#include <cstdio>
++#include <cstring>
++using namespace strata::platform::win_numa;
++#define CHECK(x) do { ++cases; if (!(x)) { std::fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x); return 1; } } while(0)
++int main() {
++    int cases = 0;
++    const uint64_t gib = 1ull << 30;
++    const std::vector<Node> two{{0,128*gib,true},{3,128*gib,true}};
++    CHECK(!choose(nullptr,two,0,gib).requested);
++    CHECK(!choose("off",two,0,gib).requested);
++    CHECK(choose("gpu",two,3,gib).node==3);
++    CHECK(choose("auto",two,0,gib).node==0);
++    CHECK(choose("0",two,-1,gib).node==0);
++    CHECK(choose("3",two,-1,gib).node==3);
++    CHECK(choose("gpu",two,-1,gib).node<0);
++    CHECK(choose("1",two,0,gib).node<0);
++    CHECK(choose("3",{{0,128*gib,true},{3,128*gib,false}},0,gib).node<0);
++    CHECK(choose("0",{{0,128*gib,true}},0,gib).node<0);
++    CHECK(choose("0",two,0,125*gib).node<0);
++    CHECK(choose("0",two,0,124*gib).node==0);
++    CHECK(choose("0",two,0,~uint64_t(0)).node<0);
++    CHECK(choose("65536",two,0,gib).node<0);
++    CHECK(choose("99999999999999999999",two,0,gib).node<0);
++    CHECK(choose("-1",two,0,gib).node<0);
++    CHECK(choose(" 0",two,0,gib).node<0);
++    CHECK(choose("0x0",two,0,gib).node<0);
++    DWORD_PTR before=0,system=0,after=0,system_after=0;
++    CHECK(GetProcessAffinityMask(GetCurrentProcess(),&before,&system));
++    CHECK(!probe("off",-1,gib).requested);
++    // Small real Win32 API positive control. This does not claim a two-node host or enable production policy.
++    GROUP_AFFINITY mask{};
++    CHECK(GetNumaNodeProcessorMaskEx(0,&mask) && mask.Mask);
++    const SIZE_T bytes=2*1024*1024;
++    std::string note;
++    void* memory=allocate(bytes,MEM_COMMIT|MEM_RESERVE,Decision{0,true,"test node0 preferred"},note);
++    CHECK(memory!=nullptr);
++    std::memset(memory,0x5a,bytes);
++    const auto* data=static_cast<const unsigned char*>(memory);
++    bool intact=true; for(SIZE_T i=0;i<bytes;++i) if(data[i]!=0x5a){intact=false;break;}
++    CHECK(intact);
++    const std::string sample=placement(memory,bytes,0);
++    CHECK(sample.find("NUMA page sample local/remote/not-resident=")!=std::string::npos);
++    CHECK(VirtualFree(memory,0,MEM_RELEASE));
++    CHECK(GetProcessAffinityMask(GetCurrentProcess(),&after,&system_after));
++    CHECK(before==after && system==system_after);
++    std::printf("Windows NUMA arena: %d cases PASS; no CPU affinity changes; %s\n",cases,sample.c_str());
++    return 0;
++}

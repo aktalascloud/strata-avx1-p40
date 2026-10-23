@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "name": "ivybridge-o3-sm61",
+  "cpu_release_flags": "/MD /O2 /DNDEBUG /arch:AVX /fp:precise /clang:-O3 /clang:-march=ivybridge /clang:-mtune=ivybridge /clang:-mno-avx2 /clang:-mno-fma /clang:-mno-f16c /clang:-ffp-contract=off /clang:-fno-fast-math",
+  "cuda_release_flags": "-O3 -DNDEBUG -Xcompiler=/O2 -Xcompiler=/Ob3 -Xcompiler=/favor:INTEL64 -Xcompiler=/fp:precise",
+  "cuda_host": "MSVC /O2 /Ob3 /favor:INTEL64; MSVC has no /O3",
+  "cuda_arch": "61",
+  "baseline_avx2": false,
+  "baseline_fma": false,
+  "baseline_f16c": false,
+  "pascal_mmq_i": 64,
+  "cpu_compiler": "clang-cl.exe (23.1.4 reference)",
+  "cuda_version": "12.9",
+  "jobs": 12,
+  "optimization": "O3; no PGO/ThinLTO/extra-device-vectorization"
+}

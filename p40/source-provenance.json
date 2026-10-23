@@ -1,0 +1,103 @@
+{
+  "source_sha": "011c9e600a93bbc9fd451c563501b5831c32bbca",
+  "review": "Git checkout LF versus qualified Windows CRLF only; every source body matches after EOL normalization. Public source pins reflect actual LF bytes after this comparison; no ISA/SM/count/uniqueness/SRAM changes.",
+  "files": [
+    {
+      "path": "CMakeLists.txt",
+      "qualified_private_sha256": "e64e7b0a24947c6992049f7f28581af7fddf78cf8047e894377c272a3f6f54e1",
+      "public_lf_sha256": "effd6d9bd083f16d5e09ed73382bf0d4d7eeb67db6ead17ac1027daf6994aa3d",
+      "only_eol_difference": true
+    },
+    {
+      "path": "src/core/pinned.cu",
+      "qualified_private_sha256": "6c51dfda7fa8ce5347aeac95d77929892d11f88fbfff60838ed11d2dce139922",
+      "public_lf_sha256": "2ae5381c0bdabe7ccbc44af0000176fa7eaf0ff629b7962d9458e7d7f934d820",
+      "only_eol_difference": true
+    },
+    {
+      "path": "src/kernels/cpu/iq_avx2_parity.cpp",
+      "qualified_private_sha256": "ef9767c7663b22e52d9bddf7ba7d37adf14b81d177bfe8a4fddb58abd61cad4a",
+      "public_lf_sha256": "2a7e96bda844dcdd1b49c25174967f75f82136f68ed9adb9de11853dfc0012d4",
+      "only_eol_difference": true
+    },
+    {
+      "path": "src/kernels/cpu/pool.cpp",
+      "qualified_private_sha256": "c9ee6a3e432e47a9262358a0d5b802a702e50293e781909c6c7368bc0a2f4c16",
+      "public_lf_sha256": "d576d9c73fc5ece87f09e9da5e883644bcef00015f1b03a6274c2a45c668887d",
+      "only_eol_difference": true
+    },
+    {
+      "path": "src/kernels/cpu/pool_affinity_win.hpp",
+      "qualified_private_sha256": "20c2f47f2c37bd2fb8743385bbb7d5fc29d32e05048a88461e3ce2cbd174a6fd",
+      "public_lf_sha256": "24d5b3046a55ca470d48fa2719490d227ce6671098f38c2d7d4ce619e5264385",
+      "only_eol_difference": true
+    },
+    {
+      "path": "src/program/generate.cpp",
+      "qualified_private_sha256": "d6bff514379f8704989e0bd94520ea7e0f92e5286f5d87fef4d89b21c42782f5",
+      "public_lf_sha256": "0237176619207ba31c092dbabb0f638cc314c2dab459109a5a71379bf8baf5b0",
+      "only_eol_difference": true
+    },
+    {
+      "path": "include/strata/platform/cpu_pinning.hpp",
+      "qualified_private_sha256": "cbc5470b1c526ff0e722e3ad34dc9eded8f71df74b8d5acb1304e059c299079d",
+      "public_lf_sha256": "7de35320e83e5e74d32d54f349f0908dc598b08f6491783ad8e6489112fc2f82",
+      "only_eol_difference": true
+    },
+    {
+      "path": "tests/platform/no_cpu_pin_test.cpp",
+      "qualified_private_sha256": "8f8a3796f8143e66fa714be67c7b38775c51ab226cc51a875b9b93098848f962",
+      "public_lf_sha256": "457c28d2b3851f8999a24f6488472294a8b64a5d3bcd9558c55afa9427304859",
+      "only_eol_difference": true
+    },
+    {
+      "path": "tests/platform/cpu_format_parity.cpp",
+      "qualified_private_sha256": "d43851fa7acebfaa0241447a9f96e154950a322cdb058e87f6543ec49d2f4366",
+      "public_lf_sha256": "b299ae6db664a3a5732cc58587c6e086e73f0289232db26c2df0a13d5da689d8",
+      "only_eol_difference": true
+    },
+    {
+      "path": "cmake/strata_ivybridge_o3.cmake",
+      "qualified_private_sha256": "f7ef2183d5a87dcbefeb8c862ead3e4681df46e8a52153a1f414e079d62ddebf",
+      "public_lf_sha256": "f7ef2183d5a87dcbefeb8c862ead3e4681df46e8a52153a1f414e079d62ddebf",
+      "only_eol_difference": false
+    },
+    {
+      "path": "cmake/strata_pascallama_overlay.cmake",
+      "qualified_private_sha256": "3ce85ec06a0a3484f8e66e44e192a3319a26ca842a4d3e62d3db9e284cc12372",
+      "public_lf_sha256": "3ce85ec06a0a3484f8e66e44e192a3319a26ca842a4d3e62d3db9e284cc12372",
+      "only_eol_difference": false
+    },
+    {
+      "path": "tests/cuda/pascallama_mmq_screen.cpp",
+      "qualified_private_sha256": "3aec4268c94cf51e56c60d267970a5e93bc619136e2d96e4f1c5e197e46eacfe",
+      "public_lf_sha256": "3aec4268c94cf51e56c60d267970a5e93bc619136e2d96e4f1c5e197e46eacfe",
+      "only_eol_difference": false
+    },
+    {
+      "path": "tests/cuda/sm61_graph_parity.cu",
+      "qualified_private_sha256": "95be69144c64af187f174c35654971d7edc4e2efa3ec7bbe1ae0c3eca1975567",
+      "public_lf_sha256": "95be69144c64af187f174c35654971d7edc4e2efa3ec7bbe1ae0c3eca1975567",
+      "only_eol_difference": false
+    },
+    {
+      "path": "include/strata/platform/win_numa_arena.hpp",
+      "qualified_private_sha256": "f43ffa02c2d4bab285260da7c4f8b4572a5503b563abda67c350b663d747cfac",
+      "public_lf_sha256": "f43ffa02c2d4bab285260da7c4f8b4572a5503b563abda67c350b663d747cfac",
+      "only_eol_difference": false
+    },
+    {
+      "path": "tests/platform/windows_numa_arena_test.cpp",
+      "qualified_private_sha256": "c1ccf7fab20c8218e1f933338abe8588a87a873dc30971ec2ee538624b3cdff9",
+      "public_lf_sha256": "c1ccf7fab20c8218e1f933338abe8588a87a873dc30971ec2ee538624b3cdff9",
+      "only_eol_difference": false
+    },
+    {
+      "path": "serve/server.py",
+      "qualified_private_sha256": "44f8e27aa6226832eb75fea71af55581543ba425df054e298418e866d5b24152",
+      "public_lf_sha256": "bc09af76400932500f9ce09f401bf097ad7e7b120374d2cfbe3f4142fadd2304",
+      "only_eol_difference": true
+    }
+  ],
+  "parity_source_pins_reviewed": true
+}

@@ -1,3 +1,75 @@
+# Strata AVX1 / Tesla P40 performance fork
+
+Windows Strata for **AVX1-only Ivy Bridge Xeons + Tesla P40 (sm_61)**. Current qualified engine0.1.47,
+upstream [`011c9e600a93`](https://github.com/Niko1221/Strata/commit/011c9e600a93bbc9fd451c563501b5831c32bbca).
+This fork keeps upstream history, the original MIT license and contributor attribution.
+
+**Measured final native decode:50.2789 /49.9454tokens/s. Direct API including overhead:47.6324 /47.0583tokens/s.**
+Warmed short/cached4K prompts, author xhigh,128 generated tokens. These are not cold/full128K guarantees.
+The performance reference is2026-10-22, source`011c9e6`/engine0.1.47; newer source releases retain these historical results until measured again.
+
+## Download and run on Windows
+
+1. Download the portable ZIP and SHA256SUMS.txt from [Releases](https://github.com/aktalascloud/strata-avx1-p40/releases).
+2. Verify SHA-256, extract it to a writable folder, then run **INSTALL.cmd**.
+3. The installer obtains missing VC Runtime from Microsoft with signature verification, then downloads the
+   pinned GGUF/mmproj/MTP files directly from Hugging Face with **resume + SHA-256** and makes your own pack.
+4. Run **START.cmd**. It uses a separate Windows scheduled task. **STOP.cmd** performs verified graceful drain.
+5. Open `http://127.0.0.1:8093/`; OpenAI-compatible base URL is `http://127.0.0.1:8093/v1`.
+
+Use the release's CMD files, not the upstream generic installer for an AVX1/P40 setup.
+No model, pack, API keys, personal configurations, logs, caches or build toolchains are shipped.
+No original/stock checkpoint is needed. About85GB of downloads plus the local dense pack need roughly100GB of free storage.
+Reference machine:2xE5-2697v2,16 visible logical CPUs,256GiB RAM,24GiB P40, driver582.70. Smaller RAM is not qualified.
+Install a P40-compatible NVIDIA driver supporting CUDA12.9 separately; the driver is not bundled.
+
+The model preset is128K/KVq4_0, author high/xhigh, MTPQ2 (two draft tokens), prefill512,
+PLE in RAM, async1/PCIeauto and CPU-only vision. Generic NUMA default isoff; on the tested node0/P40 machine use
+`INSTALL.cmd --workers 14 --numa-node 0`. A different machine may need different workers/NUMA.
+
+## What helped, with measured deltas
+
+| Controlled comparison | Before | After | Change |
+|---|---:|---:|---:|
+| IQ TABLES/MMVQ + QFUSE + GRfast, separate sweep |47.9760tok/s|50.4235tok/s|+2.4475tok/s / **+5.101%** |
+| B6=1 + EXPDEC=1/R1, I64/J96, fresh kernel-combo sweep |48.7498tok/s|50.1116tok/s|+1.3617tok/s / **+2.793%** |
+|14 versus8 workers, same NUMA0 sweep |47.9257tok/s|49.5107tok/s|+3.307% |
+|NUMA0 versus default allocation, separate runtime comparison |48.8009tok/s|49.5107tok/s|+1.454% |
+
+Scores are harmonic means of two native-decode medians. **Do not add or multiply gains from different sweeps.**
+The historical16.4tokens/s first install had different context/KV/MTP/thinking/cache settings; it is not a controlled patch baseline.
+DenseF32's observed+0.12%prefill is within measurement noise, despite passing5201 correctness cases.
+PGO/ThinLTO/extra CUDA vectorization and I128 were tested and were not selected.
+
+## Patch list
+
+- [`native-ivybridge-p40.patch`](p40/patches/native-ivybridge-p40.patch): O3/Ivy baseline and guarded ISA dispatch,
+  no-pin opt-out, Windows NUMA allocation preference, CPU/no-pin/Pascal graph correctness tests. Already applied here.
+- [`pascallama-sm61.patch`](p40/patches/pascallama-sm61.patch): full pinned J96 DP4A MMQ/unroll overlay,
+  applied only to a build-local GGML copy. Credit:madsteph74/pascallama.cpp.
+- Runtime switches:B6=1 (two rows), EXPDEC=1/R1, I64/J96, four IQ/GR switches, DenseF32 experimental,
+  MTPQ2/spec3/minp0.25, PLEram, async1/PCIeauto. Several paths already exist upstream; settings are not independent additive patches.
+
+[Patch descriptions and per-switch deltas](p40/PATCHES.md) · [All16 combinations and method](p40/BENCHMARKS.md) ·
+[Structured measurements](p40/results/benchmarks.json) · [Русский](p40/README.ru.md)
+
+The selected build passed22 numerical/graph GPU runs, including full5201DenseF32 and actual IQ/MMQ/B6/EXPDEC shapes.
+No speed or stability is claimed for untested GPUs/backends. No hardware clocks, power, affinity, fans or thermal protections were changed.
+
+## Updating and licenses
+
+Official Strata main is merged into this fork after semantic conflict/patch review and qualification.
+The maintainer's daily08:00Bishkek workflow publishes a new release only for a newly qualified build;
+unchanged revisions do not create duplicate releases. Historical benchmark numbers are labelled; a newer build is not assumed faster without measurement.
+
+Source remains MIT with upstream notices. Binary dependencies retain their own licenses:
+see THIRD_PARTY_NOTICES.md and the included licenses. Microsoft VC Runtime is obtained from Microsoft rather than redistributed from a private installation.
+No repository or release contains authentication material; credentials for publication stay outside the export.
+
+---
+
+## Upstream Strata documentation
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="apps/host/public/brand/strata-lockup-dark.svg">

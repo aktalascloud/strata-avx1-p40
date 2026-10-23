@@ -28,6 +28,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include "strata/platform/win_numa_arena.hpp"
 #else
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -99,6 +100,24 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
         note = "shared-file arena backing is not implemented on Windows";
         return nullptr;
     }
+    // Explicit opt-in only. A single exposed NUMA node keeps ordinary allocation; no CPU affinity changes.
+    const char* numa_mode = std::getenv("STRATA_WIN_NUMA_NODE");
+    int gpu_node = -1;
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 12090 && !defined(__HIP_PLATFORM_AMD__)
+    if (numa_mode != nullptr && (std::strcmp(numa_mode, "gpu") == 0 || std::strcmp(numa_mode, "auto") == 0)) {
+        int device = 0;
+        if (cudaGetDevice(&device) != cudaSuccess ||
+            cudaDeviceGetAttribute(&gpu_node, cudaDevAttrHostNumaId, device) != cudaSuccess) {
+            gpu_node = -1;
+            (void) cudaGetLastError();
+        }
+    }
+#endif
+    const auto numa = strata::platform::win_numa::probe(numa_mode, gpu_node, bytes);
+    std::string numa_note;
+    auto host_alloc = [&](SIZE_T n, DWORD flags) {
+        return strata::platform::win_numa::allocate(n, flags, numa, numa_note);
+    };
     // MEM_LARGE_PAGES needs SeLockMemoryPrivilege.  Having it assigned to the account is not enough: the
     // PROCESS must enable it in its own token (AdjustTokenPrivileges) before VirtualAlloc, or the call fails.
     // An account without the assignment, or a failure to enable, leaves the process as it was: VirtualAlloc
@@ -125,11 +144,11 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
         // anything else is ERROR_INVALID_PARAMETER (87), which reads like a privilege problem but is not.
         // Round up: the slack is under 2 MB and the tail stays unused.
         const SIZE_T lbytes = (SIZE_T) (((SIZE_T) bytes + large - 1) / large * large);
-        void* p = VirtualAlloc(nullptr, lbytes, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES,
-                               PAGE_READWRITE);
+        void* p = host_alloc(lbytes, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES);
         if (p) {
             got = PageBacking::LargePages;
             note = "large pages (" + std::to_string((unsigned long long) large) + " B)";
+            if (!numa_note.empty()) note += "; " + numa_note;
             return p;
         }
         // 1450 (ERROR_NO_SYSTEM_RESOURCES) is the large-page pool saying no, 87 is a size that is not a
@@ -142,7 +161,8 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
     } else {
         note = "this system has no large-page minimum; using 4 KB pages";
     }
-    void* p = VirtualAlloc(nullptr, (SIZE_T) bytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void* p = host_alloc((SIZE_T) bytes, MEM_RESERVE | MEM_COMMIT);
+    if (!numa_note.empty()) note += "; " + numa_note;
     got = PageBacking::NormalPages;
     return p;
 #else
