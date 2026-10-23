@@ -100,6 +100,20 @@ def server(row, state, schema):
         return False
 
 
+def verified_console(row, wrapper_pid, rows, native_exes, expected_native):
+    """Allow only the Windows console for this wrapper or an exactly identified native child."""
+    conhost = Path(os.environ.get('SystemRoot', 'C:\\Windows'))/'System32/conhost.exe'
+    if (row.get('restricted') or row['name'].casefold()!='conhost.exe' or
+            norm(row['exe'])!=norm(conhost) or row['cmd'][1:]!=['0x4']):
+        return False
+    if row['ppid']==wrapper_pid:
+        return True
+    parent=next((r for r in rows if r['pid']==row['ppid']),None)
+    return bool(parent and not parent.get('restricted') and
+                parent['name'].casefold() in expected_native and norm(parent['exe']) in native_exes and
+                row['created']>=parent['created'])
+
+
 def verify(cfg):
     state = json.loads(STATE.read_text(encoding='utf-8-sig'))
     schema = state.get('schema', 1)
@@ -126,7 +140,7 @@ def verify(cfg):
     allowed_exe = {norm(cfg['exe']), norm(cfg['vision']['exe']), norm(state['python'])}
     rows = [wr] + [identity(p, expected_native) for p in wrapper.children(recursive=True)]
     ids = {r['pid'] for r in rows}
-    conhost = Path(os.environ.get('SystemRoot', 'C:\\Windows'))/'System32/conhost.exe'
+    native_exes={norm(cfg['exe']),norm(cfg['vision']['exe'])}
     for row in rows:
         if row['pid'] != wrapper.pid and row['ppid'] not in ids:
             raise RuntimeError('Child parent is outside the captured tree')
@@ -135,8 +149,7 @@ def verify(cfg):
             continue  # Only official /unload may end this owner-protected child.
         if server(row, state, schema):
             continue
-        if (row['name'].casefold() == 'conhost.exe' and norm(row['exe']) == norm(conhost) and
-                row['ppid'] == wrapper.pid and row['cmd'][1:] == ['0x4']):
+        if verified_console(row,wrapper.pid,rows,native_exes,expected_native):
             row['console'] = True
             continue
         if norm(row['exe']) not in allowed_exe or row['name'].casefold() not in expected_native:

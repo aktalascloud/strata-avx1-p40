@@ -20,3 +20,12 @@ This was a fresh installation directory with spaces in its path, outside the mai
 The test found and fixed two packaging defects: the original task had no boot trigger, and the original bootstrap forced port 8093 instead of using the local preset. Installer revision r2 includes both fixes, isolated task names and control tasks, and preserved CMD failure exit codes.
 
 Limits: the operating system and Codex were not restarted or closed during the test. Independence was established from actual scheduler ancestry and Job membership. Existing NVIDIA and Microsoft runtimes satisfied the declared system prerequisites; the missing-runtime installation branch was not exercised on this host. Full network model downloads were not repeated; resumability and corruption handling were checked with the offline HTTP fixtures.
+
+
+## Source0.1.48 /5c8dd322 follow-up
+
+The table above describes the earlier source011c9e6/r2 clean-folder test. New source5c8dd322 and its exact engine/vision bytes passed fresh CPU/ISA/private-DLL qualification and23 numerical/graph GPU runs, including the full5201-case DenseF32 sweep and BF16 bit parity. It was loaded through the independent private S4U task with128K/Q4/MTPQ2/CPU vision and all selected settings preserved. No new-source model generation or throughput benchmark was run.
+
+One control helper changed: native Windows engine children may own a canonical System32 conhost.exe with the exact0x4 argument. Acceptance requires an exactly identified native parent in the captured owner tree and valid creation order. Unknown executables, paths, arguments, parent identities, restricted parents and earlier creation times remain rejected. The12 portable policy tests cover these decisions. This function, full owner verification and controlled drain have the same AST as the private helper that completed an actual schema3 graceful stop and independent restart on the new engine. No force kill, bootstrap/review overwrite while alive, DACL change or admission/drain guard bypass occurred.
+
+All other installer/launcher/bootstrap/scheduler helper bytes remain identical to r2. Their earlier clean-folder/boot-definition qualification is reused; offline installer/task/import/package checks were rerun. The full public clean-folder/model test, OS reboot, Codex-close test and85GB network transfer were not repeated.

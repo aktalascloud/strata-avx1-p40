@@ -5,7 +5,7 @@ The Pascal overlay is applied only to a private build copy of the pinned GGML de
 
 | Patch / setting | Purpose | Measured gain / limit |
 |---|---|---|
-| `native-ivybridge-p40.patch` | Clang O3/Ivy Bridge baseline, no AVX2/FMA/F16C; no-pin opt-out; Windows NUMA arena; CPU/no-pin and Pascal graph correctness tests. Wider kernels retain ISA dispatch guards. | Infrastructure aggregate; no honest isolated percentage for every hunk. |
+| `native-ivybridge-p40.patch` | Clang O3/Ivy Bridge baseline, no AVX2/FMA/F16C; no-pin opt-out; Windows NUMA arena; CPU/no-pin and Pascal graph correctness tests. Includes the reviewed Windows/API/MTP/BF16 fixes listed in COMMUNITY-FIXES.md. Wider kernels retain ISA dispatch guards. | Infrastructure aggregate; no honest isolated percentage for every hunk. |
 | `pascallama-sm61.patch` | Full pinned J96 DP4A MMQ configuration and unroll overlay from madsteph74/pascallama.cpp. Keeps original GGML unchanged. | Included in all final controlled rows; no isolated causal percentage claimed. |
 | IQ tables/MMVQ + QFUSE + GR_NORM_FAST, all1 | Upstream native kernel paths qualified in direct and CUDA Graphs modes. |47.9760 ->50.4235 harmonic tok/s, +2.4475tok/s /+5.101% in its own fresh sweep. |
 | B6=1 alone | Existing Strata switch, I64/J96. |48.7498 ->49.5174tok/s, +0.7676tok/s /+1.574% in kernel-combination sweep. |
@@ -20,4 +20,6 @@ The Pascal overlay is applied only to a private build copy of the pinned GGML de
 
 These are local measurements, not sums of upstream marketing claims. CUDA Graphs, B6/EXPDEC and several fast paths already exist in upstream; this kit contributes qualification, configuration, build fixes and local patches, with attribution.
 
-The22 numerical/graph runs preserve the previous16 (including full5201DenseF32), actual-model MMQ, three B6 modes and two EXPDEC grids. Numerical-only qualification is separate from throughput tests. Do not weaken ISA/SM/uniqueness/SRAM guards or FP tolerances to make a candidate pass. Other GPUs/HIP/SYCL/Metal are not qualified by this release.
+The23 numerical/graph runs preserve the previous22 (including full5201DenseF32, actual-model MMQ, three B6 modes and two EXPDEC grids) and add direct/graph BF16 finite/tie/Inf/NaN parity. Numerical-only qualification is separate from throughput tests. Do not weaken ISA/SM/uniqueness/SRAM guards or FP tolerances to make a candidate pass. Other GPUs/HIP/SYCL/Metal are not qualified by this release.
+
+See [community fixes and review limits](COMMUNITY-FIXES.md) for the11 selected PRs and architecture-specific changes not enabled on P40. Existing benchmark numbers remain tied to source011c9e6, not the new native build.

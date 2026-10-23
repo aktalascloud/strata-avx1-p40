@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7c68676..4c49f45 100644
+index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b00a6cd85 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -88,6 +88,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
@@ -15,7 +15,29 @@ index 7c68676..4c49f45 100644
  option(STRATA_MMQ_KQUANTS "Build the MMQ prompt kernels for Q4_K / Q5_K / Q5_1 / Q6_K: the experts of Unsloth's K-quant files, and on HIP the dense GGUF projections (STRATA_DENSE_MMQ)" ON)
  # Q6_K gate/up in the grouped expert kernels (Unsloth's UD-Q6_K_XL, and layer 2 of UD-Q5_K_XL; docs/QUANTS.md).  On by
  # default since MODEL-UPDATE Phase 1: one more instance per grouped kernel in iq_kernels.cu, +19 KB of sm_60 code,
-@@ -1488,6 +1494,9 @@ endif()
+@@ -682,6 +688,11 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
+     set_tests_properties(expert_cache_slot_guard_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
+   endif()
+   if(STRATA_BUILD_CONVERSATION_TESTS)
++    # The real copy helper with host mocks: no GPU initialization or allocation.
++    add_executable(conversation_copy_lifetime_test src/core/conversation_copy_lifetime_test.cpp)
++    target_link_libraries(conversation_copy_lifetime_test PRIVATE strata_engine)
++    add_test(NAME conversation_copy_lifetime_test COMMAND conversation_copy_lifetime_test)
++    set_tests_properties(conversation_copy_lifetime_test PROPERTIES TIMEOUT 60)
+     add_executable(conversation_snapshot_test src/core/conversation_snapshot_test.cpp)
+     target_link_libraries(conversation_snapshot_test PRIVATE strata_engine)
+     add_test(NAME conversation_snapshot_test COMMAND conversation_snapshot_test)
+@@ -695,7 +706,8 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
+       target_compile_definitions(conversation_transfer_test PRIVATE CONVERSATION_TEST_TRANSFERS)
+       target_link_options(conversation_transfer_test PRIVATE
+         -Wl,--wrap=cudaMemcpy -Wl,--wrap=cudaMemcpyAsync -Wl,--wrap=cudaStreamSynchronize
+-        -Wl,--wrap=cudaGetDevice -Wl,--wrap=cudaStreamCreateWithFlags
++        -Wl,--wrap=cudaGetDevice -Wl,--wrap=cudaSetDevice -Wl,--wrap=cudaStreamCreateWithFlags
++        -Wl,--wrap=cudaStreamDestroy
+         -Wl,--wrap=cudaDeviceSynchronize -Wl,--wrap=cudaGetLastError)
+       target_link_libraries(conversation_transfer_test PRIVATE strata_engine)
+       add_test(NAME conversation_transfer_test COMMAND conversation_transfer_test)
+@@ -1515,6 +1527,9 @@ endif()
  include(CheckCXXSourceCompiles)
  if(MSVC)
    set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
@@ -25,7 +47,7 @@ index 7c68676..4c49f45 100644
  else()
    set(CMAKE_REQUIRED_FLAGS "-mavx2 -mfma -mf16c")
  endif()
-@@ -1681,6 +1690,11 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1708,6 +1723,11 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_tq_llama "${strata_llamacpp_SOURCE_DIR}")
      endif()
      include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/strata_ggml_tq_overlay.cmake)
@@ -37,7 +59,7 @@ index 7c68676..4c49f45 100644
      set(_strata_tq_overlay_dir "${CMAKE_BINARY_DIR}/ggml-tq-overlay")
      strata_ggml_tq_overlay("${_strata_tq_llama}" "${_strata_tq_overlay_dir}")
      if(STRATA_TQ_OVERLAY_OK)
-@@ -1709,6 +1723,10 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1736,6 +1756,10 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_gg ${strata_llamacpp_SOURCE_DIR}/ggml)
      endif()
      set(_strata_mmq ${_strata_gg}/src/ggml-cuda)
@@ -48,7 +70,7 @@ index 7c68676..4c49f45 100644
      set(_strata_quantize_cu ${_strata_mmq}/quantize.cu)   # the overlay's copy when the trellis overlay is on: it includes mmq.cuh
      if(_strata_mmq_tq_overlay)
        set(_strata_quantize_cu ${_strata_tq_overlay_dir}/quantize.cu)
-@@ -2071,7 +2089,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
+@@ -2098,7 +2122,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
  endif()
  
  if(STRATA_BUILD_TESTS)
@@ -71,7 +93,33 @@ index 7c68676..4c49f45 100644
      add_executable(pool_affinity_test src/kernels/cpu/pool_affinity_test.cpp)
      target_link_libraries(pool_affinity_test PRIVATE strata_kernels_cpu)
      add_test(NAME pool_affinity_test COMMAND pool_affinity_test)
-@@ -2238,3 +2271,19 @@ if(STRATA_HIP_GFX906)
+@@ -2216,6 +2255,25 @@ if(STRATA_BUILD_TESTS)
+     target_include_directories(direct_file_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+     target_link_libraries(direct_file_async_test PRIVATE Threads::Threads)
+     add_test(NAME direct_file_async_test COMMAND direct_file_async_test)
++    # Reader initialization failures must return without draining reads that were never submitted.
++    add_executable(ple_reader_lifecycle_test tests/platform/ple_reader_lifecycle.cpp
++                   src/ngram/ple_reader.cpp src/platform/direct_file.cpp)
++    target_include_directories(ple_reader_lifecycle_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
++    target_link_libraries(ple_reader_lifecycle_test PRIVATE Threads::Threads strata_warnings)
++    if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
++      target_compile_definitions(ple_reader_lifecycle_test PRIVATE STRATA_TEST_ALLOC_FAILURE=1)
++      target_link_options(ple_reader_lifecycle_test PRIVATE -Wl,--wrap=posix_memalign)
++    endif()
++    foreach(_mode caller threaded)
++      foreach(_case reads reopen)
++        add_test(NAME ple_reader_${_case}_${_mode} COMMAND ple_reader_lifecycle_test ${_case} ${_mode})
++        set_tests_properties(ple_reader_${_case}_${_mode} PROPERTIES TIMEOUT 15)
++      endforeach()
++      if(UNIX AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
++        add_test(NAME ple_reader_alloc_${_mode} COMMAND ple_reader_lifecycle_test alloc ${_mode})
++        set_tests_properties(ple_reader_alloc_${_mode} PROPERTIES TIMEOUT 15)
++      endif()
++    endforeach()
+   endif()
+   # --aux-cpus: the CPU-set derivation (pure) and the placement of live threads; header-only, no GPU
+   add_executable(aux_cpus_test tests/platform/aux_cpus_test.cpp)
+@@ -2265,3 +2323,49 @@ if(STRATA_HIP_GFX906)
    add_executable(gfx906_qsa_query_swizzle_probe bench/gfx906_qsa_query_swizzle_probe.cpp)
    target_link_libraries(gfx906_qsa_query_swizzle_probe PRIVATE strata_kernels ${_strata_gpu_runtime_target})
  endif()
@@ -91,11 +139,1307 @@ index 7c68676..4c49f45 100644
 +  target_link_libraries(windows_numa_arena_test PRIVATE psapi)
 +  add_test(NAME windows_numa_arena_test COMMAND windows_numa_arena_test)
 +endif()
++
++# Local community regression targets: do not alter production feature defaults.
++if(STRATA_BUILD_TESTS)
++  if(NOT TARGET conversation_cache_test)
++    add_executable(conversation_cache_test src/core/conversation_cache_test.cpp)
++    target_include_directories(conversation_cache_test PRIVATE include)
++    add_test(NAME conversation_cache_test COMMAND conversation_cache_test)
++  endif()
++  if(TARGET strata_engine AND NOT TARGET conversation_copy_lifetime_test)
++    add_executable(conversation_copy_lifetime_test src/core/conversation_copy_lifetime_test.cpp)
++    target_link_libraries(conversation_copy_lifetime_test PRIVATE strata_engine)
++    add_test(NAME conversation_copy_lifetime_test COMMAND conversation_copy_lifetime_test)
++  endif()
++  if(WIN32 AND NOT TARGET ple_reader_lifecycle_test)
++    add_executable(ple_reader_lifecycle_test tests/platform/ple_reader_lifecycle.cpp src/ngram/ple_reader.cpp src/platform/direct_file.cpp)
++    target_include_directories(ple_reader_lifecycle_test PRIVATE include)
++    target_link_libraries(ple_reader_lifecycle_test PRIVATE Threads::Threads strata_warnings)
++    foreach(_mode caller threaded)
++      foreach(_case reads reopen)
++        add_test(NAME ple_reader_${_case}_${_mode} COMMAND ple_reader_lifecycle_test ${_case} ${_mode})
++        set_tests_properties(ple_reader_${_case}_${_mode} PROPERTIES TIMEOUT 15)
++      endforeach()
++    endforeach()
++  endif()
++  if(STRATA_ENABLE_CUDA AND TARGET strata_prefill)
++    add_executable(bf16_nan_parity tests/cuda/bf16_nan_parity.cpp)
++    target_link_libraries(bf16_nan_parity PRIVATE strata_prefill CUDA::cudart)
++    add_test(NAME bf16_nan_parity COMMAND bf16_nan_parity)
++  endif()
++endif()
+diff --git a/cmake/strata_ivybridge_o3.cmake b/cmake/strata_ivybridge_o3.cmake
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc943ce5c30e60082c0e9b05cc8eba915df86f1a
+--- /dev/null
++++ b/cmake/strata_ivybridge_o3.cmake
+@@ -0,0 +1,19 @@
++# Local profile: genuine Clang O3 with an Ivy Bridge baseline. Preserve runtime-dispatched wider kernels.
++option(STRATA_IVYBRIDGE_O3 "Local Windows Clang O3/Ivy Bridge profile" OFF)
++if(STRATA_IVYBRIDGE_O3)
++  if(NOT MSVC OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
++    message(FATAL_ERROR "STRATA_IVYBRIDGE_O3 requires clang-cl with the MSVC ABI")
++  endif()
++  set(_ivy_wide /clang:-mavx2 /clang:-mfma /clang:-mf16c /clang:-fno-vectorize /clang:-fno-slp-vectorize)
++  foreach(_src src/kernels/cpu/expert.cpp src/kernels/cpu/iq_avx512.cpp src/kernels/cpu/nvfp4_avx512.cpp src/kernels/cpu/tq_avx512.cpp)
++    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide}
++      /clang:-mavx512f /clang:-mavx512bw /clang:-mavx512vl /clang:-mavx512dq /clang:-mavx512vnni /clang:-mavx512vbmi)
++  endforeach()
++  foreach(_src src/kernels/cpu/q2_avx2.cpp src/kernels/cpu/iq_avx2.cpp src/kernels/cpu/kq_avx2.cpp src/kernels/cpu/nvfp4_avx2.cpp src/kernels/cpu/tq_avx2.cpp)
++    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide})
++  endforeach()
++  foreach(_src src/kernels/cpu/q2_avx1.cpp src/kernels/cpu/iq_avx1.cpp src/kernels/cpu/kq_avx1.cpp)
++    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS /clang:-mavx /clang:-mno-avx2 /clang:-mno-fma /clang:-mno-f16c)
++  endforeach()
++  message(STATUS "Local CPU profile: Clang -O3, Ivy Bridge tuning, AVX baseline, guarded wide kernels retained")
++endif()
+diff --git a/cmake/strata_pascallama_overlay.cmake b/cmake/strata_pascallama_overlay.cmake
+new file mode 100644
+index 0000000000000000000000000000000000000000..753ef5f9dbd02b20779c1ca516a5cfb11117a4e5
+--- /dev/null
++++ b/cmake/strata_pascallama_overlay.cmake
+@@ -0,0 +1,23 @@
++# The complete upstream pascallama patch is applied only to a private build-tree copy of pinned ggml.
++function(strata_pascallama_overlay original destination patch git)
++  if(NOT EXISTS "${patch}" OR NOT EXISTS "${git}")
++    message(FATAL_ERROR "Verified pascallama patch/private Git are required")
++  endif()
++  file(MAKE_DIRECTORY "${destination}")
++  file(COPY "${original}/ggml" DESTINATION "${destination}" FILES_MATCHING PATTERN "*.h" PATTERN "*.cuh" PATTERN "*.cu")
++  foreach(_name mmq-config-pascal-dp4a.cuh mmq-vec-dot.cuh)
++    set(_file "${destination}/ggml/src/ggml-cuda/${_name}")
++    file(READ "${original}/ggml/src/ggml-cuda/${_name}" _text)
++    string(REPLACE "\r\n" "\n" _text "${_text}")
++    file(CONFIGURE OUTPUT "${_file}" CONTENT "${_text}" @ONLY NEWLINE_STYLE UNIX)
++  endforeach()
++  execute_process(COMMAND "${git}" -C "${destination}" apply --check "${patch}" RESULT_VARIABLE _check OUTPUT_VARIABLE _stdout ERROR_VARIABLE _stderr)
++  if(NOT _check EQUAL 0)
++    message(FATAL_ERROR "Pascallama patch does not match pinned ggml: ${_stdout}${_stderr}")
++  endif()
++  execute_process(COMMAND "${git}" -C "${destination}" apply "${patch}" RESULT_VARIABLE _apply OUTPUT_VARIABLE _stdout ERROR_VARIABLE _stderr)
++  if(NOT _apply EQUAL 0)
++    message(FATAL_ERROR "Pascallama private overlay failed: ${_stdout}${_stderr}")
++  endif()
++  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
++endfunction()
+diff --git a/docs/DETAILS.md b/docs/DETAILS.md
+index f037c65cbb46da1a99cf84dc86ef5183fc5cb3ab..a9e957646e72a0fe6835b6987c4fb89bf4ad3d94 100644
+--- a/docs/DETAILS.md
++++ b/docs/DETAILS.md
+@@ -1815,6 +1815,40 @@ test images.
+ 
+ **Stager threads for a GGUF read in place (0.1.41, #1353):** a native pack read from its GGUF shards in place (UD-Q4_K_XL, a Q8_0 pack) copies each expert with 32 threads and a 128-deep ring when the bytes are page faults on an SSD. If the shards' pages are already in the page cache (a big-RAM box, a warm start) those copies are memory copies and the same profile ran 4-7x slower than the 4-thread default (a 124K-token Q8 prompt: 57 -> 350-410 tok/s with the default). The engine now checks a sample of the experts with `mincore` at the first prompt (Linux) and takes the RAM profile when 90% or more of their pages are resident, saying so in its log; a cold or partly cached GGUF keeps the SSD profile. `STRATA_STAGER_SSD=1` / `0` forces either profile; `STRATA_STAGER_THREADS` still wins. The bytes copied are the same.
+ 
++## A faster engine start on Windows (on by default with CUDA: `STRATA_ARENA_PREFAULT`, `STRATA_DENSE_UPLOAD_THREADS`, `STRATA_EARLY_ARENA`)
++
++On Windows with an NVIDIA card, three changes shorten the engine's load. Each has a switch that restores the old way.
++Measured on an RTX 3090 24 GB, Core Ultra 9 285K, 95 GB DDR5-6800 and a PCIe 5 SSD reading 11.2 GiB/s, with IQ3_S at a
++262,144-token context: the engine alone was ready in 8.72 s instead of 15.94 s (medians of 8 + 8 starts, every start
++with the changes faster than every start without).
++
++- **The arena's pages are touched by several threads before it is pinned** (`STRATA_ARENA_PREFAULT`). Left to
++  `cudaHostRegister`, the first touch of the 46.8 GiB expert arena ran on one thread inside it, about 5 s; min(16,
++  hardware threads) threads take 0.5-0.7 s in most starts (1.1 s or 2.5 s with other programs busy).
++  `STRATA_ARENA_PREFAULT=0` leaves the first touch to `cudaHostRegister`;
++  `=N` sets the threads. Not used with large pages, a shared arena file, or an arena that is not pinned (integrated
++  GPU).
++- **The projection matrices are uploaded by 8 threads** (`STRATA_DENSE_UPLOAD_THREADS`). Windows does not read a mapped
++  file ahead, so one copy per matrix took its page faults 4 KiB at a time: 1.5 s for 2019 MiB. Eight threads, each
++  reading 8 MiB pieces into pinned buffers, take 0.3 s. `STRATA_DENSE_UPLOAD_THREADS=1` restores the single copy.
++  `STRATA_DENSE_CHECKSUM=1` prints a hash of the matrices as the GPU holds them, for checking that both ways give the
++  same bytes (they do: the same hash with 1 and 8 threads).
++- **The expert arena is loaded from the start** (`STRATA_EARLY_ARENA`). Before, it was read only after the dense
++  weights, the draft layer and the output head. Now a thread pins it and reads the experts into it while those load;
++  the arena is ready about 2 s sooner. The other loads then share the drive with it and take longer (done at about
++  6.5 s instead of 2.7 s here); the bytes read are the same, only their order changes, so on a slower drive the gain
++  may be smaller. It starts only when the free RAM covers the arena plus the RAM floor
++  (`--conversation-cache-min-free-mib`, at least 8 GiB); otherwise the start is as before, with the line
++  `STRATA_EARLY_ARENA: expert read not started: ...` saying why. Not used with two GPUs (a layer split, also one
++  that `--split-skip-if-fits` later drops, or remote experts), a pin cap, a shared arena file, `--mmap-experts`, `STRATA_PIN_BY_NEED=1` or `STRATA_DEFERRED_REGISTER=1`.
++  If the early read fails, the line `STRATA_EARLY_ARENA: the early arena is not used (...)` says why and the arena
++  loads as before. A load that fails before the arena is opened exits only once the early read has finished.
++  `STRATA_EARLY_ARENA=0` turns it off.
++
++The answers do not change: the expert arena's checksum (`STRATA_VERIFY_ARENA=1`) is the same with these on and off, and
++decode and prompt speed after loading were unchanged in the same runs. None of this is built for Linux, macOS, AMD
++(HIP) or Intel Arc (SYCL): there the start is as before.
++
+ ## Short prompts: the CPU shares the experts (on by default on one NVIDIA GPU, `STRATA_PREFILL_CPU_SHARE`)
+ 
+ A prompt chunk of a few thousand tokens (an agent's tool result, a test's output, a short follow-up) streams every routed
+diff --git a/include/strata/core/conversation_cache.hpp b/include/strata/core/conversation_cache.hpp
+index b2e6a74f7785264a0882cc4105c65acace51bd00..935de225389b971f57c77ac41038c6da0b747b6e 100644
+--- a/include/strata/core/conversation_cache.hpp
++++ b/include/strata/core/conversation_cache.hpp
+@@ -67,10 +67,14 @@ struct ConversationKvReuse {
+     std::vector<ConversationKv> kv;
+     // Original image extent for validation, and the earliest subsequent rewrite.
+     int64_t captured_tokens = 0, unchanged_tokens = 0;
++    // The conversation the image was captured from: a park reuses it only for the prefix it shares with the
++    // conversation then in the main session (a slot may have replaced that session's K/V since).
++    std::vector<int32_t> ids;
+     // With a layer split: the later stages' own retained K/V, one per stage, same extents (empty: none)
+     std::vector<ConversationKvReuse> stages;
+     size_t bytes() const {
+-        size_t n = kv.capacity() * sizeof(ConversationKv) + stages.capacity() * sizeof(ConversationKvReuse);
++        size_t n = kv.capacity() * sizeof(ConversationKv) + stages.capacity() * sizeof(ConversationKvReuse) +
++                   ids.capacity() * sizeof(int32_t);
+         for (const auto& layer : kv) n += layer.bytes();
+         for (const auto& s : stages) n += s.bytes();
+         return n;
+@@ -228,11 +232,12 @@ public:
+     // Retain only the restored K/V buffers, not duplicate running checkpoints.
+     // This optimization never evicts a parked conversation to make itself fit.
+     // `stage_kv`: with a layer split, the later stages' restored K/V (one per stage), retained with the first's.
++    // `ids`: the conversation the K/V belongs to (take_reuse_for refuses it for any other; none: never reused).
+     void retain(std::vector<ConversationKv>&& kv, int64_t tokens,
+-                std::vector<std::vector<ConversationKv>>&& stage_kv = {}) {
++                std::vector<std::vector<ConversationKv>>&& stage_kv = {}, std::vector<int32_t> ids = {}) {
+         reuse_ = {};
+-        ConversationKvReuse candidate{std::move(kv), tokens, tokens, {}};
+-        for (auto& k : stage_kv) candidate.stages.push_back(ConversationKvReuse{std::move(k), tokens, tokens, {}});
++        ConversationKvReuse candidate{std::move(kv), tokens, tokens, std::move(ids), {}};
++        for (auto& k : stage_kv) candidate.stages.push_back(ConversationKvReuse{std::move(k), tokens, tokens, {}, {}});
+         if (enabled() && candidate.bytes() <= budget_ - bytes_) reuse_ = std::move(candidate);
+     }
+     void limit_reuse(int64_t first_dirty) {
+@@ -241,7 +246,22 @@ public:
+         if (reuse_.unchanged_tokens <= 0) reuse_ = {};
+     }
+     ConversationKvReuse take_reuse() { return std::exchange(reuse_, {}); }
++    // The retained K/V for parking `live`: limited to the prefix `live` shares with the conversation it was captured
++    // from, and nothing when they share none.  Without this a park after a slot gave its conversation back to the main
++    // session wrote the RESTORED conversation's K/V into the new one's image (2026-10-08 cross-conversation leak).
++    template<class Token>
++    ConversationKvReuse take_reuse_for(const std::vector<Token>& live) {
++        ConversationKvReuse r = std::exchange(reuse_, {});
++        const int64_t n = std::min<int64_t>((int64_t) r.ids.size(), (int64_t) live.size());
++        int64_t same = 0;
++        while (same < n && (int64_t) r.ids[(size_t) same] == (int64_t) live[(size_t) same]) ++same;
++        r.unchanged_tokens = std::min(r.unchanged_tokens, same);
++        for (auto& st : r.stages) st.unchanged_tokens = std::min(st.unchanged_tokens, same);
++        if (r.unchanged_tokens <= 0) return {};
++        return r;
++    }
+     size_t retained_bytes() const { return reuse_.bytes(); }
++    int64_t retained_tokens() const { return reuse_.kv.empty() ? 0 : reuse_.unchanged_tokens; }
+     bool can_fit(size_t incoming, size_t held = 0) const {
+         return enabled() && held <= budget_ && incoming <= budget_ - held &&
+                entries_.size() < slots_ && bytes() <= budget_ - held - incoming;
+diff --git a/include/strata/core/expert_source.hpp b/include/strata/core/expert_source.hpp
+index 3ab77dc2a78a41003f2d19bd7a142a264ed30d18..126e16b7144b493bf320e41ad1f1cf151fca323d 100644
+--- a/include/strata/core/expert_source.hpp
++++ b/include/strata/core/expert_source.hpp
+@@ -43,6 +43,10 @@
+ #include <utility>
+ #include <string>
+ #include <vector>
++#if defined(_WIN32) && !defined(STRATA_USE_HIP)
++// Windows with CUDA: the early arena load (ArenaExpertSource::begin_early_load; STRATA_EARLY_ARENA=0 turns it off)
++#define STRATA_EARLY_ARENA_BUILT 1
++#endif
+ 
+ namespace strata::kernels::cpu {
+ struct ExpertLayout;
+@@ -1299,9 +1303,24 @@ public:
+     double load_seconds() const { return load_seconds_; }
+     double load_read_seconds() const { return load_read_s_; }
+     double load_copy_seconds() const { return load_copy_s_; }
++#ifdef STRATA_EARLY_ARENA_BUILT
++    /// Windows with CUDA (STRATA_EARLY_ARENA=0 turns it off): start loading the arena NOW on a background thread - the
++    /// normal constructor (reserve, touch, register the whole range), then the expert read - so the read overlaps
++    /// the rest of the start (dense weights, MTP, head).  open() then waits for it and takes it, or drops it and
++    /// loads as before when this open cannot use it.  Only when the available RAM covers the arena plus
++    /// `headroom_bytes`: pinned first, a short arena would make a LATER allocation fail instead of open()'s plain
++    /// warning.  False, with `note`, when it does not start (open() loads as before).
++    bool begin_early_load(const std::string& pack_dir, int64_t n_layers, int64_t n_expert, int threads,
++                          std::string& note, uint64_t headroom_bytes);
++#endif
+ 
+ private:
+     void* arena_ = nullptr;          ///< the PinnedArena, owned
++#ifdef STRATA_EARLY_ARENA_BUILT
++    struct EarlyLoad;                    ///< STRATA_EARLY_ARENA: the arena loaded by early_thread_, and its stats
++    std::shared_ptr<EarlyLoad> early_;
++    std::thread early_thread_;
++#endif
+     void* map_ = nullptr;            ///< STRATA_ARENA_MMAP: the arena file, mapped read-only (not the PinnedArena)
+     uint64_t map_bytes_ = 0;
+     std::vector<const uint8_t*> dev_slice_;   ///< device alias of each registered slice (or of the whole range)
+diff --git a/include/strata/platform/cpu_pinning.hpp b/include/strata/platform/cpu_pinning.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..6108086ca1b9c4f81a4ca27ee7ca4373a0314cd1
+--- /dev/null
++++ b/include/strata/platform/cpu_pinning.hpp
+@@ -0,0 +1,14 @@
++#pragma once
++
++#include <cstdlib>
++
++namespace strata {
++
++// Process-local opt-out for callers that require the OS to place every thread.
++// Only the exact value "1" opts out; an unset variable preserves the upstream path.
++inline bool no_cpu_pin() noexcept {
++    const char* value = std::getenv("STRATA_NO_CPU_PIN");
++    return value != nullptr && value[0] == '1' && value[1] == '\0';
++}
++
++}  // namespace strata
+diff --git a/include/strata/platform/win_numa_arena.hpp b/include/strata/platform/win_numa_arena.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e8763f0ec
+--- /dev/null
++++ b/include/strata/platform/win_numa_arena.hpp
+@@ -0,0 +1,94 @@
++// Windows-only NUMA preference for the existing pinned arena. No CPU affinity changes.
++#pragma once
++#include <cstdint>
++#include <cstdlib>
++#include <limits>
++#include <string>
++#include <vector>
++
++namespace strata::platform::win_numa {
++struct Node { int id; uint64_t free_bytes; bool has_cpu; };
++struct Decision { int node = -1; bool requested = false; std::string why; };
++inline Decision choose(const char* mode, const std::vector<Node>& nodes, int gpu_node, uint64_t bytes) {
++    Decision d;
++    if (mode == nullptr || *mode == '\0' || std::string(mode) == "off") return d;
++    d.requested = true;
++    int wanted = -1;
++    if (std::string(mode) == "gpu" || std::string(mode) == "auto") {
++        wanted = gpu_node;
++        if (wanted < 0) { d.why = "GPU host NUMA node unknown; ordinary allocation"; return d; }
++    } else {
++        unsigned value = 0;
++        for (const char* p = mode; *p; ++p) {
++            if (*p < '0' || *p > '9' || value > (65535u - unsigned(*p-'0')) / 10u) {
++                d.why = "invalid STRATA_WIN_NUMA_NODE (off, gpu or a node number); ordinary allocation"; return d;
++            }
++            value = value * 10 + unsigned(*p-'0');
++        }
++        wanted = int(value);
++    }
++    int count = 0; const Node* selected = nullptr;
++    for (const Node& n : nodes) { if (n.has_cpu) ++count; if (n.has_cpu && n.id == wanted) selected = &n; }
++    if (count < 2) { d.why = "fewer than two CPU NUMA nodes; ordinary allocation"; return d; }
++    if (selected == nullptr) { d.why = "requested NUMA node has no CPUs; ordinary allocation"; return d; }
++    constexpr uint64_t headroom = 4ull << 30;
++    if (bytes > selected->free_bytes || selected->free_bytes - bytes < headroom) {
++        d.why = "preferred NUMA node lacks arena plus 4 GiB headroom; ordinary allocation"; return d;
++    }
++    d.node = wanted;
++    d.why = "NUMA node " + std::to_string(wanted) + " preferred (Windows may fall back); CPU placement unchanged";
++    return d;
++}
++} // namespace strata::platform::win_numa
++
++#if defined(_WIN32)
++#include <windows.h>
++#include <psapi.h>
++namespace strata::platform::win_numa {
++inline Decision probe(const char* mode, int gpu_node, uint64_t bytes) {
++    if (mode == nullptr || *mode == '\0' || std::string(mode) == "off") return {};
++    ULONG highest = 0; std::vector<Node> nodes;
++    if (!GetNumaHighestNodeNumber(&highest) || highest > 1024) {
++        return {-1, true, "Windows NUMA topology unavailable; ordinary allocation"};
++    }
++    for (ULONG n = 0; n <= highest; ++n) {
++        GROUP_AFFINITY mask{}; ULONGLONG available = 0;
++        if (GetNumaNodeProcessorMaskEx(USHORT(n), &mask) && mask.Mask != 0 &&
++            GetNumaAvailableMemoryNodeEx(USHORT(n), &available)) nodes.push_back({int(n), available, true});
++    }
++    return choose(mode, nodes, gpu_node, bytes);
++}
++inline std::string placement(void* base, SIZE_T bytes, int preferred) {
++    if (base == nullptr || bytes == 0 || preferred < 0) return {};
++    constexpr SIZE_T page = 4096;
++    const SIZE_T pages = (bytes - 1) / page + 1;
++    const SIZE_T count = pages < 128 ? pages : 128;
++    PSAPI_WORKING_SET_EX_INFORMATION info[128]{};
++    for (SIZE_T i = 0; i < count; ++i) {
++        const SIZE_T index = count == 1 ? 0 : ((pages - 1) / (count - 1)) * i;
++        info[i].VirtualAddress = static_cast<unsigned char*>(base) + index * page;
++    }
++    if (!QueryWorkingSetEx(GetCurrentProcess(), info, DWORD(count * sizeof(info[0]))))
++        return "NUMA page sample unavailable (error " + std::to_string(GetLastError()) + ")";
++    unsigned local = 0, remote = 0, not_resident = 0;
++    for (SIZE_T i = 0; i < count; ++i) {
++        if (!info[i].VirtualAttributes.Valid) ++not_resident;
++        else if (int(info[i].VirtualAttributes.Node) == preferred) ++local;
++        else ++remote;
++    }
++    return "NUMA page sample local/remote/not-resident=" + std::to_string(local) + "/" +
++        std::to_string(remote) + "/" + std::to_string(not_resident);
++}
++inline void* allocate(SIZE_T bytes, DWORD flags, const Decision& d, std::string& report) {
++    if (d.node >= 0) {
++        void* p = VirtualAllocExNuma(GetCurrentProcess(), nullptr, bytes, flags, PAGE_READWRITE, DWORD(d.node));
++        if (p != nullptr) { report = d.why + "; " + placement(p, bytes, d.node); return p; }
++        const DWORD error = GetLastError();
++        report = "NUMA allocation refused (error " + std::to_string(error) + "); ordinary allocation";
++    } else if (d.requested) report = d.why;
++    void* p = VirtualAlloc(nullptr, bytes, flags, PAGE_READWRITE);
++    // Preserve the ordinary allocation's last error for the existing large-page diagnostic.
++    const DWORD error = GetLastError(); SetLastError(error); return p;
++}
++} // namespace strata::platform::win_numa
++#endif
+diff --git a/serve/server.py b/serve/server.py
+index 87f59459227129ad757d5f6f032f408483df45ea..d4449352da37f9fa48d939ef1a383fe01dec1893 100644
+--- a/serve/server.py
++++ b/serve/server.py
+@@ -92,7 +92,11 @@ IMAGE_PAD = "<|image_pad|>"
+ def popen(what: str, args: list, role: str = "engine", **kw):
+     """#735: subprocess.Popen, but Windows' refusal to start a program (WinError 4551, or 1260 when a policy blocks it:
+     Smart App Control on a clean Windows 11 blocks an exe that is not signed) is said in words instead of a bare
+-    OSError."""
++    OSError.  On Windows the program gets no console window of its own (as serve/mcp.py's servers): a server started
++    without a console (pythonw, a service, a launcher that hides it) would otherwise open one for the engine and one
++    for the image encoder; their output goes through pipes and the log either way."""
++    if os.name == "nt":
++        kw.setdefault("creationflags", getattr(subprocess, "CREATE_NO_WINDOW", 0))
+     try:
+         return lifeline.popen(args, role, **kw)       # a child that cannot outlive this server (serve/lifeline.py)
+     except OSError as e:
+@@ -5003,11 +5007,13 @@ class Service:
+         """Yields ("event", Event) as text arrives, then ("done", {"finish": .., "completion_tokens": ..}).
+         `force` (forced_call): the opening of the call the reply must make - see prepare()."""
+         # the model card's sampling for this thinking state, then the config's block, then the Chat settings shared with
+-        # apps; the request's own fields win over all of them
++        # apps; the request's own fields win over all of them.  Under greedy the penalty defaults are not merged: a
++        # penalty makes the engine score the last penalty_last_n logits and its speculation (MTP) then drafts nothing.
+         defaults = {**model_card_sampling(self.model_arch, thinking), **self.sampling_defaults, **self.shared}
+-        if defaults:                   # the request's own fields win (explicit 0 stays greedy)
+-            req_values = {k: v for k, v in (sampling or {}).items() if v is not None}
+-            sampling = {**defaults, **req_values}
++        if defaults:
++            sampling, note = merge_sampling(defaults, sampling)
++            if note:
++                print(note, flush=True)
+         # #123: read after the merge, so a budget shared through POST /settings is seen like the other keys
+         budget = self.reasoning_budget(sampling) if thinking else None
+         if thinking and not budget and self.answer_room and max_new and max_new >= ANSWER_ROOM_MIN_CAP:
+@@ -6575,8 +6581,11 @@ def make_handler(svc: Service):
+             elif path in ("/v1/models", "/models"):
+                 if self._authorized():
+                     loaded = svc.loaded()
++                    ctx = svc.reported_ctx()
++                    # the context size under the names other APIs use too (vLLM's max_model_len, OpenRouter's
++                    # context_length), so a client that sizes its window from /v1/models reads it
+                     model = {"id": svc.model, "object": "model", "status": {"value": "loaded"},
+-                             "meta": {"n_ctx": svc.reported_ctx()},
++                             "max_model_len": ctx, "context_length": ctx, "meta": {"n_ctx": ctx},
+                              "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
+                                               "output_modalities": ["text"]}}
+                     if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
+@@ -7080,10 +7089,20 @@ def make_handler(svc: Service):
+             if not req.get("stream"):
+                 return self._json(200, openai_collect(chunks))
+             self._sse()
++            # OpenAI's streaming contract: with "stream_options": {"include_usage": true} the usage rides in its own
++            # last chunk, "choices": []. Clients and gateways read it there (LiteLLM ignores a usage that sits on the
++            # finish_reason chunk and recounts the tokens itself, too low). Without the option the chunk is unchanged.
++            split_usage = bool((req.get("stream_options") or {}).get("include_usage"))
+             try:
+                 for c in chunks:
+                     if c is None:
+                         self.wfile.write(b": keep-alive\n\n")      # an SSE comment: clients ignore it
++                    elif split_usage and c.get("usage") is not None:
++                        head = {k: v for k, v in c.items() if k != "usage"}
++                        tail = {"id": c["id"], "object": c["object"], "created": c["created"], "model": c["model"],
++                                "choices": [], "usage": c["usage"]}
++                        for part in (head, tail):
++                            self.wfile.write(b"data: " + json.dumps(part, ensure_ascii=False).encode() + b"\n\n")
+                     else:
+                         self.wfile.write(b"data: " + json.dumps(c, ensure_ascii=False).encode() + b"\n\n")
+                     self.wfile.flush()
+@@ -7973,6 +7992,49 @@ def model_card_sampling(arch, thinking) -> dict:
+     return dict(sets["thinking" if thinking else "instruct"]) if sets else {}
+ 
+ 
++# A penalty (presence, frequency, repetition) makes the engine score the last penalty_last_n logits, and its
++# speculation (MTP) is off for a request that needs them.  At temperature 0 a penalty cannot change which token
++# wins, so the defaults are not merged there unless the request asks for one.
++GREEDY_PENALTIES = ("presence_penalty", "frequency_penalty", "repetition_penalty")
++PENALTY_NEUTRAL = {"presence_penalty": 0.0, "frequency_penalty": 0.0, "repetition_penalty": 1.0}
++
++
++def _sampling_number(value) -> float | None:
++    """`value` as a float when it is a JSON number (never a bool), else None - the values sampling_keys reads."""
++    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
++
++
++def merge_sampling(defaults: dict, request: dict | None) -> tuple[dict, str]:
++    """The request's sampling over the defaults (model card, config `sampling`, Chat settings); the request's own
++    fields win and a field set to null falls back to the default.  Under greedy (temperature <= 0) the three
++    penalties stay at the engine's neutral values unless the request itself asks for one: a penalty makes the engine
++    score the last penalty_last_n logits and its speculation (MTP) is then off, while at temperature 0 it cannot
++    change which token wins.  -> (the merged sampling, a one-line note for the server window or "")."""
++    req = {k: v for k, v in (request or {}).items() if v is not None}
++    merged = {**defaults, **req}
++    t = _sampling_number(merged.get("temperature"))
++    if t is None or t > 0.0:
++        return merged, ""
++    explicit = {}
++    for k in GREEDY_PENALTIES:
++        v = _sampling_number(req.get(k))
++        if v is not None and v != PENALTY_NEUTRAL[k]:
++            explicit[k] = v
++    if explicit:
++        kept = " ".join(f"{k}={v!r}" for k, v in explicit.items())
++        return merged, f"[strata] greedy: {kept} kept (MTP off for this request)"
++    dropped = {}
++    for k in GREEDY_PENALTIES:
++        v = _sampling_number(merged.get(k))
++        if k in merged and v is not None and v != PENALTY_NEUTRAL[k]:
++            dropped[k] = v
++    if not dropped:
++        return merged, ""
++    merged.update(PENALTY_NEUTRAL)
++    lost = " ".join(f"{k} {v:g} -> {PENALTY_NEUTRAL[k]:g}" for k, v in dropped.items())
++    return merged, f"[strata] greedy: penalty defaults not merged (MTP stays on): {lost}"
++
++
+ def default_model_name(cfg: dict) -> str:
+     """The config's "model_name", else its family's name ("arch": qwen4exp, qwen35moe), else Flash-Next's."""
+     return cfg.get("model_name") or FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next")
+diff --git a/serve/test_sampling_merge.py b/serve/test_sampling_merge.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2ebc11fd096b70a0ef166852299f853ca7ef5e99
+--- /dev/null
++++ b/serve/test_sampling_merge.py
+@@ -0,0 +1,56 @@
++"""Offline tests for serve.server.merge_sampling: greedy must not inherit a model-card penalty (MTP stays on).
++
++No engine, no GPU, no server:
++
++    python serve/test_sampling_merge.py -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(ROOT))
++
++from serve.server import StrataEngine, merge_sampling  # noqa: E402
++
++# Qwen3.6-35B-A3B's non-thinking card, the measured offender: presence_penalty 1.5.
++CARD = {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5}
++
++
++class GreedyPenaltyMerge(unittest.TestCase):
++    def test_greedy_without_request_penalty_is_neutral(self):
++        merged, note = merge_sampling(CARD, {"temperature": 0})
++        self.assertEqual(merged["temperature"], 0)
++        self.assertEqual(merged["presence_penalty"], 0.0)
++        self.assertEqual(merged["frequency_penalty"], 0.0)
++        self.assertEqual(merged["repetition_penalty"], 1.0)
++        self.assertIn("[strata] greedy: penalty defaults not merged (MTP stays on)", note)
++        self.assertNotIn("penalty_present", StrataEngine.sampling_keys(merged))
++
++    def test_explicit_request_penalty_is_kept(self):
++        merged, note = merge_sampling(CARD, {"temperature": 0, "presence_penalty": 1.5})
++        self.assertEqual(merged["presence_penalty"], 1.5)
++        self.assertIn("kept (MTP off for this request)", note)
++        self.assertIn("penalty_present=1.5", StrataEngine.sampling_keys(merged))
++
++    def test_temperature_above_zero_is_unchanged(self):
++        merged, note = merge_sampling(CARD, {"temperature": 0.7})
++        self.assertEqual(merged, CARD)
++        self.assertEqual(note, "")
++        self.assertIn("penalty_present=1.5", StrataEngine.sampling_keys(merged))
++
++    def test_config_greedy_is_neutral_too(self):
++        merged, note = merge_sampling({"temperature": 0.0, "presence_penalty": 1.5}, None)
++        self.assertEqual(merged["presence_penalty"], 0.0)
++        self.assertIn("MTP stays on", note)
++
++    def test_explicit_penalty_at_temperature_above_zero_is_untouched(self):
++        merged, note = merge_sampling(CARD, {"temperature": 0.7, "frequency_penalty": 0.3})
++        self.assertEqual(merged["frequency_penalty"], 0.3)
++        self.assertEqual(note, "")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/serve/test_server.py b/serve/test_server.py
+index 3e60dee4ee62653df7930b086fa63e38e898d2c1..771fd92e7e4466f3ea33892310748691613325dc 100644
+--- a/serve/test_server.py
++++ b/serve/test_server.py
+@@ -633,6 +633,20 @@ class VisionTempFiles(unittest.TestCase):
+             with self.assertRaises(FileNotFoundError):
+                 popen("x", ["x"])
+ 
++    def test_no_console_window_on_windows(self):
++        import subprocess
++        from serve.server import popen
++        with mock.patch.object(subprocess, "Popen") as p:
++            popen("the Strata engine", ["strata.exe"], stdin=subprocess.PIPE)
++        kw = p.call_args.kwargs
++        if os.name == "nt":
++            self.assertTrue(kw["creationflags"] & subprocess.CREATE_NO_WINDOW)   # others may be added (lifeline)
++        else:
++            self.assertNotIn("creationflags", kw)
++        with mock.patch.object(subprocess, "Popen") as p:          # a caller's own flags are kept
++            popen("x", ["x"], creationflags=0)
++        self.assertFalse(p.call_args.kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
++
+ 
+ class ListenProblem(unittest.TestCase):
+     """#769: only an address that is taken is "already in use"."""
+@@ -2001,6 +2015,65 @@ class HipEnvGuard(unittest.TestCase):
+             del os.environ["HIP_PATH"]
+ 
+ 
++class StreamUsageChunk(unittest.TestCase):
++    """OpenAI's streaming contract: with "stream_options": {"include_usage": true} the usage rides in its own last
++    chunk, "choices": []. LiteLLM (and the AI SDK) read it there; a usage on the finish_reason chunk is ignored by
++    LiteLLM, which then recounts the tokens itself, too low, so a client compacts its context too late.
++    Without the option the usage stays on the finish_reason chunk, as before."""
++
++    @classmethod
++    def setUpClass(cls):
++        tok = ByteTokenizer()
++        cls.svc = Service(MockEngine(tok, "</think>\n\nanswer", max_context=CTX), tok,
++                          ChatTemplate(ROOT / "serve/chat_template.jinja"))
++        cls.httpd = serve(cls.svc, port=0)
++        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
++
++    @classmethod
++    def tearDownClass(cls):
++        cls.httpd.shutdown()
++        cls.httpd.server_close()
++
++    def stream(self, **extra):
++        body = {"model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 64, "stream": True, **extra}
++        req = urllib.request.Request(self.base + "/v1/chat/completions", data=json.dumps(body).encode(),
++                                     headers={"Content-Type": "application/json"})
++        with urllib.request.urlopen(req, timeout=30) as r:
++            lines = r.read().decode().split("\n\n")
++        data = [x[len("data: "):] for x in lines if x.startswith("data: ")]
++        self.assertEqual(data[-1], "[DONE]")
++        return [json.loads(x) for x in data[:-1]]
++
++    def test_usage_in_its_own_last_chunk(self):
++        chunks = self.stream(stream_options={"include_usage": True})
++        last, finish = chunks[-1], chunks[-2]
++        self.assertEqual(last["choices"], [])
++        self.assertGreater(last["usage"]["prompt_tokens"], 0)
++        self.assertGreater(last["usage"]["completion_tokens"], 0)
++        self.assertEqual(last["usage"]["total_tokens"], last["usage"]["prompt_tokens"] + last["usage"]["completion_tokens"])
++        self.assertIn("cached_tokens", last["usage"]["prompt_tokens_details"])
++        self.assertEqual(last["id"], finish["id"])
++        self.assertEqual(finish["choices"][0]["finish_reason"], "stop")
++        self.assertNotIn("usage", finish)
++        self.assertEqual(sum(1 for c in chunks if "usage" in c), 1)        # exactly one usage chunk
++
++    def test_without_the_option_the_usage_stays_on_the_finish_chunk(self):
++        for extra in ({}, {"stream_options": {"include_usage": False}}, {"stream_options": None}):
++            chunks = self.stream(**extra)
++            self.assertEqual(chunks[-1]["choices"][0]["finish_reason"], "stop", extra)
++            self.assertGreater(chunks[-1]["usage"]["prompt_tokens"], 0, extra)
++            self.assertTrue(all(c["choices"] for c in chunks), extra)
++
++    def test_same_numbers_as_the_non_streaming_answer(self):
++        body = {"model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 64}
++        req = urllib.request.Request(self.base + "/v1/chat/completions", data=json.dumps(body).encode(),
++                                     headers={"Content-Type": "application/json"})
++        with urllib.request.urlopen(req, timeout=30) as r:
++            plain = json.loads(r.read())["usage"]
++        split = self.stream(stream_options={"include_usage": True})[-1]["usage"]
++        self.assertEqual((split["prompt_tokens"], split["completion_tokens"]), (plain["prompt_tokens"], plain["completion_tokens"]))
++
++
+ class RecordingPrompt(MockEngine):
+     def generate(self, ids, max_new, sampling, cancel, embeddings=None):
+         self.last_ids = list(ids)
+@@ -3507,6 +3580,7 @@ class WebApp(unittest.TestCase):
+                     self.assertEqual(model["id"], svc.model)
+                     self.assertEqual(model["status"]["value"], "loaded")
+                     self.assertEqual(model["meta"]["n_ctx"], 262144)
++                    self.assertEqual((model["max_model_len"], model["context_length"]), (262144, 262144))
+                     self.assertEqual(model["architecture"]["input_modalities"],
+                                      ["text", "image"] if vision else ["text"])
+                 code, _, body = self.get("/props?model=" + svc.model + "&autoload=false")
+diff --git a/src/core/conversation_cache_test.cpp b/src/core/conversation_cache_test.cpp
+index a21c0d7fee06b2bd0bda9b3616eccd2fa03dd8ae..fd6042b30b413e76059febc8540f5714779bcc2e 100644
+--- a/src/core/conversation_cache_test.cpp
++++ b/src/core/conversation_cache_test.cpp
+@@ -502,6 +502,41 @@ int main() {
+         auto none = conversation_checkpoints_split({}, 3);
+         check(conversation_checkpoints_merge(std::move(none), back) && back.empty(), "no checkpoints: nothing to do");
+     }
++    {
++        // 2026-10-08 cross-conversation leak: the retained K/V of a restored conversation must never be reused to
++        // park ANOTHER conversation the main session later holds (a slot gave its conversation back)
++        auto kv = [](size_t n) {
++            std::vector<ConversationKv> v(2);
++            for (auto& l : v) l.k.resize(n, 1);
++            return v;
++        };
++        ConversationCache cache(1 << 20, 4);
++        const std::vector<int32_t> a = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
++        std::vector<std::vector<ConversationKv>> st;
++        st.push_back(kv(100));
++        cache.retain(kv(500), 16, std::move(st), a);
++        std::vector<int32_t> b(16, 99);
++        auto other = cache.take_reuse_for(b);
++        check(other.kv.empty() && other.stages.empty() && other.unchanged_tokens == 0,
++              "another conversation never gets the retained K/V");
++        check(cache.retained_bytes() == 0, "the retained K/V is dropped once refused");
++        cache.retain(kv(500), 16, {}, a);
++        check(cache.retained_tokens() == 16, "the retained extent is reported");
++        std::vector<int32_t> cont(a.begin(), a.begin() + 10);
++        cont.push_back(42);
++        cont.push_back(43);
++        auto partly = cache.take_reuse_for(cont);
++        check(partly.unchanged_tokens == 10, "a conversation that diverges reuses only the shared prefix");
++        std::vector<std::vector<ConversationKv>> st2;
++        st2.push_back(kv(100));
++        cache.retain(kv(500), 16, std::move(st2), a);
++        cache.limit_reuse(9);
++        auto same = cache.take_reuse_for(a);
++        check(same.unchanged_tokens == 9 && same.stages.size() == 1 && same.stages[0].unchanged_tokens == 9,
++              "the same conversation keeps the first rewrite's limit, on every stage");
++        cache.retain(kv(500), 16);
++        check(cache.take_reuse_for(a).kv.empty(), "retained K/V of unknown identity is never reused");
++    }
+     {
+         // the later stages' retained K/V, kept with the first stage's and limited together
+         auto kv = [](size_t n) {
+diff --git a/src/core/conversation_copy.hpp b/src/core/conversation_copy.hpp
+index 7e8341b3aa1ba10daffc06029f6086e1d10173cb..fb14c9ddbe0d102853bd402dc48733ca60f4c2ea 100644
+--- a/src/core/conversation_copy.hpp
++++ b/src/core/conversation_copy.hpp
+@@ -24,9 +24,24 @@ inline cudaError_t private_stream(cudaStream_t& s) {
+     int dev = 0;
+     cudaError_t e = cudaGetDevice(&dev);
+     if (e != cudaSuccess) return e;
+-    thread_local std::vector<cudaStream_t> streams;
++    struct StreamOwner {
++        std::vector<cudaStream_t> streams;
++        ~StreamOwner() {
++            int previous = 0;
++            if (cudaGetDevice(&previous) != cudaSuccess) return;
++            for (size_t i = 0; i < streams.size(); ++i) {
++                if (streams[i] && cudaSetDevice(static_cast<int>(i)) == cudaSuccess)
++                    (void) cudaStreamDestroy(streams[i]);
++            }
++            (void) cudaSetDevice(previous);
++        }
++    };
++    // Pipeline stage workers can be short-lived: their private streams must not
++    // outlive the thread that owns them.
++    thread_local StreamOwner owner;
++    auto& streams = owner.streams;
+     if (dev < 0) dev = 0;
+-    if ((size_t) dev >= streams.size()) streams.resize((size_t) dev + 1, nullptr);   // never destroyed: process lifetime
++    if ((size_t) dev >= streams.size()) streams.resize((size_t) dev + 1, nullptr);
+     if (!streams[(size_t) dev]) {
+         e = cudaStreamCreateWithFlags(&streams[(size_t) dev], cudaStreamNonBlocking);
+         if (e != cudaSuccess) { streams[(size_t) dev] = nullptr; return e; }
+diff --git a/src/core/conversation_copy_lifetime_test.cpp b/src/core/conversation_copy_lifetime_test.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..8323c9966353d9cfaaffc309185ca1272523cd65
+--- /dev/null
++++ b/src/core/conversation_copy_lifetime_test.cpp
+@@ -0,0 +1,128 @@
++// Exercise the actual header on host threads. No CUDA/HIP runtime call is made.
++#include "strata/core/conversation_cache.hpp"
++#include "strata/core/progress.hpp"
++#include <cuda_runtime.h>
++
++#include <atomic>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <mutex>
++#include <thread>
++#include <unordered_map>
++
++namespace fixture {
++constexpr cudaError_t failure = static_cast<cudaError_t>(1);
++std::mutex mutex;
++std::unordered_map<cudaStream_t, int> live;
++int created = 0, destroyed = 0;
++std::atomic<int> errors{0};
++thread_local int device = 0;
++thread_local bool fail_create = false, fail_get = false, fail_copy = false, fail_sync = false;
++
++cudaError_t get_device(int* d) {
++    if (fail_get) return failure;
++    *d = device;
++    return cudaSuccess;
++}
++cudaError_t set_device(int d) { device = d; return cudaSuccess; }
++cudaError_t create(cudaStream_t* s, unsigned int) {
++    std::lock_guard<std::mutex> lock(mutex);
++    if (fail_create) {
++        *s = reinterpret_cast<cudaStream_t>(uintptr_t(999999));
++        return failure;
++    }
++    *s = reinterpret_cast<cudaStream_t>(uintptr_t(++created));
++    live.emplace(*s, device);
++    return cudaSuccess;
++}
++cudaError_t destroy(cudaStream_t s) {
++    std::lock_guard<std::mutex> lock(mutex);
++    auto it = live.find(s);
++    if (it == live.end() || it->second != device) {
++        ++errors;
++        return failure;
++    }
++    live.erase(it);
++    ++destroyed;
++    return cudaSuccess;
++}
++cudaError_t copy(void*, const void*, size_t, decltype(cudaMemcpyDefault), cudaStream_t) {
++    return fail_copy ? failure : cudaSuccess;
++}
++cudaError_t sync(cudaStream_t) { return fail_sync ? failure : cudaSuccess; }
++void check(bool ok, const char* what) {
++    if (!ok) { std::fprintf(stderr, "FAIL: %s\n", what); std::exit(1); }
++}
++struct CheckRestoredDevice {
++    int expected = 0;
++    ~CheckRestoredDevice() { if (device != expected) ++errors; }
++};
++}
++
++// Dependencies are already included. Redirect only the operations of this helper.
++#undef cudaGetDevice
++#undef cudaSetDevice
++#undef cudaStreamCreateWithFlags
++#undef cudaStreamDestroy
++#undef cudaMemcpyAsync
++#undef cudaStreamSynchronize
++#define cudaGetDevice fixture::get_device
++#define cudaSetDevice fixture::set_device
++#define cudaStreamCreateWithFlags fixture::create
++#define cudaStreamDestroy fixture::destroy
++#define cudaMemcpyAsync fixture::copy
++#define cudaStreamSynchronize fixture::sync
++#include "conversation_copy.hpp"
++
++using strata::core::conversation_detail::copy_nonblocking;
++
++int main() {
++    using namespace fixture;
++    // Models one fresh async stage thread per chunk: retained streams used to
++    // increase by one each time, even after every worker had been joined.
++    for (int i = 0; i < 32; ++i) {
++        std::thread([] {
++            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "first copy");
++            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "reuse stream");
++        }).join();
++        check(live.empty(), "exited worker retains a stream");
++    }
++    check(created == 32 && destroyed == 32, "one stream per worker");
++    const int before = created;
++    std::thread([] {
++        for (int i = 0; i < 32; ++i)
++            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "persistent worker copy");
++    }).join();
++    check(created == before + 1 && live.empty(), "persistent worker reuses one stream");
++
++    std::vector<std::thread> workers;
++    for (int i = 0; i < 16; ++i) workers.emplace_back([] {
++        // Constructed before the stream owner, hence inspected after its cleanup.
++        thread_local CheckRestoredDevice after_owner;
++        for (int d : {2, 0, 3, 2}) {
++            device = d;
++            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "multi-device copy");
++        }
++        after_owner.expected = device;
++    });
++    for (auto& worker : workers) worker.join();
++    check(live.empty() && errors == 0, "multi-device cleanup and device restoration");
++
++    std::thread([] {
++        fail_get = true;
++        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "device query failure");
++        fail_get = false;
++        fail_create = true;
++        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "stream creation failure");
++        fail_create = false;
++        fail_copy = true;
++        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "copy failure");
++        fail_copy = false;
++        fail_sync = true;
++        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "sync failure");
++        fail_sync = false;
++    }).join();
++    check(live.empty() && created == destroyed && errors == 0, "error paths release owned streams");
++    std::puts("PASS: worker exit, stream reuse, concurrent devices, failure cleanup");
++}
+diff --git a/src/core/conversation_validation_test.cpp b/src/core/conversation_validation_test.cpp
+index c670ef138ed46ca058434d4b44dd17231fa65520..e5f47acc7aa71a42b0e104857f723cf619d0bda5 100644
+--- a/src/core/conversation_validation_test.cpp
++++ b/src/core/conversation_validation_test.cpp
+@@ -26,6 +26,8 @@ extern "C" cudaError_t __wrap_cudaMemcpy(void* dst, const void* src, size_t n, c
+ }
+ // the snapshot/checkpoint copies go through a private non-blocking stream (conversation_copy.hpp)
+ extern "C" cudaError_t __wrap_cudaGetDevice(int* dev) { *dev = 0; return cudaSuccess; }
++extern "C" cudaError_t __wrap_cudaSetDevice(int) { return cudaSuccess; }
++extern "C" cudaError_t __wrap_cudaStreamDestroy(cudaStream_t) { return cudaSuccess; }
+ extern "C" cudaError_t __wrap_cudaStreamCreateWithFlags(cudaStream_t* s, unsigned int) {
+     *s = reinterpret_cast<cudaStream_t>(static_cast<uintptr_t>(1)); return cudaSuccess;
+ }
+diff --git a/src/core/expert_source.cpp b/src/core/expert_source.cpp
+index b8ad8fb42129e506365978f556cdcf6c67ffcfc9..5cb9487e090803f6cbb10c3b5e7bb44672c1b731 100644
+--- a/src/core/expert_source.cpp
++++ b/src/core/expert_source.cpp
+@@ -5675,12 +5675,29 @@ LoadStats load_experts_gguf(const std::string& gguf, uint8_t* dst, const strata:
+     return st;
+ }
+ 
++#ifdef STRATA_EARLY_ARENA_BUILT
++struct ArenaExpertSource::EarlyLoad {
++    PinnedArena* arena = nullptr;   ///< set by the thread once constructed (reserved, touched, registered)
++    LoadStats st;
++    bool unbuffered = false;
++    std::string why;
++    ~EarlyLoad() { delete arena; }  // an arena nobody took (any early return of open()) goes with it
++};
++
++#endif
+ ArenaExpertSource::~ArenaExpertSource() { close(); }
+ 
+ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int64_t n_expert, int threads,
+                              std::string& err, uint64_t max_pinned_bytes,
+                              const std::string& shared_arena_file) {
++#ifdef STRATA_EARLY_ARENA_BUILT
++    std::shared_ptr<EarlyLoad> early_load = std::move(early_);   // close() would drop it (the early arena load)
++    std::thread early_thread = std::move(early_thread_);
++    close();
++    if (early_thread.joinable()) early_thread.join();          // the early read is complete before anything uses it
++#else
+     close();
++#endif
+     const std::string path = pack_dir + "/experts.bin";
+     // plan v0.3 P6: the layout (canonical, or a native pack's per-layer blobs) was loaded by the driver
+     const strata::kernels::cpu::ExpertLayout& lay = strata::kernels::cpu::expert_layout();
+@@ -5764,7 +5781,13 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+     // engine still exiting) is only a warning - the OS may make room - per the recommend-not-force rule.
+     ram_warning_.clear();
+     // (a shared arena, --shared-expert-arena, may already be in RAM for another engine: not checked)
++#ifdef STRATA_EARLY_ARENA_BUILT
++    // an early arena is in RAM already (begin_early_load checked the room, with the rest of the start)
++    if (detail::HostMemory hm; !(early_load && early_load->arena) && shared_arena_file.empty() &&
++                               detail::host_available_memory(hm)) {
++#else
+     if (detail::HostMemory hm; shared_arena_file.empty() && detail::host_available_memory(hm)) {
++#endif
+         const uint64_t need = want + (uint64_t) blob;
+         const double gib = 1073741824.0;
+         char buf[512];
+@@ -5864,11 +5887,33 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+ #else
+     const bool deferred = false;
+ #endif
++#ifdef STRATA_EARLY_ARENA_BUILT
++    // the early arena, when this open is the plain one it stands for and its read succeeded; otherwise it goes
++    // (its RAM back first) and the arena loads as before
++    const bool early = early_load && early_load->arena && early_load->st.ok && !deferred && !by_need && !padded_ &&
++                       max_pinned_bytes == 0 && shared_arena_file.empty() &&
++                       early_load->arena->capacity == want + (uint64_t) blob;
++    if (early_load && !early) {
++        const std::string why = early_load->arena == nullptr ? early_load->st.error
++                              : !early_load->st.ok ? "its read failed: " + early_load->st.error
++                                                   : std::string("this open needs another kind of arena");
++        std::fprintf(stderr, "ArenaExpertSource: STRATA_EARLY_ARENA: the early arena is not used (%s): loaded as "
++                             "before\n", why.c_str());
++        delete early_load->arena;
++        early_load->arena = nullptr;
++    }
++    PinnedArena* a = early ? early_load->arena
++                   : by_need ? new PinnedArena(arena_bytes + (uint64_t) blob, PinnedArena::ByNeed{}, need_ranges,
++#else
+     PinnedArena* a = by_need ? new PinnedArena(arena_bytes + (uint64_t) blob, PinnedArena::ByNeed{}, need_ranges,
++#endif
+                                                max_pinned_bytes, shared_arena_file, pack_hash)
+                    : deferred ? new PinnedArena(want + (uint64_t) blob, bounds, PinnedArena::Deferred{})
+                               : new PinnedArena(want + (uint64_t) blob, bounds, max_pinned_bytes,
+                                                 shared_arena_file, pack_hash);
++#ifdef STRATA_EARLY_ARENA_BUILT
++    if (early) early_load->arena = nullptr;   // owned by `a` from here
++#endif
+     if (!a->valid()) {
+         const std::string why = a->note;
+         delete a;
+@@ -5889,10 +5934,21 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+     } else {
+         files.push_back(path);
+     }
++#ifdef STRATA_EARLY_ARENA_BUILT
++    std::string why = early ? early_load->why : std::string{};
++    const bool unbuffered = early ? early_load->unbuffered : experts_unbuffered(files, want + (uint64_t) blob, why);
++#else
+     std::string why;
+     const bool unbuffered = experts_unbuffered(files, want + (uint64_t) blob, why);
++#endif
+     const int readers = unbuffered ? std::max(threads, 16) : threads;   // 16 keep a PCIe 5 drive's queue full
+     LoadStats st;
++#ifdef STRATA_EARLY_ARENA_BUILT
++    if (early) {
++        st = early_load->st;
++        a->note = "read early, on its own threads (STRATA_EARLY_ARENA); " + a->note;
++    }
++#endif
+     std::atomic<int> ready{0};
+     std::thread reg;
+     if (deferred) {
+@@ -5904,6 +5960,11 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+         });
+     }
+     const std::atomic<int>* rp = deferred ? &ready : nullptr;
++#ifdef STRATA_EARLY_ARENA_BUILT
++    if (early) {
++        // loaded by the early thread
++    } else
++#endif
+     if (from_gguf) {
+         st = load_experts_gguf(gguf_, a->data(), lay, readers, unbuffered, rp, padded_ ? &pad_ : nullptr);
+     } else {
+@@ -6008,8 +6069,95 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+     record_inputs(path, gguf_, lay, from_gguf);
+     return true;
+ }
++#ifdef STRATA_EARLY_ARENA_BUILT
++
++bool ArenaExpertSource::begin_early_load(const std::string& pack_dir, int64_t n_layers, int64_t n_expert, int threads,
++                                         std::string& note, uint64_t headroom_bytes) {
++    if (arena_ != nullptr || early_ != nullptr) { note = "an arena is already open"; return false; }
++    const std::string path = pack_dir + "/experts.bin";
++    const strata::kernels::cpu::ExpertLayout& lay = strata::kernels::cpu::expert_layout();
++    if (lay.n_layers != n_layers || lay.n_expert != n_expert) { note = "the layout is for another geometry"; return false; }
++    const int64_t blob = (int64_t) lay.max_blob;
++    const uint64_t want = lay.total;
++    const bool from_gguf = !std::ifstream(path, std::ios::binary) && lay.native && !lay.gguf_off.empty() && !gguf_.empty();
++    std::string err;
++    if (from_gguf) {
++        if (!check_experts_gguf(gguf_, lay, err)) { note = err; return false; }   // open() says it again
++    } else {
++        std::ifstream f(path, std::ios::binary | std::ios::ate);
++        const uint64_t got = f ? (uint64_t) f.tellg() : 0;
++        if (got != want && got != want + (uint64_t) blob) { note = "experts.bin does not match"; return false; }
++    }
++    detail::HostMemory hm;
++    if (!detail::host_available_memory(hm)) { note = "the available RAM is unknown: loaded as before"; return false; }
++    if (hm.available < want + (uint64_t) blob + headroom_bytes) {
++        char buf[200];
++        std::snprintf(buf, sizeof buf, "%.1f GiB of RAM available, the arena needs %.1f GiB plus %.1f GiB for the rest "
++                      "of the start: loaded as before", hm.available / 1073741824.0,
++                      (want + (uint64_t) blob) / 1073741824.0, headroom_bytes / 1073741824.0);
++        note = buf;
++        return false;
++    }
++    std::vector<uint64_t> bounds, loff, lbytes;
++    for (int64_t l = 0; l < n_layers; ++l) {
++        bounds.push_back(lay.layer_offset(l));
++        loff.push_back(lay.layer_offset(l));
++        lbytes.push_back(lay.blob_bytes(l) * (uint64_t) n_expert);
++    }
++    bounds.push_back(want);
++    std::vector<std::string> files;
++    if (from_gguf) {
++        for (int64_t l = 0; l < n_layers; ++l)
++            for (int r = 0; r < 3; ++r) {
++                const std::string fl = expert_gguf_file(gguf_, lay, l, r);
++                if (std::find(files.begin(), files.end(), fl) == files.end()) files.push_back(fl);
++            }
++    } else {
++        files.push_back(path);
++    }
++    auto el = std::make_shared<EarlyLoad>();
++    el->unbuffered = experts_unbuffered(files, want + (uint64_t) blob, el->why);
++    const bool unbuffered = el->unbuffered;
++    const int readers = unbuffered ? std::max(threads, 16) : threads;
++    int dev = 0;
++    cudaGetDevice(&dev);
++    early_ = el;
++    const std::string gg = gguf_;
++    const strata::kernels::cpu::ExpertLayout* lp = &lay;
++    const uint64_t bytes = want + (uint64_t) blob;
++    early_thread_ = std::thread([el, gg, lp, from_gguf, path, loff, lbytes, readers, threads, unbuffered, bounds,
++                                 bytes, dev] {
++        cudaSetDevice(dev);
++        // registered BEFORE the read, as open() registers it: an arena registered after it was filled cost
++        // ~1.5 s at the next large GPU step (measured: the expert cache's cudaMalloc, or its fill)
++        auto* a = new PinnedArena(bytes, bounds, 0, std::string{}, 0);
++        if (!a->valid()) {
++            el->st.error = "the arena could not be reserved: " + a->note;
++            delete a;
++            return;
++        }
++        LoadStats st;
++        if (from_gguf) {
++            st = load_experts_gguf(gg, a->data(), *lp, readers, unbuffered, nullptr, nullptr);
++        } else {
++            if (unbuffered) st = load_experts_direct(path, a->data(), loff, lbytes, readers, /*chunk=*/8u << 20, nullptr);
++            if (!unbuffered || (!st.ok && st.error.empty()))
++                st = load_experts_ranges(path, a->data(), loff, lbytes, threads, /*chunk=*/8u << 20, nullptr, nullptr);
++        }
++        el->st = std::move(st);
++        el->arena = a;
++    });
++    note = std::string("started (") + (unbuffered ? "unbuffered" : "through the file cache") + ", " +
++           std::to_string(readers) + " readers)";
++    return true;
++}
++#endif
+ 
+ void ArenaExpertSource::close() {
++#ifdef STRATA_EARLY_ARENA_BUILT
++    if (early_thread_.joinable()) early_thread_.join();
++    early_.reset();                      // ~EarlyLoad frees an arena nobody took
++#endif
+ #if !defined(_WIN32)
+     if (map_ != nullptr) munmap(map_, (size_t) map_bytes_);
+ #endif
+diff --git a/src/core/native_dense.cpp b/src/core/native_dense.cpp
+index 25efb6f6217991100c2a1a6599a17917cba49cea..99e8d2f6d11e097001656b5a58cfc9bf29326962 100644
+--- a/src/core/native_dense.cpp
++++ b/src/core/native_dense.cpp
+@@ -22,6 +22,20 @@
+ #include <mutex>
+ #include <thread>
+ #include <vector>
++#if defined(_WIN32) && !defined(STRATA_USE_HIP)
++// Windows with CUDA: the projection matrices go to the GPU from several threads (upload_parallel). Every line of it
++// is inside STRATA_DENSE_THREADED, so Linux, macOS and the HIP engines compile this file as before.
++#define STRATA_DENSE_THREADED 1
++#include <atomic>
++#include <string>
++#define WIN32_LEAN_AND_MEAN
++#ifndef NOMINMAX
++#define NOMINMAX   // std::numeric_limits<T>::max() below
++#endif
++#include <windows.h>
++#else
++#define STRATA_DENSE_THREADED 0
++#endif
+ 
+ namespace strata::core {
+ namespace {
+@@ -173,6 +187,123 @@ struct Pending {
+     DevicePtr data;
+     DevicePtr packed;   // STRATA_Q8_PACKED=1 copy, or null
+ };
++#if STRATA_DENSE_THREADED
++
++// One matrix's upload, queued until the shard's matrices are all allocated (upload_parallel).
++struct Upload {
++    std::string name;
++    void* dst;
++    const uint8_t* src;   // into the shard's mapping
++    uint64_t file_off;    // the same bytes' offset in the shard file
++    uint64_t bytes;
++};
++
++/// STRATA_DENSE_UPLOAD_THREADS: the threads that copy the matrices to the GPU (1 = one synchronous cudaMemcpy per
++/// matrix straight from the mapping, the order before).  Default 8: on Windows the mapping is not read ahead
++/// (advise_willneed is a no-op there), so one thread took its page faults one at a time: 2019 MiB in 1.5-2.2 s on
++/// an RTX 3090 + PCIe 5 NVMe.  Not built elsewhere: the mapping is read ahead there, and on Linux with 4 GPUs
++/// threads made the start slower (103 s -> 122 s cold, measured by blange48 on #2673).
++int dense_upload_threads() {
++    const char* v = std::getenv("STRATA_DENSE_UPLOAD_THREADS");
++    const int n = v != nullptr && *v ? std::atoi(v) : 8;
++    return std::clamp(n, 1, 32);
++}
++
++/// Copies every upload (all from the shard file `path`) to the GPU: `threads` workers take 8 MiB pieces, put
++/// each into one of their two pinned staging buffers and send it with cudaMemcpyAsync on their own stream, so a
++/// piece's transfer overlaps the next one's read.  A piece is one ReadFile from the shard into the staging buffer
++/// (no page faults: copying from the mapping took them 4 KiB at a time - 2.0 s with 4 threads, 1.2 s with 8,
++/// 0.8 s with 16 for the iq3_s matrices); if the file cannot be opened, it is copied from the mapping.  The same bytes land in the same buffers as the serial path.  False with `err` naming the
++/// matrix on the first failure.
++bool upload_parallel(const std::vector<Upload>& ups, const std::string& path, int threads, std::string& err) {
++    constexpr uint64_t kPiece = 8ull << 20;
++    struct Piece { size_t u; uint64_t off, n; };
++    std::vector<Piece> pieces;
++    for (size_t i = 0; i < ups.size(); ++i)
++        for (uint64_t off = 0; off < ups[i].bytes; off += kPiece)
++            pieces.push_back({i, off, (std::min)(kPiece, ups[i].bytes - off)});
++    if (pieces.empty()) return true;
++    threads = (int) (std::min)((size_t) threads, pieces.size());
++    int dev = 0;
++    cudaGetDevice(&dev);
++    std::atomic<size_t> next{0};
++    std::atomic<bool> warned{false};   // the "cannot open" line, once for all workers
++    std::mutex err_mu;
++    std::string first;
++    auto fail = [&](const std::string& what) {
++        std::lock_guard<std::mutex> g(err_mu);
++        if (first.empty()) first = what;
++        next.store(pieces.size());
++    };
++    auto worker = [&]() {
++        cudaSetDevice(dev);
++        cudaStream_t stream = nullptr;
++        void* stage[2] = {nullptr, nullptr};
++        cudaEvent_t done[2] = {nullptr, nullptr};
++        bool used[2] = {false, false};
++        bool ok = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking) == cudaSuccess;
++        for (int b = 0; ok && b < 2; ++b)
++            ok = cudaHostAlloc(&stage[b], (size_t) kPiece, cudaHostAllocDefault) == cudaSuccess &&
++                 cudaEventCreateWithFlags(&done[b], cudaEventDisableTiming) == cudaSuccess;
++        if (!ok) fail(std::string("native dense upload: staging buffers: ") + cudaGetErrorString(cudaGetLastError()));
++        HANDLE file = INVALID_HANDLE_VALUE;
++        if (ok) {
++            // the same ANSI open as the GGUF reader's (gguf_reader.hpp), so a path it opened opens here too
++            file = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
++                               FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
++            if (file == INVALID_HANDLE_VALUE && !warned.exchange(true))
++                std::fprintf(stderr, "native dense upload: cannot open %s for reading (error %lu): copying from the "
++                                     "mapping instead (slower)\n", path.c_str(), GetLastError());
++        }
++        for (int b = 0; ok;) {
++            const size_t i = next.fetch_add(1);
++            if (i >= pieces.size()) break;
++            const Piece& p = pieces[i];
++            const Upload& u = ups[p.u];
++            cudaError_t st = used[b] ? cudaEventSynchronize(done[b]) : cudaSuccess;   // the buffer's last send
++            if (st == cudaSuccess) {
++                bool read = false;
++                if (file != INVALID_HANDLE_VALUE) {
++                    const uint64_t at = u.file_off + p.off;
++                    OVERLAPPED ov{};
++                    ov.Offset = (DWORD) at;
++                    ov.OffsetHigh = (DWORD) (at >> 32);
++                    DWORD got = 0;
++                    read = ReadFile(file, stage[b], (DWORD) p.n, &got, &ov) && got == p.n;
++                }
++                if (!read) std::memcpy(stage[b], u.src + p.off, (size_t) p.n);
++                st = cudaMemcpyAsync((uint8_t*) u.dst + p.off, stage[b], (size_t) p.n, cudaMemcpyHostToDevice, stream);
++            }
++            if (st == cudaSuccess) st = cudaEventRecord(done[b], stream);
++            if (st != cudaSuccess) {
++                fail("native dense upload " + u.name + ": " + cudaGetErrorString(st));
++                break;
++            }
++            used[b] = true;
++            b ^= 1;
++        }
++        if (stream != nullptr) {
++            const cudaError_t st = cudaStreamSynchronize(stream);
++            if (st != cudaSuccess) fail(std::string("native dense upload: ") + cudaGetErrorString(st));
++            cudaStreamDestroy(stream);
++        }
++        if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
++        for (int b = 0; b < 2; ++b) {
++            if (done[b] != nullptr) cudaEventDestroy(done[b]);
++            if (stage[b] != nullptr) cudaFreeHost(stage[b]);
++        }
++    };
++    std::vector<std::thread> pool;
++    for (int t = 1; t < threads; ++t) pool.emplace_back(worker);
++    worker();
++    for (auto& t : pool) t.join();
++    if (!first.empty()) {
++        err = first;
++        return false;
++    }
++    return true;
++}
++#endif  // STRATA_DENSE_THREADED
+ }
+ 
+ bool NativeDense::served_names(const std::vector<std::string>& shards, bool include_ple_key,
+@@ -273,6 +404,10 @@ bool NativeDense::load(const std::vector<std::string>& shards, WeightTable& tabl
+     if (shards.empty()) { err = "native dense: at least one GGUF shard is required"; return false; }
+     try {
+         std::vector<Pending> pending;
++#if STRATA_DENSE_THREADED
++        std::vector<Upload> uploads;
++        const int upload_threads = dense_upload_threads();
++#endif
+         std::set<std::string> seen;
+         int max_in = 0;
+         uint64_t total = 0, hc_q8_bytes = 0, allocated = 0;
+@@ -366,6 +501,12 @@ bool NativeDense::load(const std::vector<std::string>& shards, WeightTable& tabl
+                 void* allocation = nullptr;
+                 auto status = cudaMalloc(&allocation, bytes);
+                 DevicePtr data(allocation);
++#if STRATA_DENSE_THREADED
++                if (status == cudaSuccess && upload_threads > 1)
++                    uploads.push_back(Upload{tensor.name, data.get(), (const uint8_t*) gguf.tensor_data(tensor),
++                                             gguf.data_start() + tensor.offset, bytes});
++                else
++#endif
+                 if (status == cudaSuccess)
+                     status = cudaMemcpy(data.get(), gguf.tensor_data(tensor), bytes, cudaMemcpyHostToDevice);
+                 if (status != cudaSuccess) {
+@@ -395,6 +536,23 @@ bool NativeDense::load(const std::vector<std::string>& shards, WeightTable& tabl
+                 }
+                 pending.push_back(Pending{&ref, (int) tensor.type, bytes, std::move(data), std::move(packed)});
+             }
++#if STRATA_DENSE_THREADED
++            // while `gguf` (the mapping the uploads read) is still open
++            if (!upload_parallel(uploads, path, upload_threads, err)) {
++                // e.g. no pinned memory for the staging buffers: the serial copy, as before, rather than a failed load
++                std::fprintf(stderr, "%s: copying the matrices one at a time instead\n", err.c_str());
++                (void) cudaGetLastError();   // a worker's failed async copy must not count against the copies or checks below
++                for (const Upload& u : uploads) {
++                    const cudaError_t st = cudaMemcpy(u.dst, u.src, (size_t) u.bytes, cudaMemcpyHostToDevice);
++                    if (st != cudaSuccess) {
++                        err = "native dense upload " + u.name + ": " + cudaGetErrorString(st);
++                        return false;
++                    }
++                }
++                err.clear();
++            }
++            uploads.clear();
++#endif
+             if (hc_q8_env())
+                 for (const auto& tensor : gguf.tensors()) {
+                     // S25: the F32 inject rows hold BF16-exact values: the read takes the pack's BF16 rows unless
+@@ -483,6 +641,23 @@ bool NativeDense::load(const std::vector<std::string>& shards, WeightTable& tabl
+         const auto status = cudaMalloc(&allocation, strata::kernels::native_q8_1_bytes(max_in));
+         DevicePtr scratch(allocation);
+         if (status != cudaSuccess) { err = std::string("native dense scratch: ") + cudaGetErrorString(status); return false; }
++#if STRATA_DENSE_THREADED
++        // STRATA_DENSE_CHECKSUM=1 (tests): FNV-1a over every uploaded matrix as the GPU holds it, in load order - the
++        // check that the parallel upload puts the same bytes in place as STRATA_DENSE_UPLOAD_THREADS=1
++        if (const char* cs = std::getenv("STRATA_DENSE_CHECKSUM"); cs != nullptr && cs[0] == '1') {
++            uint64_t h = 1469598103934665603ull;
++            std::vector<uint8_t> host;
++            for (const auto& item : pending) {
++                host.resize((size_t) item.bytes);
++                if (cudaMemcpy(host.data(), item.data.get(), (size_t) item.bytes, cudaMemcpyDeviceToHost) != cudaSuccess) {
++                    err = "native dense checksum: read-back failed"; return false;
++                }
++                for (uint8_t byte : host) h = (h ^ byte) * 1099511628211ull;
++            }
++            std::fprintf(stderr, "strata generate: native dense checksum %016llx over %zu matrices\n",
++                         (unsigned long long) h, pending.size());
++        }
++#endif
+         // All checks and allocations finish before publishing any reference.
+         weights_.reserve(pending.size());
+         uint64_t packed_bytes = 0;
 diff --git a/src/core/pinned.cu b/src/core/pinned.cu
-index 0c45c05..efa7027 100644
+index 0c45c051c5685a8581c1607f6d6f3bc7a7df2be5..026059e89e5623a861de524e1456af544ae8d945 100644
 --- a/src/core/pinned.cu
 +++ b/src/core/pinned.cu
-@@ -28,6 +28,7 @@
+@@ -6,6 +6,10 @@
+ #include <cuda_runtime.h>
+ 
+ #include <atomic>
++#if defined(_WIN32) && !defined(STRATA_USE_HIP)   // the prefault in PinnedArena (Windows with CUDA)
++#include <chrono>
++#include <vector>
++#endif
+ #include <climits>
+ #include <cerrno>
+ #include <cstdlib>
+@@ -28,6 +32,7 @@
  
  #ifdef _WIN32
  #include <windows.h>
@@ -103,7 +1447,7 @@ index 0c45c05..efa7027 100644
  #else
  #include <fcntl.h>
  #include <sys/mman.h>
-@@ -99,6 +100,24 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
+@@ -99,6 +104,24 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
          note = "shared-file arena backing is not implemented on Windows";
          return nullptr;
      }
@@ -128,7 +1472,7 @@ index 0c45c05..efa7027 100644
      // MEM_LARGE_PAGES needs SeLockMemoryPrivilege.  Having it assigned to the account is not enough: the
      // PROCESS must enable it in its own token (AdjustTokenPrivileges) before VirtualAlloc, or the call fails.
      // An account without the assignment, or a failure to enable, leaves the process as it was: VirtualAlloc
-@@ -125,11 +144,11 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
+@@ -125,11 +148,11 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
          // anything else is ERROR_INVALID_PARAMETER (87), which reads like a privilege problem but is not.
          // Round up: the slack is under 2 MB and the tail stays unused.
          const SIZE_T lbytes = (SIZE_T) (((SIZE_T) bytes + large - 1) / large * large);
@@ -142,7 +1486,7 @@ index 0c45c05..efa7027 100644
              return p;
          }
          // 1450 (ERROR_NO_SYSTEM_RESOURCES) is the large-page pool saying no, 87 is a size that is not a
-@@ -142,7 +161,8 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
+@@ -142,7 +165,8 @@ void* reserve(uint64_t bytes, PageBacking& got, std::string& note, const std::st
      } else {
          note = "this system has no large-page minimum; using 4 KB pages";
      }
@@ -152,8 +1496,49 @@ index 0c45c05..efa7027 100644
      got = PageBacking::NormalPages;
      return p;
  #else
+@@ -414,6 +438,40 @@ PinnedArena::PinnedArena(uint64_t bytes, const std::vector<uint64_t>& bounds,
+         mapping_base = base;
+         mapping_bytes = bytes;
+     }
++#if defined(_WIN32) && !defined(STRATA_USE_HIP)
++    // Windows with CUDA, 4 KB pages: touch every page from several threads before the registration.  Left to cudaHostRegister,
++    // the first touch (the zero-fill) of the whole arena ran on one thread inside it: 4.98 s for 46.8 GiB on an RTX
++    // 3090 + Core Ultra 9 285K.  Touched by 16 threads first it took 0.5-0.7 s in most starts (1.1 s or 2.5 s with
++    // other programs busy), and the registration then 0.08 s, the whole arena still registered (PORTABLE ok) and
++    // decode/prompt speed unchanged (3 + 3 starts).  Not for large
++    // pages or memory cudaHostAlloc pinned (resident already), a shared arena file (touching would read it), or an
++    // arena that is not registered (integrated GPU, UMA mode: nothing for the threads to speed up).
++    // STRATA_ARENA_PREFAULT=N sets the threads, 0 leaves the first touch to cudaHostRegister as before.  (The note
++    // below - a region faulted in page by page is far more expensive to register and may fail - did not hold here
++    // for pages touched by these threads.)  Not built for HIP or outside Windows: not measured there.
++    if (base != nullptr && backing == PageBacking::NormalPages && shared_file.empty() && !arena_no_register()) {
++        const char* pf = std::getenv("STRATA_ARENA_PREFAULT");
++        const int n = pf != nullptr && *pf ? std::clamp(std::atoi(pf), 0, 64)
++                                           : (int) std::clamp(std::thread::hardware_concurrency(), 1u, 16u);
++        if (n > 0) {
++            const auto t0 = std::chrono::steady_clock::now();
++            const uint64_t per = (bytes / (uint64_t) n + 4095) / 4096 * 4096;
++            std::vector<std::thread> pool;
++            volatile uint8_t* const first = (volatile uint8_t*) base;
++            for (int t = 0; t < n; ++t)
++                pool.emplace_back([first, bytes, per, t] {
++                    volatile uint8_t* p = first;
++                    const uint64_t end = std::min<uint64_t>(bytes, (uint64_t) (t + 1) * per);
++                    for (uint64_t off = (uint64_t) t * per; off < end; off += 4096) p[off] = 0;
++                });
++            for (auto& th : pool) th.join();
++            char buf[160];
++            std::snprintf(buf, sizeof buf, "; pages first touched by %d threads in %.2f s (STRATA_ARENA_PREFAULT=0: by "
++                          "cudaHostRegister)", n, std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count());
++            note += buf;
++        }
++    }
++#endif
+ 
+     // Register with CUDA BEFORE any page is touched: cudaHostRegister pins what is resident now, and a region
+     // that has already been faulted in page by page is far more expensive to register and may fail outright.
 diff --git a/src/kernels/cpu/iq_avx2_parity.cpp b/src/kernels/cpu/iq_avx2_parity.cpp
-index 67544c9..46641b9 100644
+index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85b9123d82 100644
 --- a/src/kernels/cpu/iq_avx2_parity.cpp
 +++ b/src/kernels/cpu/iq_avx2_parity.cpp
 @@ -21,6 +21,7 @@
@@ -173,7 +1558,7 @@ index 67544c9..46641b9 100644
      if (cpu_index < 0 || cpu_index >= 64) return false;
      return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;
 diff --git a/src/kernels/cpu/pool.cpp b/src/kernels/cpu/pool.cpp
-index cdcc8d7..e6daaa3 100644
+index cdcc8d79249e5af774112383942228453331e7fe..e6daaa33826d3fe37322f0ece347255fab2cfd2b 100644
 --- a/src/kernels/cpu/pool.cpp
 +++ b/src/kernels/cpu/pool.cpp
 @@ -2,6 +2,7 @@
@@ -220,7 +1605,7 @@ index cdcc8d7..e6daaa3 100644
      layout_ = logical_cpu_layout();   // now, before anything pins the caller (Linux reads the calling thread's allowed CPUs)
      if (const char* e = std::getenv("STRATA_POOL_SPIN_US"))   // a test knob; see kSpinBeforeSleep
 diff --git a/src/kernels/cpu/pool_affinity_win.hpp b/src/kernels/cpu/pool_affinity_win.hpp
-index 6f0e402..c5ac8e1 100644
+index 6f0e4020227a576269a07d5449cb05f936c020f9..c5ac8e1571bc67bb909b5e4fde25178eb1c7352e 100644
 --- a/src/kernels/cpu/pool_affinity_win.hpp
 +++ b/src/kernels/cpu/pool_affinity_win.hpp
 @@ -9,13 +9,14 @@
@@ -239,8 +1624,109 @@ index 6f0e402..c5ac8e1 100644
      GROUP_AFFINITY target{};
      target.Group = (WORD) (core / 64);
      target.Mask = KAFFINITY(1) << (core & 63);
+diff --git a/src/kernels/cuda/iq_kernels.cu b/src/kernels/cuda/iq_kernels.cu
+index d2f2e34e8f59262506dcbb33c6ef24afd1db3c83..b305ccd38925dca945da7e947f4c006f23419077 100644
+--- a/src/kernels/cuda/iq_kernels.cu
++++ b/src/kernels/cuda/iq_kernels.cu
+@@ -5257,10 +5257,15 @@ void native_expert_grouped(const NativeExpertLayout& L, const unsigned long long
+     const dim3 gd((unsigned) (((L.n_embd + d_rows - 1) / d_rows + tq_ch - 1) / tq_ch), (unsigned) gy);
+ #if STRATA_EXP_LAYOUTS
+     const int em0d = sm75_down_em(em0, cap_groups);
+-    int dev_d = 0;
+-    cudaGetDevice(&dev_d);
+-    // gfx1151: the LDS down kernel is slower than the CUDA layout for IQ4_NL (86 vs 63 us, 24 groups) and faster for Q2_0 (-18%)
+-    const bool lds_down_ok = L.d_type == 42 || (L.d_type == 20 && !gfx1151_exp8(dev_d));
++    // The gfx1151 exception is HIP-only. CUDA/Pascal needs no runtime device query here.
++    bool lds_down_ok = L.d_type == 42 || L.d_type == 20;
++#if defined(__HIPCC__) && !defined(STRATA_HIP_GFX906)
++    if ((em0d == 7 || em0d == 8) && L.d_type == 20) {
++        int dev_d = 0;
++        cudaGetDevice(&dev_d);
++        lds_down_ok = !gfx1151_exp8(dev_d);
++    }
++#endif
+     if ((em0d == 7 || em0d == 8) && lds_down_ok) {
+         const dim3 gl((unsigned) ((L.n_embd + LDS_RB - 1) / LDS_RB), (unsigned) cap_groups);
+         const size_t sh = (size_t) LDS_NT * (size_t) (L.n_ff / 32) * sizeof(block_q8_1);
+diff --git a/src/kernels/cuda/ple.cu b/src/kernels/cuda/ple.cu
+index f945ef3b8dd8999e2721a993f0ad131d921eb90c..776c720a8fc8c7308557ef155ed91d5177c10425 100644
+--- a/src/kernels/cuda/ple.cu
++++ b/src/kernels/cuda/ple.cu
+@@ -54,6 +54,8 @@ __global__ void history_advance_kernel(float* __restrict__ history, const float*
+ __device__ __forceinline__ uint16_t bf16_bits(float f) {
+     uint32_t i;
+     memcpy(&i, &f, 4);
++    // a NaN stays a quiet NaN, as in bf16_bits.hpp: the rounding add would carry it into -0 or inf
++    if ((i & 0x7FFFFFFFu) > 0x7F800000u) return (uint16_t) ((i >> 16) | 64u);
+     i = (i + ((i >> 16) & 1u) + 0x7FFFu) & 0xFFFF0000u;
+     return (uint16_t) (i >> 16);
+ }
+diff --git a/src/ngram/ple_reader.cpp b/src/ngram/ple_reader.cpp
+index 9d2a05051e504b36ac0f433f89a02910cec6d8b8..96351582b37fc5efa302ccc36c30b763ee0a9ddf 100644
+--- a/src/ngram/ple_reader.cpp
++++ b/src/ngram/ple_reader.cpp
+@@ -347,12 +347,13 @@ bool PleReader::open(const std::string& path, uint64_t table_offset, uint64_t n_
+     }
+     impl_->table_offset = table_offset;
+     impl_->n_rows = n_rows;
+-    impl_->max_inflight = max_inflight;
+     impl_->slab = (uint8_t*) DirectFile::alloc_aligned((size_t) max_inflight * 2 * PAGE);
+     if (impl_->slab == nullptr) { err = "PleReader: cannot allocate read buffers"; close(); return false; }
+     impl_->inflight.assign(max_inflight, Job{});
+     impl_->free_slots.clear();
+     for (uint32_t s = max_inflight; s-- > 0;) impl_->free_slots.push_back(s);
++    // Publish the slot count only after every slot is free. A failed initialization has no reads to drain.
++    impl_->max_inflight = max_inflight;
+     impl_->cache.init(cache_rows, row_bytes);
+     impl_->error.clear();
+     impl_->keep_us = 0;
+@@ -409,6 +410,7 @@ void PleReader::close() {
+     m.delayed.clear();
+     m.inflight.clear();
+     m.free_slots.clear();
++    m.max_inflight = 0;
+     m.cache.init(0);
+     m.threaded = false;
+     m.stop = false;
+diff --git a/src/prefill/kernels.cu b/src/prefill/kernels.cu
+index a4f56f10cf9dc2211bcfef403de828a4205f72bb..b0d871dcd1b7b2688080ef722fb540ce53943814 100644
+--- a/src/prefill/kernels.cu
++++ b/src/prefill/kernels.cu
+@@ -35,6 +35,8 @@ __device__ __forceinline__ float warp_max(float v) {
+ }
+ __device__ __forceinline__ uint16_t bf(float f) {
+     uint32_t u = __float_as_uint(f);
++    // a NaN stays a quiet NaN, as in bf16_bits.hpp: the rounding add would carry it into -0 or inf
++    if ((u & 0x7fffffffu) > 0x7f800000u) return (uint16_t) ((u >> 16) | 64u);
+     u += 0x7fffu + ((u >> 16) & 1u);
+     return (uint16_t) (u >> 16);
+ }
+diff --git a/src/prefill/prefill.cpp b/src/prefill/prefill.cpp
+index 6cb888e50a4ed516a1bb90566d7140d1315dc372..0ef5f24b5ad61f615a331f3a2692c9bfb544c7bd 100644
+--- a/src/prefill/prefill.cpp
++++ b/src/prefill/prefill.cpp
+@@ -3571,7 +3571,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
+                                 cudaMemcpy(hid.data(), m.ids, hid.size() * 4, cudaMemcpyDeviceToHost);
+                                 cudaMemcpy(hw.data(), m.w, hw.size() * 4, cudaMemcpyDeviceToHost);
+                                 std::vector<uint16_t> ids16(hid.size()), w16(hw.size());
+-                                for (size_t i = 0; i < hid.size(); ++i) { ids16[i] = (uint16_t) hid[i]; w16[i] = (uint16_t) (((*(const uint32_t*) &hw[i]) + 0x8000u) >> 16); }
++                                for (size_t i = 0; i < hid.size(); ++i) { ids16[i] = (uint16_t) hid[i]; const uint32_t b = *(const uint32_t*) &hw[i]; w16[i] = (b & 0x7fffffffu) > 0x7f800000u ? (uint16_t) ((b >> 16) | 64u) : (uint16_t) ((b + 0x8000u) >> 16); }
+                                 const int32_t hd[4] = {(int32_t) l, pos, (int32_t) T, featl[(size_t) (l & 63)] ? 1 : 0};
+                                 std::fwrite(hd, 4, 4, ff);
+                                 std::fwrite(ids16.data(), 2, ids16.size(), ff);
+@@ -4967,6 +4967,10 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
+                     for (int64_t i = 0; i < nr * D; ++i) {
+                         uint32_t u;
+                         std::memcpy(&u, &rows[(size_t) i], 4);
++                        if ((u & 0x7fffffffu) > 0x7f800000u) {      // a NaN stays a quiet NaN (bf16_bits.hpp)
++                            out[(size_t) i] = (uint16_t) ((u >> 16) | 64u);
++                            continue;
++                        }
+                         u += 0x7fffu + ((u >> 16) & 1u);
+                         out[(size_t) i] = (uint16_t) (u >> 16);
+                     }
 diff --git a/src/program/generate.cpp b/src/program/generate.cpp
-index dbc0cf8..e6394c3 100644
+index 7bafd685073a102d2ad099d623643615b6cffc1f..d207a614cd7622b77fd3f0b47928480e18e45bc2 100644
 --- a/src/program/generate.cpp
 +++ b/src/program/generate.cpp
 @@ -45,6 +45,7 @@
@@ -251,7 +1737,71 @@ index dbc0cf8..e6394c3 100644
  #include "strata/kernels/cpu/expert_layout.hpp"
  #include "strata/kernels/cpu/hadamard.hpp"
  #include "strata/kernels/ngram.hpp"
-@@ -5866,6 +5867,8 @@ int main(int argc, char** argv) {
+@@ -2624,7 +2625,13 @@ int main(int argc, char** argv) {
+         else if (a == "--mtp-window") o.mtp_window = std::atoll(next("--mtp-window"));
+         else if (a == "--pcie-frac") o.pcie_frac = std::atof(next("--pcie-frac"));
+         else if (a == "--adapt-every") { o.adapt_every = std::atoi(next("--adapt-every")); o.adapt_every_given = true; }
+-        else if (a == "--adapt-decay") o.adapt_decay = (float) std::atof(next("--adapt-decay"));
++        else if (a == "--adapt-decay") {
++            o.adapt_decay = (float) std::atof(next("--adapt-decay"));
++            if (!(o.adapt_decay > 0.0f && o.adapt_decay < 1.0f)) {
++                std::fprintf(stderr, "--adapt-decay must be between 0 and 1 (exclusive)\n");
++                return 2;
++            }
++        }
+         else if (a == "--adapt-min-gain") o.adapt_min_gain = (float) std::atof(next("--adapt-min-gain"));
+         else if (a == "--adapt-async") o.adapt_async = std::atoi(next("--adapt-async")) != 0 ? 1 : 0;
+         else if (a == "--spec-min-p") o.spec_min_p = std::atof(next("--spec-min-p"));
+@@ -3508,6 +3515,36 @@ int main(int argc, char** argv) {
+         }
+     }
+     const bool native_pack = strata::kernels::cpu::expert_layout().native;
++#ifdef STRATA_EARLY_ARENA_BUILT
++    // Windows with CUDA, one GPU's plain arena (STRATA_EARLY_ARENA=0 turns it off): the expert arena is reserved,
++    // touched and registered on its own thread from here, and the experts are read into it while the dense weights, MTP
++    // and head load; open() below takes it.  Measured on an RTX 3090 with a PCIe 5 SSD reading 11.2 GiB/s: engine
++    // READY 11.10 -> 9.22 s (medians of 3 + 3), the same arena checksum.  The other loads share the drive with the
++    // expert read meanwhile (done at 6.5 s instead of 2.7 s here); the bytes read are the same, only their order
++    // changes.  It starts only with RAM for the arena plus the floor kept free (at least 8 GiB), else as before.
++    strata::core::ArenaExpertSource arena_src;
++    {
++        const char* ea = std::getenv("STRATA_EARLY_ARENA");
++        // (pin by need, the deferred registration and a multi-GPU run - a layer split or remote experts, capped at
++        // 8 GiB of pinned pages under WDDM below - make open() build another kind of arena: not started for them)
++        const char* pbn = std::getenv("STRATA_PIN_BY_NEED");
++        const char* dr = std::getenv("STRATA_DEFERRED_REGISTER");
++        if (!(ea && ea[0] == '0') && !o.mmap_experts && o.shared_expert_arena.empty() &&
++            strata::core::arena_pin_cap_gib() == -1 && o.expert_cache_remote[0] == 0 && !multi_gpu &&
++            !(pbn && pbn[0] != '\0' && pbn[0] != '0') && !(dr && dr[0] != '\0' && dr[0] != '0')) {
++            arena_src.set_gguf(o.native_preset);
++            const uint64_t headroom = (uint64_t) std::max<int64_t>(o.conversation_cache_min_free_mib, 8192) << 20;
++            // the pinned-memory headroom is taken before the arena pins, as open() takes it (a second take is a no-op)
++            strata::core::pin_reserve_take();
++            std::string why;
++            const bool started = arena_src.begin_early_load(o.pack, strata::kernels::cpu::expert_layout().n_layers,
++                                                            strata::kernels::cpu::expert_layout().n_expert,
++                                                            /*threads=*/6, why, headroom);
++            std::fprintf(stderr, "strata generate: STRATA_EARLY_ARENA: expert read %s%s\n",
++                         started ? "" : "not started: ", why.c_str());
++        }
++    }
++#endif
+     // STRATA_MMQ_DIRECT: the room each sized expert slot keeps after its blob (0 unless it is on: the slot costs and
+     // the arena are then today's, byte for byte)
+     const int64_t slot_guard = native_pack ? (int64_t) strata::prefill::Prefill::slot_guard_bytes() : 0;
+@@ -5704,7 +5741,11 @@ int main(int argc, char** argv) {
+             return 1;
+         }
+     }
++#ifdef STRATA_EARLY_ARENA_BUILT
++    // (arena_src: declared before the dense weights' load, for STRATA_EARLY_ARENA)
++#else
+     strata::core::ArenaExpertSource arena_src;
++#endif
+     strata::core::ExpertSource* srcp = nullptr;
+     if (o.mmap_experts) {
+         // FileExpertSource maps the pack's experts.bin: a canonical pack has it; a native (IQ) pack has it when
+@@ -5968,6 +6009,8 @@ int main(int argc, char** argv) {
          }
      }
  #endif
@@ -260,7 +1810,36 @@ index dbc0cf8..e6394c3 100644
      if (o.pool_measure)
          o.pool_affinity = measure_pool_affinity(srcp, o.pool_workers, !o.no_host_worker, o.pool_tasks);
      strata::kernels::cpu::ExpertPool pool(o.pool_workers, /*pin=*/true, /*host_works=*/!o.no_host_worker,
-@@ -13433,7 +13436,8 @@ int main(int argc, char** argv) {
+@@ -9507,7 +9550,10 @@ int main(int argc, char** argv) {
+                 ~MergeBack() { if (on && !strata::core::conversation_checkpoints_merge(std::move(cs), checks)) checks.clear(); }
+             } merge_back{cs, checks, n_st > 0};
+             const strata::core::ConversationView view{live, live_imgs, n_st > 0 ? cs.stage0 : checks, cvec_cached};
+-            auto reuse = conversations.take_reuse();
++            const int64_t retained_n = conversations.retained_tokens();
++            auto reuse = conversations.take_reuse_for(live);
++            if (retained_n > 0 && reuse.unchanged_tokens < retained_n)
++                std::fprintf(stderr, "strata serve: conversation cache: retained K/V reused for %lld of its %lld tokens (the rest is not this conversation's)\n", (long long) reuse.unchanged_tokens, (long long) retained_n);
+             std::vector<strata::core::ConversationKvReuse> stage_reuse = std::move(reuse.stages);
+             stage_reuse.resize(n_st);
+             reuse.stages.clear();
+@@ -11469,6 +11515,7 @@ int main(int argc, char** argv) {
+         // conversation an idle slot holds reads on from there.  Every stage, the same calls.
+         // `at`: one of the slot's checkpoints - only the K/V up to it is copied and its state restored instead
+         auto copy_from_slot = [&](int b, const ConvCheckpoint* at, std::string& e) -> bool {
++            conversations.take_reuse(); // PR1503: the slot replaces the previous session K/V
+             const int64_t upto = at != nullptr ? (int64_t) at->ids.size() : (int64_t) bs[(size_t) b].ids.size();
+             if (at != nullptr && at->stage_parts.size() != stages.size()) { e = "a checkpoint without its stage parts"; return false; }
+             if (slot_copy_direct && at == nullptr) {
+@@ -12910,7 +12957,7 @@ int main(int argc, char** argv) {
+                 if (std::getenv("STRATA_SNAPSHOT_FULL_CAPTURE") == nullptr) {
+                     std::vector<std::vector<strata::core::ConversationKv>> stage_kv;   // every stage's, for its next park
+                     for (auto& si : incoming->stage_images) stage_kv.push_back(std::move(si.kv));
+-                    conversations.retain(std::move(incoming->kv), int64_t(live.size()), std::move(stage_kv));
++                    conversations.retain(std::move(incoming->kv), int64_t(live.size()), std::move(stage_kv), live);
+                 }
+                 incoming.reset(); // Running-state/checkpoint copies are no longer needed.
+                 lent_slot = -1;   // (the main session holds the parked conversation now)
+@@ -13588,7 +13635,8 @@ int main(int argc, char** argv) {
                          return v == nullptr || std::atoi(v) != 0;
                      }();
  #if defined(_WIN32)
@@ -270,7 +1849,7 @@ index dbc0cf8..e6394c3 100644
                      std::vector<ULONG> host_cpu_sets;
                      if (conc_on_host) {
                          const HANDLE self = GetCurrentThread();
-@@ -13461,6 +13465,7 @@ int main(int argc, char** argv) {
+@@ -13616,6 +13664,7 @@ int main(int argc, char** argv) {
                              std::fprintf(stderr, "strata batch: %d threads that ran on the host thread's core moved off "
                                                   "it, for reads beside the slots\n", moved);
                      auto conc_thread_cpus = [&] {
@@ -278,27 +1857,547 @@ index dbc0cf8..e6394c3 100644
                          strata::aux_cpus::pin_current_thread();
  #if defined(_WIN32)
                          const HANDLE self = GetCurrentThread();
-diff --git a/include/strata/platform/cpu_pinning.hpp b/include/strata/platform/cpu_pinning.hpp
+diff --git a/strata_control/procs.py b/strata_control/procs.py
+index b550c07b64fe2e04a9739dfb84652e742ea95b23..bf12810b73df3c41686c97263def05abcafc9b60 100644
+--- a/strata_control/procs.py
++++ b/strata_control/procs.py
+@@ -358,21 +358,27 @@ def orphans_of(engine_exe: str) -> list[Ident]:
+     except psutil.Error:
+         pass
+     found = []
+-    for p in psutil.process_iter(["pid", "ppid", "cmdline", "create_time"]):
++    # Only the command line while listing: on Windows psutil reads a process's parent and, when it may not open the
++    # process, its start time from a snapshot of the whole system, once per process - 6.2 s for 474 processes at every
++    # server start. Only a process that runs --serve from this executable is asked for them, below.
++    for p in psutil.process_iter(["cmdline"]):
+         try:
+             cmd = p.info.get("cmdline") or []
+             if "--serve" not in cmd or p.pid in mine:
+                 continue
+             if not same_file(p.exe(), engine_exe):
+                 continue
+-            parent = p.info.get("ppid")
++            try:
++                parent = p.ppid()
++            except psutil.AccessDenied:
++                parent = None
+             if parent in mine:
+                 continue                              # started by this server (or by a process above it)
+             if parent and parent != 1:
+                 try:
+                     q = psutil.Process(parent)
+                     adopted = q.name().lower() in INIT_NAMES      # an init that adopts orphans did not start it
+-                    if not adopted and q.create_time() <= p.info["create_time"] + 1.0                             and q.status() != psutil.STATUS_ZOMBIE:
++                    if not adopted and q.create_time() <= p.create_time() + 1.0                             and q.status() != psutil.STATUS_ZOMBIE:
+                         continue                      # a live parent started it: not an orphan
+                 except psutil.NoSuchProcess:
+                     pass
+diff --git a/sycl/src/program/generate.cpp b/sycl/src/program/generate.cpp
+index 2a4db4d163b2b57786253c359bf51906b1cee3db..5a111ea47accba1d81c821a9479e96fd2e74249d 100644
+--- a/sycl/src/program/generate.cpp
++++ b/sycl/src/program/generate.cpp
+@@ -7694,7 +7694,12 @@ int main(int argc, char **argv) try {
+                 ~MergeBack() { if (on && !strata::core::conversation_checkpoints_merge(std::move(cs), checks)) checks.clear(); }
+             } merge_back{cs, checks, n_st > 0};
+             const strata::core::ConversationView view{live, live_imgs, n_st > 0 ? cs.stage0 : checks, cvec_cached};
+-            auto reuse = conversations.take_reuse();
++            const int64_t retained_n = conversations.retained_tokens();
++            auto reuse = conversations.take_reuse_for(live);   // never another conversation's K/V
++            if (retained_n > 0 && reuse.unchanged_tokens < retained_n)
++                std::fprintf(stderr, "strata serve: conversation cache: retained K/V reused for %lld of its %lld tokens "
++                                     "(the rest is not this conversation's)\n", (long long) reuse.unchanged_tokens,
++                             (long long) retained_n);
+             std::vector<strata::core::ConversationKvReuse> stage_reuse = std::move(reuse.stages);
+             stage_reuse.resize(n_st);
+             reuse.stages.clear();
+@@ -9051,6 +9056,8 @@ int main(int argc, char **argv) try {
+         // `at`: one of the slot's checkpoints - only the K/V up to it is copied and its state restored instead
+         auto copy_from_slot = [&](int b, const ConvCheckpoint *at,
+                                   std::string &e) -> bool {
++            // the main session's K/V is replaced by the slot's: K/V retained from a restore described the old one
++            conversations.take_reuse();
+             try {
+         const int64_t upto = at != nullptr ? (int64_t)at->ids.size()
+                                            : (int64_t)bs[(size_t)b].ids.size();
+@@ -10063,7 +10070,7 @@ int main(int argc, char **argv) try {
+                 if (std::getenv("STRATA_SNAPSHOT_FULL_CAPTURE") == nullptr) {
+                     std::vector<std::vector<strata::core::ConversationKv>> stage_kv;   // every stage's, for its next park
+                     for (auto& si : incoming->stage_images) stage_kv.push_back(std::move(si.kv));
+-                    conversations.retain(std::move(incoming->kv), int64_t(live.size()), std::move(stage_kv));
++                    conversations.retain(std::move(incoming->kv), int64_t(live.size()), std::move(stage_kv), live);
+                 }
+                 incoming.reset(); // Running-state/checkpoint copies are no longer needed.
+                 std::fprintf(stderr, "strata serve: conversation cache: restored %lld tokens (%s) in %.1f ms; parked=%zu bytes=%zu\n",
+diff --git a/tests/cuda/bf16_nan_parity.cpp b/tests/cuda/bf16_nan_parity.cpp
 new file mode 100644
+index 0000000000000000000000000000000000000000..39188efefb740c88aeaaac98ddc3d9a0c1c63157
 --- /dev/null
-+++ b/include/strata/platform/cpu_pinning.hpp
-@@ -0,0 +1,14 @@
-+#pragma once
++++ b/tests/cuda/bf16_nan_parity.cpp
+@@ -0,0 +1,55 @@
++// Numerical-only regression for the actual prefill BF16 conversion (PR2955).
++#include "strata/kernels/bf16_bits.hpp"
++#include "strata/prefill/kernels.hpp"
++#include <cuda_runtime.h>
++#include <cstdint>
++#include <cstdio>
++#include <cstring>
++#include <stdexcept>
++#include <string>
++#include <vector>
++static void ck(cudaError_t e, const char* what) {
++    if (e != cudaSuccess) throw std::runtime_error(std::string(what) + ": " + cudaGetErrorString(e));
++}
++int main() {
++    try {
++        std::vector<float> input;
++        std::vector<uint16_t> expected;
++        for (uint32_t hi = 0; hi < 65536; ++hi) {
++            for (uint32_t lo : {0u, 1u, 0x7fffu, 0x8000u, 0xffffu}) {
++                const uint32_t bits = (hi << 16) | lo;
++                float f; std::memcpy(&f, &bits, sizeof(f));
++                input.push_back(f); expected.push_back(strata::kernels::bf16_from_f32(f));
++            }
++        }
++        float* x = nullptr; uint16_t* y = nullptr;
++        ck(cudaMalloc(reinterpret_cast<void**>(&x), input.size()*sizeof(float)), "input allocation");
++        ck(cudaMalloc(reinterpret_cast<void**>(&y), expected.size()*sizeof(uint16_t)), "output allocation");
++        ck(cudaMemcpy(x,input.data(),input.size()*sizeof(float),cudaMemcpyHostToDevice), "input copy");
++        cudaStream_t stream; ck(cudaStreamCreateWithFlags(&stream,cudaStreamNonBlocking), "stream");
++        strata::prefill::set_act_f16(false);
++        auto check = [&](const char* mode) {
++            std::vector<uint16_t> got(expected.size());
++            ck(cudaStreamSynchronize(stream), "conversion sync");
++            ck(cudaMemcpy(got.data(),y,got.size()*sizeof(uint16_t),cudaMemcpyDeviceToHost), "result copy");
++            for (size_t i=0;i<got.size();++i) {
++                if (got[i]!=expected[i]) {
++                    std::fprintf(stderr,"%s: case %zu got %04x expected %04x\n",mode,i,got[i],expected[i]);
++                    throw std::runtime_error("BF16 bit mismatch");
++                }
++            }
++            std::printf("PASS %s: %zu finite/tie/Inf/NaN bit cases\n",mode,got.size());
++        };
++        strata::prefill::to_bf16(x,y,(int64_t)input.size(),stream);
++        check("direct");
++        cudaGraph_t graph=nullptr; cudaGraphExec_t exec=nullptr;
++        ck(cudaStreamBeginCapture(stream,cudaStreamCaptureModeGlobal),"capture");
++        strata::prefill::to_bf16(x,y,(int64_t)input.size(),stream);
++        ck(cudaStreamEndCapture(stream,&graph),"end capture");
++        ck(cudaGraphInstantiate(&exec,graph,nullptr,nullptr,0),"instantiate");
++        ck(cudaGraphLaunch(exec,stream),"graph launch");
++        check("graph");
++        cudaGraphExecDestroy(exec);cudaGraphDestroy(graph);cudaStreamDestroy(stream);cudaFree(x);cudaFree(y);
++        return 0;
++    }catch(const std::exception& e){std::fprintf(stderr,"%s\n",e.what());return 1;}
++}
+diff --git a/tests/cuda/pascallama_mmq_screen.cpp b/tests/cuda/pascallama_mmq_screen.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..3d28f93d165ca49e159a74979ca475e3c3e15439
+--- /dev/null
++++ b/tests/cuda/pascallama_mmq_screen.cpp
+@@ -0,0 +1,182 @@
++// Local Pascal MMQ screen derived from upstream prefill_mmq_kquant_test (MIT).
++// Covers full pascallama J96/unroll with current IQ3_S/IQ4_NL and Q2_0/Q8_0 types.
++#include "strata/prefill/moe_mmq.hpp"
 +
-+#include <cstdlib>
++#include "ggml.h"
 +
-+namespace strata {
++#include <cuda_runtime.h>
 +
-+// Process-local opt-out for callers that require the OS to place every thread.
-+// Only the exact value "1" opts out; an unset variable preserves the upstream path.
-+inline bool no_cpu_pin() noexcept {
-+    const char* value = std::getenv("STRATA_NO_CPU_PIN");
-+    return value != nullptr && value[0] == '1' && value[1] == '\0';
++#include <algorithm>
++#include <cmath>
++#include <cstdint>
++#include <cstdio>
++#include <numeric>
++#include <stdexcept>
++#include <string>
++#include <vector>
++
++namespace {
++namespace mmq = strata::prefill::mmq;
++
++void ck(cudaError_t e, const char* what) {
++    if (e != cudaSuccess) throw std::runtime_error(std::string(what) + ": " + cudaGetErrorString(e));
 +}
 +
-+}  // namespace strata
++struct Dev {
++    void* p = nullptr;
++    explicit Dev(size_t n) { ck(cudaMalloc(&p, n), "cudaMalloc"); }
++    ~Dev() { cudaFree(p); }
++    Dev(const Dev&) = delete;
++    Dev& operator=(const Dev&) = delete;
++};
++
++std::vector<uint8_t> make_matrix(ggml_type t, int64_t rows, int64_t cols, int expert, int trial) {
++    const auto* tr = ggml_get_type_traits(t);
++    if (tr == nullptr || tr->to_float == nullptr) throw std::runtime_error("no reference dequantizer");
++    const size_t rb = ggml_row_size(t, cols);
++    std::vector<uint8_t> out((size_t) rows * rb);
++    std::vector<float> row((size_t) cols);
++    for (int64_t r = 0; r < rows; ++r) {
++        for (int64_t k = 0; k < cols; ++k) {
++            const int code = (int) ((k * 37 + r * 19 + expert * 23 + trial * 11) % 101) - 50;
++            row[(size_t) k] = 0.025f * std::sin(0.013f * (float) (k + 1) + 0.17f * (float) r + 0.31f * (float) expert) +
++                              0.0015f * (float) code;
++        }
++        if (tr->from_float_ref != nullptr) tr->from_float_ref(row.data(), out.data() + (size_t) r * rb, cols);
++        else {
++            if (t != GGML_TYPE_IQ3_S) throw std::runtime_error("unsupported synthetic quant");
++            const size_t bs = ggml_type_size(t), blocks = rb / bs;
++            for (size_t block = 0; block < blocks; ++block) {
++                uint8_t* dst = out.data() + (size_t) r * rb + block * bs;
++                for (size_t k = 0; k < bs; ++k) dst[k] = (uint8_t) ((k * 37 + block * 19 + r * 11 + expert * 23 + trial * 7) & 255);
++                dst[0] = 0; dst[1] = 0x24; // finite positive fp16 block scale
++            }
++        }
++    }
++    return out;
++}
++
++std::vector<float> make_x(int rows, int64_t cols, int trial) {
++    std::vector<float> x((size_t) rows * (size_t) cols);
++    for (int r = 0; r < rows; ++r)
++        for (int64_t k = 0; k < cols; ++k)
++            x[(size_t) r * (size_t) cols + (size_t) k] =
++                0.45f * std::sin(0.009f * (float) (k + 1) + 0.23f * (float) r + 0.07f * (float) trial) +
++                0.17f * std::cos(0.021f * (float) (k + 3) - 0.19f * (float) r) +
++                0.002f * (float) (((k * 7 + r * 13 + trial * 5) % 19) - 9);
++    std::fill(x.end() - cols, x.end(), 0.0f);   // an all-zero row: exactly zero out
++    return x;
++}
++
++std::vector<int32_t> perm(int n, int shift, bool reverse) {
++    std::vector<int32_t> p((size_t) n);
++    for (int i = 0; i < n; ++i) p[(size_t) i] = (int32_t) (((reverse ? n - 1 - i : i) + shift) % n);
++    return p;
++}
++
++// one grouped product: experts side by side at one stride (a zeroed tail after them, as prefill.cpp stages them)
++void product(mmq::Context& ctx, cudaStream_t s, const char* name, ggml_type t, int64_t out_rows, int64_t cols,
++             const std::vector<int>& counts, int trial) {
++    if (!mmq::supported((int) t)) throw std::runtime_error(std::string(name) + ": not covered by this build");
++    const int n = (int) counts.size(), rows = std::accumulate(counts.begin(), counts.end(), 0);
++    std::vector<int32_t> bounds((size_t) n + 1, 0);
++    for (int e = 0; e < n; ++e) bounds[(size_t) e + 1] = bounds[(size_t) e] + counts[(size_t) e];
++    const auto src = perm(rows, trial + 1, false), dst = perm(rows, trial + 2, true);
++    const std::vector<float> x = make_x(rows, cols, trial);
++    const size_t eb = mmq::matrix_bytes((int) t, out_rows, cols);
++    if (eb != (size_t) out_rows * ggml_row_size(t, cols)) throw std::runtime_error(std::string(name) + ": matrix_bytes");
++    std::vector<std::vector<uint8_t>> ws;
++    std::vector<uint8_t> w((size_t) n * eb + 4096, 0);
++    for (int e = 0; e < n; ++e) {
++        ws.push_back(make_matrix(t, out_rows, cols, e, trial));
++        std::copy(ws.back().begin(), ws.back().end(), w.begin() + (ptrdiff_t) ((size_t) e * eb));
++    }
++    Dev dx(x.size() * 4), dsrc((size_t) rows * 4), ddst((size_t) rows * 4), db(bounds.size() * 4), dw(w.size()),
++        dxq(mmq::q8_bytes(rows, cols)), dy((size_t) rows * (size_t) out_rows * 4);
++    ck(cudaMemcpy(dx.p, x.data(), x.size() * 4, cudaMemcpyHostToDevice), "x");
++    ck(cudaMemcpy(dsrc.p, src.data(), src.size() * 4, cudaMemcpyHostToDevice), "src");
++    ck(cudaMemcpy(ddst.p, dst.data(), dst.size() * 4, cudaMemcpyHostToDevice), "dst");
++    ck(cudaMemcpy(db.p, bounds.data(), bounds.size() * 4, cudaMemcpyHostToDevice), "bounds");
++    ck(cudaMemcpy(dw.p, w.data(), w.size(), cudaMemcpyHostToDevice), "w");
++    ck(cudaMemset(dy.p, 0xff, (size_t) rows * (size_t) out_rows * 4), "sentinel");
++    // the copies and the sentinel above run on the legacy stream, which a non-blocking stream does not wait for: a
++    // pageable cudaMemcpy/cudaMemset can still be in flight when the kernels start (a 128-SM 4090 caught it)
++    ck(cudaDeviceSynchronize(), "inputs");
++    mmq::quantize((const float*) dx.p, (const int32_t*) dsrc.p, dxq.p, (int) t, cols, cols, rows, s);
++    mmq::Product p;
++    p.w = dw.p; p.type = (int) t; p.w_rows = out_rows; p.w_cols = cols; p.expert_bytes = eb; p.n = n;
++    p.xq = dxq.p; p.bounds = (const int32_t*) db.p; p.ids = (const int32_t*) ddst.p; p.total_rows = rows;
++    p.max_rows = *std::max_element(counts.begin(), counts.end()); p.dst = (float*) dy.p; p.ld_dst = out_rows;
++    ctx.run(p, s);
++    ck(cudaGetLastError(), "launch");
++    ck(cudaStreamSynchronize(s), "sync");
++    std::vector<float> got((size_t) rows * (size_t) out_rows);
++    ck(cudaMemcpy(got.data(), dy.p, got.size() * 4, cudaMemcpyDeviceToHost), "y");
++
++    const auto* tr = ggml_get_type_traits(t);
++    std::vector<float> ref(got.size(), 0.0f), wd((size_t) out_rows * (size_t) cols);
++    for (int e = 0; e < n; ++e) {
++        const size_t rb = ggml_row_size(t, cols);
++        for (int64_t o = 0; o < out_rows; ++o)
++            tr->to_float(ws[(size_t) e].data() + (size_t) o * rb, wd.data() + (size_t) o * (size_t) cols, cols);
++        for (int r = bounds[(size_t) e]; r < bounds[(size_t) e + 1]; ++r) {
++            const float* xr = x.data() + (size_t) src[(size_t) r] * (size_t) cols;
++            for (int64_t o = 0; o < out_rows; ++o) {
++                double acc = 0;
++                const float* wr = wd.data() + (size_t) o * (size_t) cols;
++                for (int64_t k = 0; k < cols; ++k) acc += (double) wr[k] * xr[k];
++                ref[(size_t) dst[(size_t) r] * (size_t) out_rows + (size_t) o] = (float) acc;
++            }
++        }
++    }
++    double err2 = 0, ref2 = 0, max_abs = 0, zero_max = 0;
++    for (size_t i = 0; i < got.size(); ++i) {
++        if (!std::isfinite(got[i])) throw std::runtime_error(std::string(name) + ": unwritten or non-finite output");
++        const double d = (double) got[i] - ref[i];
++        err2 += d * d; ref2 += (double) ref[i] * ref[i]; max_abs = std::max(max_abs, std::fabs(d));
++    }
++    for (int r = 0; r < rows; ++r)
++        if (src[(size_t) r] == rows - 1)   // the zero row
++            for (int64_t o = 0; o < out_rows; ++o)
++                zero_max = std::max(zero_max, (double) std::fabs(got[(size_t) dst[(size_t) r] * (size_t) out_rows + (size_t) o]));
++    const double rms = std::sqrt(ref2 / (double) ref.size()), rel = std::sqrt(err2 / (double) ref.size()) / rms;
++    std::printf("%-22s rows %2d experts %d  ref_rms %.4g  rel_l2 %.5f  max/rms %.4f  zero row %.3g\n", name, rows, n, rms,
++                rel, max_abs / rms, zero_max);
++    if (rel > 0.04 || max_abs / rms > 0.35 || zero_max > std::max(1e-5, 1e-4 * rms))
++        throw std::runtime_error(std::string(name) + ": outside the screen");
++}
++}  // namespace
++
++int main() {
++    try {
++        cudaDeviceProp prop{};
++        if(cudaGetDeviceProperties(&prop,0)!=cudaSuccess || prop.major!=6 || prop.minor!=1){std::puts("SKIP: real sm_61 required");return 77;}
++        if (!mmq::built()) { std::printf("no MMQ in this build\n"); return 1; }
++        // Reference IQ quantizers/dequantizers require their lookup tables.
++        // This is test setup; leave production quantization and error bounds unchanged.
++        for (ggml_type t : {GGML_TYPE_IQ3_S, GGML_TYPE_IQ4_NL, GGML_TYPE_Q2_0, GGML_TYPE_Q8_0})
++            ggml_quantize_init(t);
++        cudaStream_t s = nullptr;
++        ck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking), "stream");
++        {
++            mmq::Context ctx;
++            const std::vector<std::vector<int>> batches{{1,3,3},{4,1,2},{17},{63},{96},{129}};
++            int trial = 0;
++            for (const auto& counts : batches) {
++                const std::string tag = "-" + std::to_string(trial);
++                product(ctx,s,("IQ3_S"+tag).c_str(),GGML_TYPE_IQ3_S,128,256,counts,trial);
++                product(ctx,s,("IQ4_NL"+tag).c_str(),GGML_TYPE_IQ4_NL,130,256,counts,trial+3);
++                product(ctx,s,("Q2_0"+tag).c_str(),GGML_TYPE_Q2_0,128,256,counts,trial+7);
++                product(ctx,s,("Q8_0"+tag).c_str(),GGML_TYPE_Q8_0,130,256,counts,trial+11);
++                ++trial;
++            }
++        }
++        ck(cudaStreamDestroy(s), "destroy");
++        ggml_quantize_free();
++        std::printf("Pascallama sm_61 MMQ numerical screen passed\n");
++        return 0;
++    } catch (const std::exception& e) {
++        std::fprintf(stderr, "Pascallama sm_61 MMQ numerical screen failed: %s\n", e.what());
++        return 1;
++    }
++}
+diff --git a/tests/cuda/sm61_graph_parity.cu b/tests/cuda/sm61_graph_parity.cu
+new file mode 100644
+index 0000000000000000000000000000000000000000..ab1c48426abceabd838348a7bf71140bc403c092
+--- /dev/null
++++ b/tests/cuda/sm61_graph_parity.cu
+@@ -0,0 +1,25 @@
++// Local P40 qualification. No model, no ISA/SM guard bypass; mutable-buffer CUDA Graph replay vs direct kernels.
++#include <cuda_runtime.h>
++#include <cstdio>
++#include <vector>
++__global__ void transform(const float* x,float* y,int n){int i=(int)(blockIdx.x*blockDim.x+threadIdx.x);if(i<n)y[i]=x[i]*2.0f+1.0f;}
++int main(){
++  cudaDeviceProp prop{};if(cudaGetDeviceProperties(&prop,0)!=cudaSuccess||prop.major!=6||prop.minor!=1){std::puts("SKIP: this qualification targets real sm_61");return 77;}
++  const int n=4096;float *x=nullptr,*a=nullptr,*b=nullptr;cudaStream_t stream=nullptr;
++  if(cudaMalloc(&x,n*sizeof(float))||cudaMalloc(&a,n*sizeof(float))||cudaMalloc(&b,n*sizeof(float))||cudaStreamCreate(&stream))return 1;
++  cudaGraph_t graph=nullptr;cudaGraphExec_t exec=nullptr;
++  if(cudaStreamBeginCapture(stream,cudaStreamCaptureModeGlobal)!=cudaSuccess)return 1;
++  transform<<<16,256,0,stream>>>(x,b,n);
++  if(cudaStreamEndCapture(stream,&graph)!=cudaSuccess||cudaGraphInstantiate(&exec,graph,nullptr,nullptr,0)!=cudaSuccess)return 1;
++  std::vector<float> input(n),direct(n),captured(n);
++  for(int trial=0;trial<4;++trial){
++    for(int i=0;i<n;++i)input[i]=(float)(i+trial*17)/32.0f;
++    if(cudaMemcpyAsync(x,input.data(),n*sizeof(float),cudaMemcpyHostToDevice,stream)!=cudaSuccess)return 1;
++    transform<<<16,256,0,stream>>>(x,a,n);
++    if(cudaGraphLaunch(exec,stream)!=cudaSuccess||cudaStreamSynchronize(stream)!=cudaSuccess)return 1;
++    if(cudaMemcpy(direct.data(),a,n*sizeof(float),cudaMemcpyDeviceToHost)!=cudaSuccess||cudaMemcpy(captured.data(),b,n*sizeof(float),cudaMemcpyDeviceToHost)!=cudaSuccess)return 1;
++    for(int i=0;i<n;++i)if(direct[i]!=captured[i]||captured[i]!=input[i]*2.0f+1.0f)return 1;
++  }
++  cudaGraphExecDestroy(exec);cudaGraphDestroy(graph);cudaStreamDestroy(stream);cudaFree(x);cudaFree(a);cudaFree(b);
++  std::printf("PASS: %s sm_61 CUDA Graph capture/replay, changed inputs, bitwise direct parity\n",prop.name);return 0;
++}
+diff --git a/tests/platform/cpu_format_parity.cpp b/tests/platform/cpu_format_parity.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..3d43a868f80daa99d196d34cc4637a3b2a245099
+--- /dev/null
++++ b/tests/platform/cpu_format_parity.cpp
+@@ -0,0 +1,181 @@
++// CPU arithmetic parity on valid GGML rows. No model, GPU, pinning, or unquantized-weight reference.
++#include "ggml.h"
++#include "ggml-cpu.h"
++#include "ggml-quants.h"
++
++#include <algorithm>
++#include <chrono>
++#include <cmath>
++#include <cstdint>
++#include <cstdio>
++#include <cstring>
++#include <vector>
++
++namespace {
++constexpr int kCases = 16;
++constexpr double kAbsTolerance = 1e-4, kRelTolerance = 1e-4;
++
++uint64_t random_bits(uint64_t& state) {
++    uint64_t value = (state += UINT64_C(0x9e3779b97f4a7c15));
++    value = (value ^ (value >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
++    value = (value ^ (value >> 27)) * UINT64_C(0x94d049bb133111eb);
++    return value ^ (value >> 31);
++}
++
++float uniform(uint64_t& state) {
++    return static_cast<float>(random_bits(state) >> 40) * (2.0f / 16777216.0f) - 1.0f;
++}
++
++void make_inputs(int which, int n, std::vector<float>& weights, std::vector<float>& activations) {
++    uint64_t state = UINT64_C(0x20261020c001d00d) + static_cast<uint64_t>(which) * 12347 + n;
++    weights.resize(n);
++    activations.resize(n);
++    for (int i = 0; i < n; ++i) {
++        const float u = uniform(state), v = uniform(state);
++        float w = 0.05f * u, y = v;
++        switch (which) {
++            case 0: w = 0; break;
++            case 1: y = 0; break;
++            case 2: w = 0.125f; y = 0.25f; break;
++            case 3: w = (i & 1) ? -0.125f : 0.125f; y = (i & 1) ? -0.25f : 0.25f; break;
++            case 4: w = i == n / 3 ? -0.75f : 0; break;
++            case 5: y = i == n - 1 ? 0.75f : 0; break;
++            case 6: y = 0.5f * u; break;
++            case 7: y = -0.5f * u; break;
++            case 8: w = static_cast<float>(i % 15 - 7) * 0.003f; y = static_cast<float>(i % 11 - 5) * 0.1f; break;
++            case 9: y = (i & 1) ? -1.0f : 1.0f; break;
++            case 10: w = 0.03f * u; y = 0.75f * v; break;
++            case 11: w = 0.25f * u; y = 2.0f * v; break;
++            case 12: w = 0.001f * u; y = 0.5f * v; break;
++            case 13: w *= (i % 7 == 0) ? 8.0f : 0.015625f; break;
++            case 14: w = 0.015f * (1.0f + u); y = 0.5f * (1.0f + v); break;
++            case 15: w = 0.125f * u; y = (i % 3 == 0) ? -2.0f * v : 0.125f * v; break;
++        }
++        weights[i] = w;
++        activations[i] = y;
++    }
++}
++
++// Allocation is aligned for float/half access, including types whose CPU trait is an identity conversion.
++struct Row {
++    explicit Row(size_t size) : bytes(size), storage((size + sizeof(uint64_t) - 1) / sizeof(uint64_t)) {}
++    void* data() { return storage.data(); }
++    const void* data() const { return storage.data(); }
++    size_t bytes;
++    std::vector<uint64_t> storage;
++};
++
++bool dequantize(ggml_type type, const Row& source, std::vector<float>& output) {
++    if (type == GGML_TYPE_Q8_K) {
++        dequantize_row_q8_K(static_cast<const block_q8_K*>(source.data()), output.data(),
++                            static_cast<int64_t>(output.size()));
++        return true;
++    }
++    if (type == GGML_TYPE_F32) {
++        if (source.bytes != output.size() * sizeof(float)) return false;
++        std::memcpy(output.data(), source.data(), source.bytes);
++        return true;
++    }
++    const auto* traits = ggml_get_type_traits(type);
++    if (traits == nullptr || traits->to_float == nullptr) return false;
++    traits->to_float(source.data(), output.data(), static_cast<int64_t>(output.size()));
++    return true;
++}
++
++int check_type(ggml_type type) {
++    const char* name = ggml_type_name(type);
++    const auto* traits = ggml_get_type_traits_cpu(type);
++    if (traits == nullptr || traits->vec_dot == nullptr) {
++        std::fprintf(stderr, "FAIL %s: CPU vec_dot is unavailable\n", name);
++        return 1;
++    }
++    const ggml_type activation_type = traits->vec_dot_type;
++    const auto* activation_traits = ggml_get_type_traits_cpu(activation_type);
++    if (activation_traits == nullptr || activation_traits->from_float == nullptr) {
++        std::fprintf(stderr, "FAIL %s: production activation converter is unavailable\n", name);
++        return 1;
++    }
++
++    std::printf("CPU parity: %s x %s: initialize quantizer\n", name, ggml_type_name(activation_type));
++    const auto started = std::chrono::steady_clock::now();
++    ggml_quantize_init(type);
++    int failures = 0, checks = 0;
++    double max_abs = 0, max_bound_fraction = 0, max_float_abs = 0;
++    for (int n : {256, 2560}) {
++        if (n % ggml_blck_size(type) != 0 || n % ggml_blck_size(activation_type) != 0) {
++            std::fprintf(stderr, "FAIL %s: n=%d violates a weight/activation block size\n", name, n);
++            ++failures;
++            continue;
++        }
++        std::vector<float> source, input, weight_ref(n), activation_ref(n), importance(n, 1.0f);
++        Row weight_row(ggml_row_size(type, n)), activation_row(ggml_row_size(activation_type, n));
++        for (int which = 0; which < kCases; ++which) {
++            make_inputs(which, n, source, input);
++            const size_t written = ggml_quantize_chunk(type, source.data(), weight_row.data(), 0, 1, n,
++                ggml_quantize_requires_imatrix(type) ? importance.data() : nullptr);
++            if (written != weight_row.bytes) {
++                std::fprintf(stderr, "FAIL %s n=%d case=%d: quantizer wrote %zu, expected %zu bytes\n",
++                             name, n, which, written, weight_row.bytes);
++                ++failures;
++                continue;
++            }
++            activation_traits->from_float(input.data(), activation_row.data(), n);
++
++            if (!dequantize(type, weight_row, weight_ref) ||
++                !dequantize(activation_type, activation_row, activation_ref)) {
++                std::fprintf(stderr, "FAIL %s n=%d case=%d: independent operand dequantizer unavailable\n",
++                             name, n, which);
++                ++failures;
++                continue;
++            }
++
++            // Quantization affects both operands. Compare arithmetic on their decoded values, never on source floats.
++            double reference = 0;
++            float float_reference = 0;
++            bool finite = true;
++            for (int i = 0; i < n; ++i) {
++                finite = finite && std::isfinite(weight_ref[i]) && std::isfinite(activation_ref[i]);
++                reference += static_cast<double>(weight_ref[i]) * static_cast<double>(activation_ref[i]);
++                float_reference += weight_ref[i] * activation_ref[i];
++            }
++            float got = 0;
++            traits->vec_dot(n, &got, 0, weight_row.data(), 0, activation_row.data(), 0, 1);
++            const double error = std::fabs(static_cast<double>(got) - reference);
++            const double bound = kAbsTolerance + kRelTolerance * std::fabs(reference);
++            const bool ok = finite && std::isfinite(reference) && std::isfinite(float_reference) &&
++                            std::isfinite(got) && error <= bound;
++            max_abs = std::fmax(max_abs, error);
++            max_bound_fraction = std::fmax(max_bound_fraction, error / bound);
++            max_float_abs = std::fmax(max_float_abs, std::fabs(static_cast<double>(float_reference) - reference));
++            ++checks;
++            if (!ok) {
++                std::fprintf(stderr,
++                    "FAIL %s n=%d case=%d: got=%.9g decoded-double=%.17g decoded-float=%.9g error=%.6g bound=%.6g finite=%d\n",
++                    name, n, which, got, reference, float_reference, error, bound, static_cast<int>(finite));
++                ++failures;
++            }
++        }
++    }
++    ggml_quantize_free(); // Keep only one IQ codebook allocation alive at a time.
++    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
++    std::printf("%s: %d checks, max_abs=%.6g, max_bound_fraction=%.6g, float_accum_abs=%.6g, %.3fs: %s\n",
++                name, checks, max_abs, max_bound_fraction, max_float_abs, elapsed, failures ? "FAIL" : "PASS");
++    return failures;
++}
++} // namespace
++
++int main() {
++    setvbuf(stdout, nullptr, _IONBF, 0);
++    ggml_cpu_init();
++    static_assert(static_cast<int>(GGML_TYPE_Q2_0) == 42, "DavidAU Q2_0 must retain GGUF type ID 42");
++    const ggml_type types[] = {
++        GGML_TYPE_Q2_0, GGML_TYPE_IQ2_S, GGML_TYPE_IQ3_XXS, GGML_TYPE_IQ3_S,
++        GGML_TYPE_IQ4_XS, GGML_TYPE_IQ4_NL, GGML_TYPE_Q4_K, GGML_TYPE_Q5_K,
++        GGML_TYPE_Q6_K, GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_BF16, GGML_TYPE_F32,
++    };
++    int failures = 0;
++    for (ggml_type type : types) failures += check_type(type);
++    std::printf("CPU format parity: 13 types x 2 lengths x %d cases; arithmetic tolerance %.1e + %.1e*abs(decoded-double); failures=%d\n",
++                kCases, kAbsTolerance, kRelTolerance, failures);
++    return failures ? 1 : 0;
++}
 diff --git a/tests/platform/no_cpu_pin_test.cpp b/tests/platform/no_cpu_pin_test.cpp
 new file mode 100644
+index 0000000000000000000000000000000000000000..631691ca42eb516e58a957e5b4e0399e570db7e2
 --- /dev/null
 +++ b/tests/platform/no_cpu_pin_test.cpp
 @@ -0,0 +1,245 @@
@@ -547,562 +2646,142 @@ new file mode 100644
 +                disabled ? "disabled" : "positive control", group_calls.load(), cpu_set_calls.load(), failures);
 +    return failures ? 1 : 0;
 +}
-diff --git a/tests/platform/cpu_format_parity.cpp b/tests/platform/cpu_format_parity.cpp
+diff --git a/tests/platform/ple_reader_lifecycle.cpp b/tests/platform/ple_reader_lifecycle.cpp
 new file mode 100644
+index 0000000000000000000000000000000000000000..1f78f55613ab3c579a54a816703b40c0190162ba
 --- /dev/null
-+++ b/tests/platform/cpu_format_parity.cpp
-@@ -0,0 +1,181 @@
-+// CPU arithmetic parity on valid GGML rows. No model, GPU, pinning, or unquantized-weight reference.
-+#include "ggml.h"
-+#include "ggml-cpu.h"
-+#include "ggml-quants.h"
++++ b/tests/platform/ple_reader_lifecycle.cpp
+@@ -0,0 +1,127 @@
++// CPU-only lifecycle regressions using real DirectFile I/O; allocation failure is injected at link time.
++#include "strata/ngram/ple_reader.hpp"
 +
-+#include <algorithm>
-+#include <chrono>
-+#include <cmath>
-+#include <cstdint>
++#include <cerrno>
 +#include <cstdio>
-+#include <cstring>
-+#include <vector>
-+
-+namespace {
-+constexpr int kCases = 16;
-+constexpr double kAbsTolerance = 1e-4, kRelTolerance = 1e-4;
-+
-+uint64_t random_bits(uint64_t& state) {
-+    uint64_t value = (state += UINT64_C(0x9e3779b97f4a7c15));
-+    value = (value ^ (value >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-+    value = (value ^ (value >> 27)) * UINT64_C(0x94d049bb133111eb);
-+    return value ^ (value >> 31);
-+}
-+
-+float uniform(uint64_t& state) {
-+    return static_cast<float>(random_bits(state) >> 40) * (2.0f / 16777216.0f) - 1.0f;
-+}
-+
-+void make_inputs(int which, int n, std::vector<float>& weights, std::vector<float>& activations) {
-+    uint64_t state = UINT64_C(0x20261020c001d00d) + static_cast<uint64_t>(which) * 12347 + n;
-+    weights.resize(n);
-+    activations.resize(n);
-+    for (int i = 0; i < n; ++i) {
-+        const float u = uniform(state), v = uniform(state);
-+        float w = 0.05f * u, y = v;
-+        switch (which) {
-+            case 0: w = 0; break;
-+            case 1: y = 0; break;
-+            case 2: w = 0.125f; y = 0.25f; break;
-+            case 3: w = (i & 1) ? -0.125f : 0.125f; y = (i & 1) ? -0.25f : 0.25f; break;
-+            case 4: w = i == n / 3 ? -0.75f : 0; break;
-+            case 5: y = i == n - 1 ? 0.75f : 0; break;
-+            case 6: y = 0.5f * u; break;
-+            case 7: y = -0.5f * u; break;
-+            case 8: w = static_cast<float>(i % 15 - 7) * 0.003f; y = static_cast<float>(i % 11 - 5) * 0.1f; break;
-+            case 9: y = (i & 1) ? -1.0f : 1.0f; break;
-+            case 10: w = 0.03f * u; y = 0.75f * v; break;
-+            case 11: w = 0.25f * u; y = 2.0f * v; break;
-+            case 12: w = 0.001f * u; y = 0.5f * v; break;
-+            case 13: w *= (i % 7 == 0) ? 8.0f : 0.015625f; break;
-+            case 14: w = 0.015f * (1.0f + u); y = 0.5f * (1.0f + v); break;
-+            case 15: w = 0.125f * u; y = (i % 3 == 0) ? -2.0f * v : 0.125f * v; break;
-+        }
-+        weights[i] = w;
-+        activations[i] = y;
-+    }
-+}
-+
-+// Allocation is aligned for float/half access, including types whose CPU trait is an identity conversion.
-+struct Row {
-+    explicit Row(size_t size) : bytes(size), storage((size + sizeof(uint64_t) - 1) / sizeof(uint64_t)) {}
-+    void* data() { return storage.data(); }
-+    const void* data() const { return storage.data(); }
-+    size_t bytes;
-+    std::vector<uint64_t> storage;
-+};
-+
-+bool dequantize(ggml_type type, const Row& source, std::vector<float>& output) {
-+    if (type == GGML_TYPE_Q8_K) {
-+        dequantize_row_q8_K(static_cast<const block_q8_K*>(source.data()), output.data(),
-+                            static_cast<int64_t>(output.size()));
-+        return true;
-+    }
-+    if (type == GGML_TYPE_F32) {
-+        if (source.bytes != output.size() * sizeof(float)) return false;
-+        std::memcpy(output.data(), source.data(), source.bytes);
-+        return true;
-+    }
-+    const auto* traits = ggml_get_type_traits(type);
-+    if (traits == nullptr || traits->to_float == nullptr) return false;
-+    traits->to_float(source.data(), output.data(), static_cast<int64_t>(output.size()));
-+    return true;
-+}
-+
-+int check_type(ggml_type type) {
-+    const char* name = ggml_type_name(type);
-+    const auto* traits = ggml_get_type_traits_cpu(type);
-+    if (traits == nullptr || traits->vec_dot == nullptr) {
-+        std::fprintf(stderr, "FAIL %s: CPU vec_dot is unavailable\n", name);
-+        return 1;
-+    }
-+    const ggml_type activation_type = traits->vec_dot_type;
-+    const auto* activation_traits = ggml_get_type_traits_cpu(activation_type);
-+    if (activation_traits == nullptr || activation_traits->from_float == nullptr) {
-+        std::fprintf(stderr, "FAIL %s: production activation converter is unavailable\n", name);
-+        return 1;
-+    }
-+
-+    std::printf("CPU parity: %s x %s: initialize quantizer\n", name, ggml_type_name(activation_type));
-+    const auto started = std::chrono::steady_clock::now();
-+    ggml_quantize_init(type);
-+    int failures = 0, checks = 0;
-+    double max_abs = 0, max_bound_fraction = 0, max_float_abs = 0;
-+    for (int n : {256, 2560}) {
-+        if (n % ggml_blck_size(type) != 0 || n % ggml_blck_size(activation_type) != 0) {
-+            std::fprintf(stderr, "FAIL %s: n=%d violates a weight/activation block size\n", name, n);
-+            ++failures;
-+            continue;
-+        }
-+        std::vector<float> source, input, weight_ref(n), activation_ref(n), importance(n, 1.0f);
-+        Row weight_row(ggml_row_size(type, n)), activation_row(ggml_row_size(activation_type, n));
-+        for (int which = 0; which < kCases; ++which) {
-+            make_inputs(which, n, source, input);
-+            const size_t written = ggml_quantize_chunk(type, source.data(), weight_row.data(), 0, 1, n,
-+                ggml_quantize_requires_imatrix(type) ? importance.data() : nullptr);
-+            if (written != weight_row.bytes) {
-+                std::fprintf(stderr, "FAIL %s n=%d case=%d: quantizer wrote %zu, expected %zu bytes\n",
-+                             name, n, which, written, weight_row.bytes);
-+                ++failures;
-+                continue;
-+            }
-+            activation_traits->from_float(input.data(), activation_row.data(), n);
-+
-+            if (!dequantize(type, weight_row, weight_ref) ||
-+                !dequantize(activation_type, activation_row, activation_ref)) {
-+                std::fprintf(stderr, "FAIL %s n=%d case=%d: independent operand dequantizer unavailable\n",
-+                             name, n, which);
-+                ++failures;
-+                continue;
-+            }
-+
-+            // Quantization affects both operands. Compare arithmetic on their decoded values, never on source floats.
-+            double reference = 0;
-+            float float_reference = 0;
-+            bool finite = true;
-+            for (int i = 0; i < n; ++i) {
-+                finite = finite && std::isfinite(weight_ref[i]) && std::isfinite(activation_ref[i]);
-+                reference += static_cast<double>(weight_ref[i]) * static_cast<double>(activation_ref[i]);
-+                float_reference += weight_ref[i] * activation_ref[i];
-+            }
-+            float got = 0;
-+            traits->vec_dot(n, &got, 0, weight_row.data(), 0, activation_row.data(), 0, 1);
-+            const double error = std::fabs(static_cast<double>(got) - reference);
-+            const double bound = kAbsTolerance + kRelTolerance * std::fabs(reference);
-+            const bool ok = finite && std::isfinite(reference) && std::isfinite(float_reference) &&
-+                            std::isfinite(got) && error <= bound;
-+            max_abs = std::fmax(max_abs, error);
-+            max_bound_fraction = std::fmax(max_bound_fraction, error / bound);
-+            max_float_abs = std::fmax(max_float_abs, std::fabs(static_cast<double>(float_reference) - reference));
-+            ++checks;
-+            if (!ok) {
-+                std::fprintf(stderr,
-+                    "FAIL %s n=%d case=%d: got=%.9g decoded-double=%.17g decoded-float=%.9g error=%.6g bound=%.6g finite=%d\n",
-+                    name, n, which, got, reference, float_reference, error, bound, static_cast<int>(finite));
-+                ++failures;
-+            }
-+        }
-+    }
-+    ggml_quantize_free(); // Keep only one IQ codebook allocation alive at a time.
-+    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-+    std::printf("%s: %d checks, max_abs=%.6g, max_bound_fraction=%.6g, float_accum_abs=%.6g, %.3fs: %s\n",
-+                name, checks, max_abs, max_bound_fraction, max_float_abs, elapsed, failures ? "FAIL" : "PASS");
-+    return failures;
-+}
-+} // namespace
-+
-+int main() {
-+    setvbuf(stdout, nullptr, _IONBF, 0);
-+    ggml_cpu_init();
-+    static_assert(static_cast<int>(GGML_TYPE_Q2_0) == 42, "DavidAU Q2_0 must retain GGUF type ID 42");
-+    const ggml_type types[] = {
-+        GGML_TYPE_Q2_0, GGML_TYPE_IQ2_S, GGML_TYPE_IQ3_XXS, GGML_TYPE_IQ3_S,
-+        GGML_TYPE_IQ4_XS, GGML_TYPE_IQ4_NL, GGML_TYPE_Q4_K, GGML_TYPE_Q5_K,
-+        GGML_TYPE_Q6_K, GGML_TYPE_Q8_0, GGML_TYPE_F16, GGML_TYPE_BF16, GGML_TYPE_F32,
-+    };
-+    int failures = 0;
-+    for (ggml_type type : types) failures += check_type(type);
-+    std::printf("CPU format parity: 13 types x 2 lengths x %d cases; arithmetic tolerance %.1e + %.1e*abs(decoded-double); failures=%d\n",
-+                kCases, kAbsTolerance, kRelTolerance, failures);
-+    return failures ? 1 : 0;
-+}
-diff --git a/cmake/strata_ivybridge_o3.cmake b/cmake/strata_ivybridge_o3.cmake
-new file mode 100644
---- /dev/null
-+++ b/cmake/strata_ivybridge_o3.cmake
-@@ -0,0 +1,19 @@
-+# Local profile: genuine Clang O3 with an Ivy Bridge baseline. Preserve runtime-dispatched wider kernels.
-+option(STRATA_IVYBRIDGE_O3 "Local Windows Clang O3/Ivy Bridge profile" OFF)
-+if(STRATA_IVYBRIDGE_O3)
-+  if(NOT MSVC OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-+    message(FATAL_ERROR "STRATA_IVYBRIDGE_O3 requires clang-cl with the MSVC ABI")
-+  endif()
-+  set(_ivy_wide /clang:-mavx2 /clang:-mfma /clang:-mf16c /clang:-fno-vectorize /clang:-fno-slp-vectorize)
-+  foreach(_src src/kernels/cpu/expert.cpp src/kernels/cpu/iq_avx512.cpp src/kernels/cpu/nvfp4_avx512.cpp src/kernels/cpu/tq_avx512.cpp)
-+    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide}
-+      /clang:-mavx512f /clang:-mavx512bw /clang:-mavx512vl /clang:-mavx512dq /clang:-mavx512vnni /clang:-mavx512vbmi)
-+  endforeach()
-+  foreach(_src src/kernels/cpu/q2_avx2.cpp src/kernels/cpu/iq_avx2.cpp src/kernels/cpu/kq_avx2.cpp src/kernels/cpu/nvfp4_avx2.cpp src/kernels/cpu/tq_avx2.cpp)
-+    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide})
-+  endforeach()
-+  foreach(_src src/kernels/cpu/q2_avx1.cpp src/kernels/cpu/iq_avx1.cpp src/kernels/cpu/kq_avx1.cpp)
-+    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS /clang:-mavx /clang:-mno-avx2 /clang:-mno-fma /clang:-mno-f16c)
-+  endforeach()
-+  message(STATUS "Local CPU profile: Clang -O3, Ivy Bridge tuning, AVX baseline, guarded wide kernels retained")
-+endif()
-diff --git a/cmake/strata_pascallama_overlay.cmake b/cmake/strata_pascallama_overlay.cmake
-new file mode 100644
---- /dev/null
-+++ b/cmake/strata_pascallama_overlay.cmake
-@@ -0,0 +1,23 @@
-+# The complete upstream pascallama patch is applied only to a private build-tree copy of pinned ggml.
-+function(strata_pascallama_overlay original destination patch git)
-+  if(NOT EXISTS "${patch}" OR NOT EXISTS "${git}")
-+    message(FATAL_ERROR "Verified pascallama patch/private Git are required")
-+  endif()
-+  file(MAKE_DIRECTORY "${destination}")
-+  file(COPY "${original}/ggml" DESTINATION "${destination}" FILES_MATCHING PATTERN "*.h" PATTERN "*.cuh" PATTERN "*.cu")
-+  foreach(_name mmq-config-pascal-dp4a.cuh mmq-vec-dot.cuh)
-+    set(_file "${destination}/ggml/src/ggml-cuda/${_name}")
-+    file(READ "${original}/ggml/src/ggml-cuda/${_name}" _text)
-+    string(REPLACE "\r\n" "\n" _text "${_text}")
-+    file(CONFIGURE OUTPUT "${_file}" CONTENT "${_text}" @ONLY NEWLINE_STYLE UNIX)
-+  endforeach()
-+  execute_process(COMMAND "${git}" -C "${destination}" apply --check "${patch}" RESULT_VARIABLE _check OUTPUT_VARIABLE _stdout ERROR_VARIABLE _stderr)
-+  if(NOT _check EQUAL 0)
-+    message(FATAL_ERROR "Pascallama patch does not match pinned ggml: ${_stdout}${_stderr}")
-+  endif()
-+  execute_process(COMMAND "${git}" -C "${destination}" apply "${patch}" RESULT_VARIABLE _apply OUTPUT_VARIABLE _stdout ERROR_VARIABLE _stderr)
-+  if(NOT _apply EQUAL 0)
-+    message(FATAL_ERROR "Pascallama private overlay failed: ${_stdout}${_stderr}")
-+  endif()
-+  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
-+endfunction()
-diff --git a/tests/cuda/pascallama_mmq_screen.cpp b/tests/cuda/pascallama_mmq_screen.cpp
-new file mode 100644
---- /dev/null
-+++ b/tests/cuda/pascallama_mmq_screen.cpp
-@@ -0,0 +1,182 @@
-+// Local Pascal MMQ screen derived from upstream prefill_mmq_kquant_test (MIT).
-+// Covers full pascallama J96/unroll with current IQ3_S/IQ4_NL and Q2_0/Q8_0 types.
-+#include "strata/prefill/moe_mmq.hpp"
-+
-+#include "ggml.h"
-+
-+#include <cuda_runtime.h>
-+
-+#include <algorithm>
-+#include <cmath>
-+#include <cstdint>
-+#include <cstdio>
-+#include <numeric>
++#include <cstdlib>
++#include <filesystem>
++#include <fstream>
 +#include <stdexcept>
 +#include <string>
 +#include <vector>
++#if defined(_WIN32)
++#include <io.h>
++#include <fcntl.h>
++#include <sys/stat.h>
++#else
++#include <unistd.h>
++#endif
++
++#ifdef STRATA_TEST_ALLOC_FAILURE
++static bool fail_alloc = false;
++extern "C" int __real_posix_memalign(void**, size_t, size_t);
++extern "C" int __wrap_posix_memalign(void** out, size_t alignment, size_t bytes) {
++    if (fail_alloc) { fail_alloc = false; return ENOMEM; }
++    return __real_posix_memalign(out, alignment, bytes);
++}
++#endif
 +
 +namespace {
-+namespace mmq = strata::prefill::mmq;
++using strata::ngram::PleReader;
++constexpr uint32_t kRows = 128, kRowBytes = 90;
++constexpr size_t kFileBytes = 16384;
++void check(bool ok, const std::string& why) { if (!ok) throw std::runtime_error(why); }
++uint8_t pattern(size_t i) { return (uint8_t) ((i * 17 + i / 257) & 255); }
 +
-+void ck(cudaError_t e, const char* what) {
-+    if (e != cudaSuccess) throw std::runtime_error(std::string(what) + ": " + cudaGetErrorString(e));
-+}
-+
-+struct Dev {
-+    void* p = nullptr;
-+    explicit Dev(size_t n) { ck(cudaMalloc(&p, n), "cudaMalloc"); }
-+    ~Dev() { cudaFree(p); }
-+    Dev(const Dev&) = delete;
-+    Dev& operator=(const Dev&) = delete;
++struct Table {
++    std::filesystem::path path;
++    Table() {
++        std::string name = (std::filesystem::temp_directory_path() / "strata-ple-lifecycle-XXXXXX").string();
++#if defined(_WIN32)
++        check(_mktemp_s(name.data(), name.size() + 1) == 0, "temporary name failed");
++        const int fd = _open(name.c_str(), _O_CREAT | _O_EXCL | _O_RDWR | _O_BINARY, _S_IREAD | _S_IWRITE);
++        check(fd >= 0, "temporary file open failed");
++        _close(fd);
++#else
++        const int fd = mkstemp(name.data());
++        check(fd >= 0, "mkstemp failed");
++        ::close(fd);
++#endif
++        path = name;
++        std::vector<uint8_t> bytes(kFileBytes);
++        for (size_t i = 0; i < bytes.size(); ++i) bytes[i] = pattern(i);
++        std::ofstream f(path, std::ios::binary | std::ios::trunc);
++        f.write(reinterpret_cast<const char*>(bytes.data()), (std::streamsize) bytes.size());
++        check((bool) f, "cannot write fixture");
++    }
++    ~Table() { std::error_code ignored; std::filesystem::remove(path, ignored); }
 +};
 +
-+std::vector<uint8_t> make_matrix(ggml_type t, int64_t rows, int64_t cols, int expert, int trial) {
-+    const auto* tr = ggml_get_type_traits(t);
-+    if (tr == nullptr || tr->to_float == nullptr) throw std::runtime_error("no reference dequantizer");
-+    const size_t rb = ggml_row_size(t, cols);
-+    std::vector<uint8_t> out((size_t) rows * rb);
-+    std::vector<float> row((size_t) cols);
-+    for (int64_t r = 0; r < rows; ++r) {
-+        for (int64_t k = 0; k < cols; ++k) {
-+            const int code = (int) ((k * 37 + r * 19 + expert * 23 + trial * 11) % 101) - 50;
-+            row[(size_t) k] = 0.025f * std::sin(0.013f * (float) (k + 1) + 0.17f * (float) r + 0.31f * (float) expert) +
-+                              0.0015f * (float) code;
-+        }
-+        if (tr->from_float_ref != nullptr) tr->from_float_ref(row.data(), out.data() + (size_t) r * rb, cols);
-+        else {
-+            if (t != GGML_TYPE_IQ3_S) throw std::runtime_error("unsupported synthetic quant");
-+            const size_t bs = ggml_type_size(t), blocks = rb / bs;
-+            for (size_t block = 0; block < blocks; ++block) {
-+                uint8_t* dst = out.data() + (size_t) r * rb + block * bs;
-+                for (size_t k = 0; k < bs; ++k) dst[k] = (uint8_t) ((k * 37 + block * 19 + r * 11 + expert * 23 + trial * 7) & 255);
-+                dst[0] = 0; dst[1] = 0x24; // finite positive fp16 block scale
-+            }
-+        }
-+    }
-+    return out;
++void open(PleReader& r, const Table& table, bool threaded) {
++    std::string err;
++    const bool ok = r.open(table.path.string(), 0, kRows, 4, 0, err, threaded, kRowBytes);
++    check(ok, "open failed: " + err);
 +}
 +
-+std::vector<float> make_x(int rows, int64_t cols, int trial) {
-+    std::vector<float> x((size_t) rows * (size_t) cols);
-+    for (int r = 0; r < rows; ++r)
-+        for (int64_t k = 0; k < cols; ++k)
-+            x[(size_t) r * (size_t) cols + (size_t) k] =
-+                0.45f * std::sin(0.009f * (float) (k + 1) + 0.23f * (float) r + 0.07f * (float) trial) +
-+                0.17f * std::cos(0.021f * (float) (k + 3) - 0.19f * (float) r) +
-+                0.002f * (float) (((k * 7 + r * 13 + trial * 5) % 19) - 9);
-+    std::fill(x.end() - cols, x.end(), 0.0f);   // an all-zero row: exactly zero out
-+    return x;
++void read(PleReader& r) {
++    const uint32_t rows[] = {0, 45, 91, 127}; // different pages, including a row that crosses a page boundary
++    std::vector<uint8_t> out(4 * kRowBytes, 0);
++    const auto ticket = r.issue(rows, 4, out.data());
++    std::string err;
++    const bool ok = r.collect(ticket, err);
++    check(ok, "collect failed: " + err);
++    for (size_t i = 0; i < 4; ++i)
++        for (size_t b = 0; b < kRowBytes; ++b)
++            check(out[i * kRowBytes + b] == pattern((size_t) rows[i] * kRowBytes + b), "row bytes changed");
 +}
 +
-+std::vector<int32_t> perm(int n, int shift, bool reverse) {
-+    std::vector<int32_t> p((size_t) n);
-+    for (int i = 0; i < n; ++i) p[(size_t) i] = (int32_t) (((reverse ? n - 1 - i : i) + shift) % n);
-+    return p;
++void refused(PleReader& r, const Table& table, bool threaded, bool allocation) {
++    std::string err;
++#ifdef STRATA_TEST_ALLOC_FAILURE
++    if (allocation) fail_alloc = true;
++#endif
++    const bool ok = r.open(table.path.string(), allocation ? 0 : kFileBytes, kRows, 4, 0, err,
++                           threaded, kRowBytes);
++    check(!ok, "invalid initialization was accepted");
++    check(err.find(allocation ? "cannot allocate read buffers" : "table extends past the end") != std::string::npos,
++          "unexpected initialization error: " + err);
++#ifdef STRATA_TEST_ALLOC_FAILURE
++    check(!fail_alloc, "allocation failure was not exercised");
++#endif
++    check(!r.is_open(), "failed reader kept its file open");
++    r.close();
++    r.close();
 +}
++} // namespace
 +
-+// one grouped product: experts side by side at one stride (a zeroed tail after them, as prefill.cpp stages them)
-+void product(mmq::Context& ctx, cudaStream_t s, const char* name, ggml_type t, int64_t out_rows, int64_t cols,
-+             const std::vector<int>& counts, int trial) {
-+    if (!mmq::supported((int) t)) throw std::runtime_error(std::string(name) + ": not covered by this build");
-+    const int n = (int) counts.size(), rows = std::accumulate(counts.begin(), counts.end(), 0);
-+    std::vector<int32_t> bounds((size_t) n + 1, 0);
-+    for (int e = 0; e < n; ++e) bounds[(size_t) e + 1] = bounds[(size_t) e] + counts[(size_t) e];
-+    const auto src = perm(rows, trial + 1, false), dst = perm(rows, trial + 2, true);
-+    const std::vector<float> x = make_x(rows, cols, trial);
-+    const size_t eb = mmq::matrix_bytes((int) t, out_rows, cols);
-+    if (eb != (size_t) out_rows * ggml_row_size(t, cols)) throw std::runtime_error(std::string(name) + ": matrix_bytes");
-+    std::vector<std::vector<uint8_t>> ws;
-+    std::vector<uint8_t> w((size_t) n * eb + 4096, 0);
-+    for (int e = 0; e < n; ++e) {
-+        ws.push_back(make_matrix(t, out_rows, cols, e, trial));
-+        std::copy(ws.back().begin(), ws.back().end(), w.begin() + (ptrdiff_t) ((size_t) e * eb));
-+    }
-+    Dev dx(x.size() * 4), dsrc((size_t) rows * 4), ddst((size_t) rows * 4), db(bounds.size() * 4), dw(w.size()),
-+        dxq(mmq::q8_bytes(rows, cols)), dy((size_t) rows * (size_t) out_rows * 4);
-+    ck(cudaMemcpy(dx.p, x.data(), x.size() * 4, cudaMemcpyHostToDevice), "x");
-+    ck(cudaMemcpy(dsrc.p, src.data(), src.size() * 4, cudaMemcpyHostToDevice), "src");
-+    ck(cudaMemcpy(ddst.p, dst.data(), dst.size() * 4, cudaMemcpyHostToDevice), "dst");
-+    ck(cudaMemcpy(db.p, bounds.data(), bounds.size() * 4, cudaMemcpyHostToDevice), "bounds");
-+    ck(cudaMemcpy(dw.p, w.data(), w.size(), cudaMemcpyHostToDevice), "w");
-+    ck(cudaMemset(dy.p, 0xff, (size_t) rows * (size_t) out_rows * 4), "sentinel");
-+    // the copies and the sentinel above run on the legacy stream, which a non-blocking stream does not wait for: a
-+    // pageable cudaMemcpy/cudaMemset can still be in flight when the kernels start (a 128-SM 4090 caught it)
-+    ck(cudaDeviceSynchronize(), "inputs");
-+    mmq::quantize((const float*) dx.p, (const int32_t*) dsrc.p, dxq.p, (int) t, cols, cols, rows, s);
-+    mmq::Product p;
-+    p.w = dw.p; p.type = (int) t; p.w_rows = out_rows; p.w_cols = cols; p.expert_bytes = eb; p.n = n;
-+    p.xq = dxq.p; p.bounds = (const int32_t*) db.p; p.ids = (const int32_t*) ddst.p; p.total_rows = rows;
-+    p.max_rows = *std::max_element(counts.begin(), counts.end()); p.dst = (float*) dy.p; p.ld_dst = out_rows;
-+    ctx.run(p, s);
-+    ck(cudaGetLastError(), "launch");
-+    ck(cudaStreamSynchronize(s), "sync");
-+    std::vector<float> got((size_t) rows * (size_t) out_rows);
-+    ck(cudaMemcpy(got.data(), dy.p, got.size() * 4, cudaMemcpyDeviceToHost), "y");
-+
-+    const auto* tr = ggml_get_type_traits(t);
-+    std::vector<float> ref(got.size(), 0.0f), wd((size_t) out_rows * (size_t) cols);
-+    for (int e = 0; e < n; ++e) {
-+        const size_t rb = ggml_row_size(t, cols);
-+        for (int64_t o = 0; o < out_rows; ++o)
-+            tr->to_float(ws[(size_t) e].data() + (size_t) o * rb, wd.data() + (size_t) o * (size_t) cols, cols);
-+        for (int r = bounds[(size_t) e]; r < bounds[(size_t) e + 1]; ++r) {
-+            const float* xr = x.data() + (size_t) src[(size_t) r] * (size_t) cols;
-+            for (int64_t o = 0; o < out_rows; ++o) {
-+                double acc = 0;
-+                const float* wr = wd.data() + (size_t) o * (size_t) cols;
-+                for (int64_t k = 0; k < cols; ++k) acc += (double) wr[k] * xr[k];
-+                ref[(size_t) dst[(size_t) r] * (size_t) out_rows + (size_t) o] = (float) acc;
-+            }
-+        }
-+    }
-+    double err2 = 0, ref2 = 0, max_abs = 0, zero_max = 0;
-+    for (size_t i = 0; i < got.size(); ++i) {
-+        if (!std::isfinite(got[i])) throw std::runtime_error(std::string(name) + ": unwritten or non-finite output");
-+        const double d = (double) got[i] - ref[i];
-+        err2 += d * d; ref2 += (double) ref[i] * ref[i]; max_abs = std::max(max_abs, std::fabs(d));
-+    }
-+    for (int r = 0; r < rows; ++r)
-+        if (src[(size_t) r] == rows - 1)   // the zero row
-+            for (int64_t o = 0; o < out_rows; ++o)
-+                zero_max = std::max(zero_max, (double) std::fabs(got[(size_t) dst[(size_t) r] * (size_t) out_rows + (size_t) o]));
-+    const double rms = std::sqrt(ref2 / (double) ref.size()), rel = std::sqrt(err2 / (double) ref.size()) / rms;
-+    std::printf("%-22s rows %2d experts %d  ref_rms %.4g  rel_l2 %.5f  max/rms %.4f  zero row %.3g\n", name, rows, n, rms,
-+                rel, max_abs / rms, zero_max);
-+    if (rel > 0.04 || max_abs / rms > 0.35 || zero_max > std::max(1e-5, 1e-4 * rms))
-+        throw std::runtime_error(std::string(name) + ": outside the screen");
-+}
-+}  // namespace
-+
-+int main() {
++int main(int argc, char** argv) {
 +    try {
-+        cudaDeviceProp prop{};
-+        if(cudaGetDeviceProperties(&prop,0)!=cudaSuccess || prop.major!=6 || prop.minor!=1){std::puts("SKIP: real sm_61 required");return 77;}
-+        if (!mmq::built()) { std::printf("no MMQ in this build\n"); return 1; }
-+        // Reference IQ quantizers/dequantizers require their lookup tables.
-+        // This is test setup; leave production quantization and error bounds unchanged.
-+        for (ggml_type t : {GGML_TYPE_IQ3_S, GGML_TYPE_IQ4_NL, GGML_TYPE_Q2_0, GGML_TYPE_Q8_0})
-+            ggml_quantize_init(t);
-+        cudaStream_t s = nullptr;
-+        ck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking), "stream");
-+        {
-+            mmq::Context ctx;
-+            const std::vector<std::vector<int>> batches{{1,3,3},{4,1,2},{17},{63},{96},{129}};
-+            int trial = 0;
-+            for (const auto& counts : batches) {
-+                const std::string tag = "-" + std::to_string(trial);
-+                product(ctx,s,("IQ3_S"+tag).c_str(),GGML_TYPE_IQ3_S,128,256,counts,trial);
-+                product(ctx,s,("IQ4_NL"+tag).c_str(),GGML_TYPE_IQ4_NL,130,256,counts,trial+3);
-+                product(ctx,s,("Q2_0"+tag).c_str(),GGML_TYPE_Q2_0,128,256,counts,trial+7);
-+                product(ctx,s,("Q8_0"+tag).c_str(),GGML_TYPE_Q8_0,130,256,counts,trial+11);
-+                ++trial;
-+            }
++        check(argc == 3, "usage: ple_reader_lifecycle_test reads|reopen|alloc caller|threaded");
++        const std::string mode = argv[1];
++        const bool threaded = std::string(argv[2]) == "threaded";
++        check(mode == "reads" || mode == "reopen" || mode == "alloc", "unknown case");
++        Table table;
++        PleReader r;
++        if (mode != "reads") refused(r, table, threaded, mode == "alloc");
++        open(r, table, threaded);
++        read(r);
++        // open() must also clean up a previously initialized reader before handling the new failure.
++        if (mode != "reads") refused(r, table, threaded, mode == "alloc");
++        else {
++            const uint32_t rows[] = {0, 45, 91, 127};
++            std::vector<uint8_t> out(4 * kRowBytes, 0);
++            (void) r.issue(rows, 4, out.data());
++            r.close(); // outstanding writes must finish before out is released
 +        }
-+        ck(cudaStreamDestroy(s), "destroy");
-+        ggml_quantize_free();
-+        std::printf("Pascallama sm_61 MMQ numerical screen passed\n");
++        r.close();
++        open(r, table, threaded);
++        read(r);
++        r.close();
++        r.close();
++        std::printf("%s %s: passed\n", argv[1], argv[2]);
 +        return 0;
 +    } catch (const std::exception& e) {
-+        std::fprintf(stderr, "Pascallama sm_61 MMQ numerical screen failed: %s\n", e.what());
++        std::fprintf(stderr, "%s\n", e.what());
 +        return 1;
 +    }
 +}
-diff --git a/tests/cuda/sm61_graph_parity.cu b/tests/cuda/sm61_graph_parity.cu
-new file mode 100644
---- /dev/null
-+++ b/tests/cuda/sm61_graph_parity.cu
-@@ -0,0 +1,25 @@
-+// Local P40 qualification. No model, no ISA/SM guard bypass; mutable-buffer CUDA Graph replay vs direct kernels.
-+#include <cuda_runtime.h>
-+#include <cstdio>
-+#include <vector>
-+__global__ void transform(const float* x,float* y,int n){int i=(int)(blockIdx.x*blockDim.x+threadIdx.x);if(i<n)y[i]=x[i]*2.0f+1.0f;}
-+int main(){
-+  cudaDeviceProp prop{};if(cudaGetDeviceProperties(&prop,0)!=cudaSuccess||prop.major!=6||prop.minor!=1){std::puts("SKIP: this qualification targets real sm_61");return 77;}
-+  const int n=4096;float *x=nullptr,*a=nullptr,*b=nullptr;cudaStream_t stream=nullptr;
-+  if(cudaMalloc(&x,n*sizeof(float))||cudaMalloc(&a,n*sizeof(float))||cudaMalloc(&b,n*sizeof(float))||cudaStreamCreate(&stream))return 1;
-+  cudaGraph_t graph=nullptr;cudaGraphExec_t exec=nullptr;
-+  if(cudaStreamBeginCapture(stream,cudaStreamCaptureModeGlobal)!=cudaSuccess)return 1;
-+  transform<<<16,256,0,stream>>>(x,b,n);
-+  if(cudaStreamEndCapture(stream,&graph)!=cudaSuccess||cudaGraphInstantiate(&exec,graph,nullptr,nullptr,0)!=cudaSuccess)return 1;
-+  std::vector<float> input(n),direct(n),captured(n);
-+  for(int trial=0;trial<4;++trial){
-+    for(int i=0;i<n;++i)input[i]=(float)(i+trial*17)/32.0f;
-+    if(cudaMemcpyAsync(x,input.data(),n*sizeof(float),cudaMemcpyHostToDevice,stream)!=cudaSuccess)return 1;
-+    transform<<<16,256,0,stream>>>(x,a,n);
-+    if(cudaGraphLaunch(exec,stream)!=cudaSuccess||cudaStreamSynchronize(stream)!=cudaSuccess)return 1;
-+    if(cudaMemcpy(direct.data(),a,n*sizeof(float),cudaMemcpyDeviceToHost)!=cudaSuccess||cudaMemcpy(captured.data(),b,n*sizeof(float),cudaMemcpyDeviceToHost)!=cudaSuccess)return 1;
-+    for(int i=0;i<n;++i)if(direct[i]!=captured[i]||captured[i]!=input[i]*2.0f+1.0f)return 1;
-+  }
-+  cudaGraphExecDestroy(exec);cudaGraphDestroy(graph);cudaStreamDestroy(stream);cudaFree(x);cudaFree(a);cudaFree(b);
-+  std::printf("PASS: %s sm_61 CUDA Graph capture/replay, changed inputs, bitwise direct parity\n",prop.name);return 0;
-+}
-diff --git a/include/strata/platform/win_numa_arena.hpp b/include/strata/platform/win_numa_arena.hpp
-new file mode 100644
---- /dev/null
-+++ b/include/strata/platform/win_numa_arena.hpp
-@@ -0,0 +1,94 @@
-+// Windows-only NUMA preference for the existing pinned arena. No CPU affinity changes.
-+#pragma once
-+#include <cstdint>
-+#include <cstdlib>
-+#include <limits>
-+#include <string>
-+#include <vector>
-+
-+namespace strata::platform::win_numa {
-+struct Node { int id; uint64_t free_bytes; bool has_cpu; };
-+struct Decision { int node = -1; bool requested = false; std::string why; };
-+inline Decision choose(const char* mode, const std::vector<Node>& nodes, int gpu_node, uint64_t bytes) {
-+    Decision d;
-+    if (mode == nullptr || *mode == '\0' || std::string(mode) == "off") return d;
-+    d.requested = true;
-+    int wanted = -1;
-+    if (std::string(mode) == "gpu" || std::string(mode) == "auto") {
-+        wanted = gpu_node;
-+        if (wanted < 0) { d.why = "GPU host NUMA node unknown; ordinary allocation"; return d; }
-+    } else {
-+        unsigned value = 0;
-+        for (const char* p = mode; *p; ++p) {
-+            if (*p < '0' || *p > '9' || value > (65535u - unsigned(*p-'0')) / 10u) {
-+                d.why = "invalid STRATA_WIN_NUMA_NODE (off, gpu or a node number); ordinary allocation"; return d;
-+            }
-+            value = value * 10 + unsigned(*p-'0');
-+        }
-+        wanted = int(value);
-+    }
-+    int count = 0; const Node* selected = nullptr;
-+    for (const Node& n : nodes) { if (n.has_cpu) ++count; if (n.has_cpu && n.id == wanted) selected = &n; }
-+    if (count < 2) { d.why = "fewer than two CPU NUMA nodes; ordinary allocation"; return d; }
-+    if (selected == nullptr) { d.why = "requested NUMA node has no CPUs; ordinary allocation"; return d; }
-+    constexpr uint64_t headroom = 4ull << 30;
-+    if (bytes > selected->free_bytes || selected->free_bytes - bytes < headroom) {
-+        d.why = "preferred NUMA node lacks arena plus 4 GiB headroom; ordinary allocation"; return d;
-+    }
-+    d.node = wanted;
-+    d.why = "NUMA node " + std::to_string(wanted) + " preferred (Windows may fall back); CPU placement unchanged";
-+    return d;
-+}
-+} // namespace strata::platform::win_numa
-+
-+#if defined(_WIN32)
-+#include <windows.h>
-+#include <psapi.h>
-+namespace strata::platform::win_numa {
-+inline Decision probe(const char* mode, int gpu_node, uint64_t bytes) {
-+    if (mode == nullptr || *mode == '\0' || std::string(mode) == "off") return {};
-+    ULONG highest = 0; std::vector<Node> nodes;
-+    if (!GetNumaHighestNodeNumber(&highest) || highest > 1024) {
-+        return {-1, true, "Windows NUMA topology unavailable; ordinary allocation"};
-+    }
-+    for (ULONG n = 0; n <= highest; ++n) {
-+        GROUP_AFFINITY mask{}; ULONGLONG available = 0;
-+        if (GetNumaNodeProcessorMaskEx(USHORT(n), &mask) && mask.Mask != 0 &&
-+            GetNumaAvailableMemoryNodeEx(USHORT(n), &available)) nodes.push_back({int(n), available, true});
-+    }
-+    return choose(mode, nodes, gpu_node, bytes);
-+}
-+inline std::string placement(void* base, SIZE_T bytes, int preferred) {
-+    if (base == nullptr || bytes == 0 || preferred < 0) return {};
-+    constexpr SIZE_T page = 4096;
-+    const SIZE_T pages = (bytes - 1) / page + 1;
-+    const SIZE_T count = pages < 128 ? pages : 128;
-+    PSAPI_WORKING_SET_EX_INFORMATION info[128]{};
-+    for (SIZE_T i = 0; i < count; ++i) {
-+        const SIZE_T index = count == 1 ? 0 : ((pages - 1) / (count - 1)) * i;
-+        info[i].VirtualAddress = static_cast<unsigned char*>(base) + index * page;
-+    }
-+    if (!QueryWorkingSetEx(GetCurrentProcess(), info, DWORD(count * sizeof(info[0]))))
-+        return "NUMA page sample unavailable (error " + std::to_string(GetLastError()) + ")";
-+    unsigned local = 0, remote = 0, not_resident = 0;
-+    for (SIZE_T i = 0; i < count; ++i) {
-+        if (!info[i].VirtualAttributes.Valid) ++not_resident;
-+        else if (int(info[i].VirtualAttributes.Node) == preferred) ++local;
-+        else ++remote;
-+    }
-+    return "NUMA page sample local/remote/not-resident=" + std::to_string(local) + "/" +
-+        std::to_string(remote) + "/" + std::to_string(not_resident);
-+}
-+inline void* allocate(SIZE_T bytes, DWORD flags, const Decision& d, std::string& report) {
-+    if (d.node >= 0) {
-+        void* p = VirtualAllocExNuma(GetCurrentProcess(), nullptr, bytes, flags, PAGE_READWRITE, DWORD(d.node));
-+        if (p != nullptr) { report = d.why + "; " + placement(p, bytes, d.node); return p; }
-+        const DWORD error = GetLastError();
-+        report = "NUMA allocation refused (error " + std::to_string(error) + "); ordinary allocation";
-+    } else if (d.requested) report = d.why;
-+    void* p = VirtualAlloc(nullptr, bytes, flags, PAGE_READWRITE);
-+    // Preserve the ordinary allocation's last error for the existing large-page diagnostic.
-+    const DWORD error = GetLastError(); SetLastError(error); return p;
-+}
-+} // namespace strata::platform::win_numa
-+#endif
 diff --git a/tests/platform/windows_numa_arena_test.cpp b/tests/platform/windows_numa_arena_test.cpp
 new file mode 100644
+index 0000000000000000000000000000000000000000..8f24a8d815cbc1ed5e172fba23b1561c1d1a7ee3
 --- /dev/null
 +++ b/tests/platform/windows_numa_arena_test.cpp
 @@ -0,0 +1,49 @@

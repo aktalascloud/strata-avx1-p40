@@ -9,6 +9,8 @@ This is an independent community build, not endorsed by NVIDIA, Microsoft or ups
 | GGML/llama.cpp and Pascal source overlay | MIT; upstream notices preserved. |
 | Python interpreter | PSF license and its included third-party/Microsoft conditions. |
 | NumPy, Jinja2, MarkupSafe, psutil, regex, Pillow | Their included package licenses/notices; preserved with dependencies. |
+| certifi2026.10.19 | MPL2.0; unmodified certificate bundle, source and license retained in its package/dist-info. |
+| truststore0.10.5 | MIT; source and license retained in its package/dist-info. |
 | LLVM OpenMP (`libomp.dll`) | Apache2.0 with LLVM exceptions; full license included. |
 | CUDA Runtime, cuBLAS, cuBLASLt | NVIDIA CUDA agreement and redistributable attachment; included only as unmodified application dependencies. |
 | Microsoft Visual C++ Runtime | Not bundled separately; installer downloads the official Microsoft installer and validates its signature if needed. |

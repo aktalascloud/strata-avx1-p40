@@ -633,6 +633,20 @@ class VisionTempFiles(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 popen("x", ["x"])
 
+    def test_no_console_window_on_windows(self):
+        import subprocess
+        from serve.server import popen
+        with mock.patch.object(subprocess, "Popen") as p:
+            popen("the Strata engine", ["strata.exe"], stdin=subprocess.PIPE)
+        kw = p.call_args.kwargs
+        if os.name == "nt":
+            self.assertTrue(kw["creationflags"] & subprocess.CREATE_NO_WINDOW)   # others may be added (lifeline)
+        else:
+            self.assertNotIn("creationflags", kw)
+        with mock.patch.object(subprocess, "Popen") as p:          # a caller's own flags are kept
+            popen("x", ["x"], creationflags=0)
+        self.assertFalse(p.call_args.kwargs["creationflags"] & subprocess.CREATE_NO_WINDOW)
+
 
 class ListenProblem(unittest.TestCase):
     """#769: only an address that is taken is "already in use"."""
@@ -1187,9 +1201,10 @@ class ToolCallRecovery(unittest.TestCase):
 
     def test_bare_function_without_the_wrapper(self):
         # corpus 395efd4c / 6e71eed4 (x5 each): <function=...> with no <tool_call> around it
-        self.check(f"Writing it now.\n\n<function=write>\n{self.PARAMS}", [("write", self.CALL)], "Writing it now.")
-        self.check(f"<function=write>\n{self.PARAMS}\n</tool_call>", [("write", self.CALL)], "")   # stray closer
-        self.check(f"<function=write>\n{self.PARAMS}\nDone.", [("write", self.CALL)], "Done.")
+        for name in ("write", " write ", "\twrite\t"):
+            self.check(f"Writing it now.\n\n<function={name}>\n{self.PARAMS}", [("write", self.CALL)], "Writing it now.")
+            self.check(f"<function={name}>\n{self.PARAMS}\n</tool_call>", [("write", self.CALL)], "")   # stray closer
+            self.check(f"<function={name}>\n{self.PARAMS}\nDone.", [("write", self.CALL)], "Done.")
 
     def test_two_calls_in_one_wrapper(self):
         # corpus 0912870b / 51b155c9: a batch inside one <tool_call> - the second call's parameters were merged into
@@ -1208,6 +1223,9 @@ class ToolCallRecovery(unittest.TestCase):
         self.check(inline, [], inline)
         unknown = "<function=format_disk>\n<parameter=x>\n1\n</parameter>\n</function>"
         self.check(unknown, [], unknown)
+        for text in (fenced, inline, unknown):
+            padded = text.replace("<function=write>", "<function= write >").replace("<function=format_disk>", "<function= format_disk >")
+            self.check(padded, [], padded)
 
 
 class ToolCallRecoveryOff(unittest.TestCase):
@@ -1329,12 +1347,28 @@ class UnfinishedToolCall(unittest.TestCase):
             ("anthropic", False): ("end_turn", []),                      # call out: it has no arguments to give
             ("anthropic", True): ("end_turn", cut)})
 
+    def test_quoted_incomplete_wrapper_is_not_a_call(self):
+        text = "Format: " + self.WHOLE[len("</think>\n\n"):].removesuffix("</tool_call>") + "and then I explain it."
+        answers = self.answers("</think>\n\n" + text)
+        for api, stop in (("openai", "stop"), ("anthropic", "end_turn")):
+            self.assertEqual(answers[api, False], (stop, []))
+            self.assertEqual(answers[api, True][0], stop)
+            with self.assertRaises(ValueError):
+                json.loads(answers[api, True][1])
+
     def test_a_call_cut_at_the_token_limit(self):
         """The same cut by max_tokens: "length" / "max_tokens", and the whole (non-streamed) answers leave the call
         out in both APIs."""
-        a = self.answers(self.CUT + "rest of the file, never reached" * 40, max_tokens=len(self.CUT))
-        self.assertEqual((a["openai", False], a["anthropic", False]), (("length", []), ("max_tokens", [])))
-        self.assertEqual((a["openai", True][0], a["anthropic", True][0]), ("length", "max_tokens"))
+        cases = ((self.CUT + "rest of the file, never reached" * 40, len(self.CUT)),
+                 (self.WHOLE, len(self.WHOLE) - len("</tool_call>")))
+        for script, limit in cases:
+            with self.subTest(limit=limit):
+                a = self.answers(script, max_tokens=limit)
+                self.assertEqual((a["openai", False], a["anthropic", False]), (("length", []), ("max_tokens", [])))
+                self.assertEqual((a["openai", True][0], a["anthropic", True][0]), ("length", "max_tokens"))
+                for api in ("openai", "anthropic"):
+                    with self.assertRaises(ValueError):
+                        json.loads(a[api, True][1])
 
     def test_collect_keeps_calls_whose_arguments_parse(self):
         from serve.server import openai_collect
@@ -1979,6 +2013,65 @@ class HipEnvGuard(unittest.TestCase):
             self.assertNotIn("HIP_PATH", child_env({"backend": "hip"}))
         finally:
             del os.environ["HIP_PATH"]
+
+
+class StreamUsageChunk(unittest.TestCase):
+    """OpenAI's streaming contract: with "stream_options": {"include_usage": true} the usage rides in its own last
+    chunk, "choices": []. LiteLLM (and the AI SDK) read it there; a usage on the finish_reason chunk is ignored by
+    LiteLLM, which then recounts the tokens itself, too low, so a client compacts its context too late.
+    Without the option the usage stays on the finish_reason chunk, as before."""
+
+    @classmethod
+    def setUpClass(cls):
+        tok = ByteTokenizer()
+        cls.svc = Service(MockEngine(tok, "</think>\n\nanswer", max_context=CTX), tok,
+                          ChatTemplate(ROOT / "serve/chat_template.jinja"))
+        cls.httpd = serve(cls.svc, port=0)
+        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+
+    def stream(self, **extra):
+        body = {"model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 64, "stream": True, **extra}
+        req = urllib.request.Request(self.base + "/v1/chat/completions", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            lines = r.read().decode().split("\n\n")
+        data = [x[len("data: "):] for x in lines if x.startswith("data: ")]
+        self.assertEqual(data[-1], "[DONE]")
+        return [json.loads(x) for x in data[:-1]]
+
+    def test_usage_in_its_own_last_chunk(self):
+        chunks = self.stream(stream_options={"include_usage": True})
+        last, finish = chunks[-1], chunks[-2]
+        self.assertEqual(last["choices"], [])
+        self.assertGreater(last["usage"]["prompt_tokens"], 0)
+        self.assertGreater(last["usage"]["completion_tokens"], 0)
+        self.assertEqual(last["usage"]["total_tokens"], last["usage"]["prompt_tokens"] + last["usage"]["completion_tokens"])
+        self.assertIn("cached_tokens", last["usage"]["prompt_tokens_details"])
+        self.assertEqual(last["id"], finish["id"])
+        self.assertEqual(finish["choices"][0]["finish_reason"], "stop")
+        self.assertNotIn("usage", finish)
+        self.assertEqual(sum(1 for c in chunks if "usage" in c), 1)        # exactly one usage chunk
+
+    def test_without_the_option_the_usage_stays_on_the_finish_chunk(self):
+        for extra in ({}, {"stream_options": {"include_usage": False}}, {"stream_options": None}):
+            chunks = self.stream(**extra)
+            self.assertEqual(chunks[-1]["choices"][0]["finish_reason"], "stop", extra)
+            self.assertGreater(chunks[-1]["usage"]["prompt_tokens"], 0, extra)
+            self.assertTrue(all(c["choices"] for c in chunks), extra)
+
+    def test_same_numbers_as_the_non_streaming_answer(self):
+        body = {"model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 64}
+        req = urllib.request.Request(self.base + "/v1/chat/completions", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            plain = json.loads(r.read())["usage"]
+        split = self.stream(stream_options={"include_usage": True})[-1]["usage"]
+        self.assertEqual((split["prompt_tokens"], split["completion_tokens"]), (plain["prompt_tokens"], plain["completion_tokens"]))
 
 
 class RecordingPrompt(MockEngine):
@@ -3487,6 +3580,7 @@ class WebApp(unittest.TestCase):
                     self.assertEqual(model["id"], svc.model)
                     self.assertEqual(model["status"]["value"], "loaded")
                     self.assertEqual(model["meta"]["n_ctx"], 262144)
+                    self.assertEqual((model["max_model_len"], model["context_length"]), (262144, 262144))
                     self.assertEqual(model["architecture"]["input_modalities"],
                                      ["text", "image"] if vision else ["text"])
                 code, _, body = self.get("/props?model=" + svc.model + "&autoload=false")

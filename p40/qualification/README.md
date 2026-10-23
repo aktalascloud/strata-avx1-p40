@@ -9,8 +9,9 @@ remain enforced. Run it with --root <this-repo> --build <repo/work/build-dir>
 Private Windows CRLF versus public Git LF is reviewed by comparing every source
 body after EOL normalization; public SHA pins match the actual LF source bytes.
 
-The selected deployment ran22 cases: the previous16 (including the full standard
-5201 DenseF32 GEMM sweep), one actual-IQ MMQ test, three B6 modes, and two EXPDEC
-grid/graph cases. Timing loops are disabled in the generated extra drivers.
+The selected deployment ran23 cases: the previous22 (including the full standard
+5201 DenseF32 GEMM sweep), plus BF16 NaN parity (327680 exact bit cases in each
+direct/graph mode). Actual-IQ MMQ, three B6 modes and two EXPDEC grid/graph cases
+are preserved. Timing loops are disabled in the generated extra drivers.
 The PowerShell policy gives exact runtime cases and argv. These files are source,
 not raw logs or prebuilt test binaries. Building an engine alone is not qualification.
