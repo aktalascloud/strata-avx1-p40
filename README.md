@@ -8,7 +8,7 @@ The reference model is **DavidAU Qwen3.8-Flash-Next IQ3_S**, with MTP Q2 and a C
 
 **Reference performance: 50.28 and 49.95 tokens/s in the engine, or 47.63 and 47.06 tokens/s including API overhead.** These are warmed short-prompt and cached 4K-context measurements, not a guarantee for every workload.
 
-The packaged engine is **0.1.48**, based on upstream commit [`5c8dd322528c`](https://github.com/Niko1221/Strata/commit/5c8dd322528cc84f68f461ad54a506b9da8fa8d4). Performance measurements below were taken on **22 October 2026**, using reference commit `011c9e6` and engine 0.1.47.
+The packaged engine is **0.1.49**, based on upstream commit [`06e51dfaef70`](https://github.com/Niko1221/Strata/commit/06e51dfaef7003f01f23b85e63c800b10efe4066). Performance measurements below were taken on **22 October 2026**, using reference commit `011c9e6` and engine 0.1.47.
 
 ## Quick start on Windows
 
@@ -81,6 +81,8 @@ The current build passed **23 numerical and graph checks**, including the full 5
 The new source also includes **11 reviewed community fixes** for Windows startup/lifetime, MTP, streamed OpenAI usage and BF16 handling. [Changes, authors and review limits](p40/COMMUNITY-FIXES.md). The performance table above remains a measurement of source `011c9e6`; throughput was not remeasured on this release.
 
 [Patch descriptions and individual comparisons](p40/PATCHES.md) · [Reviewed external sources](p40/RESEARCH.md)
+
+[Changes in this build](p40/CHANGES.md)
 
 [Portable installation verification and its limits](p40/INSTALLATION-VERIFICATION.md)
 

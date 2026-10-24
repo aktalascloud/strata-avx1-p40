@@ -7,6 +7,7 @@ This is an independent community build, not endorsed by NVIDIA, Microsoft or ups
 |---|---|
 | Strata and local source modifications | MIT; upstream copyright preserved. |
 | GGML/llama.cpp and Pascal source overlay | MIT; upstream notices preserved. |
+| Vendored Project Maya source and contributions | MIT; original LICENSE and attribution NOTICE included when these sources are present. The optional DeepSeek engine is not enabled or qualified by this P40 preset. |
 | Python interpreter | PSF license and its included third-party/Microsoft conditions. |
 | NumPy, Jinja2, MarkupSafe, psutil, regex, Pillow | Their included package licenses/notices; preserved with dependencies. |
 | certifi2026.10.19 | MPL2.0; unmodified certificate bundle, source and license retained in its package/dist-info. |

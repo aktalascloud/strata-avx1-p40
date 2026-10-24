@@ -9,6 +9,9 @@ if(STRATA_IVYBRIDGE_O3)
     set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide}
       /clang:-mavx512f /clang:-mavx512bw /clang:-mavx512vl /clang:-mavx512dq /clang:-mavx512vnni /clang:-mavx512vbmi)
   endforeach()
+  # New upstream exact IQ512 rows require these only in this guarded wide-ISA TU.
+  set_property(SOURCE src/kernels/cpu/iq_avx512.cpp APPEND PROPERTY COMPILE_OPTIONS
+    /clang:-mavx512vpopcntdq /clang:-mbmi2)
   foreach(_src src/kernels/cpu/q2_avx2.cpp src/kernels/cpu/iq_avx2.cpp src/kernels/cpu/kq_avx2.cpp src/kernels/cpu/nvfp4_avx2.cpp src/kernels/cpu/tq_avx2.cpp)
     set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide})
   endforeach()

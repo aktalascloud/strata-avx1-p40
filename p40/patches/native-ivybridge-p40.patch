@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b00a6cd85 100644
+index bbe296b2..b623e705 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -88,6 +88,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
@@ -37,7 +37,7 @@ index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b
          -Wl,--wrap=cudaDeviceSynchronize -Wl,--wrap=cudaGetLastError)
        target_link_libraries(conversation_transfer_test PRIVATE strata_engine)
        add_test(NAME conversation_transfer_test COMMAND conversation_transfer_test)
-@@ -1515,6 +1527,9 @@ endif()
+@@ -1617,6 +1629,9 @@ endif()
  include(CheckCXXSourceCompiles)
  if(MSVC)
    set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
@@ -47,7 +47,7 @@ index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b
  else()
    set(CMAKE_REQUIRED_FLAGS "-mavx2 -mfma -mf16c")
  endif()
-@@ -1708,6 +1723,11 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1810,6 +1825,11 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_tq_llama "${strata_llamacpp_SOURCE_DIR}")
      endif()
      include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/strata_ggml_tq_overlay.cmake)
@@ -59,7 +59,7 @@ index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b
      set(_strata_tq_overlay_dir "${CMAKE_BINARY_DIR}/ggml-tq-overlay")
      strata_ggml_tq_overlay("${_strata_tq_llama}" "${_strata_tq_overlay_dir}")
      if(STRATA_TQ_OVERLAY_OK)
-@@ -1736,6 +1756,10 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1838,6 +1858,10 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_gg ${strata_llamacpp_SOURCE_DIR}/ggml)
      endif()
      set(_strata_mmq ${_strata_gg}/src/ggml-cuda)
@@ -70,7 +70,7 @@ index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b
      set(_strata_quantize_cu ${_strata_mmq}/quantize.cu)   # the overlay's copy when the trellis overlay is on: it includes mmq.cuh
      if(_strata_mmq_tq_overlay)
        set(_strata_quantize_cu ${_strata_tq_overlay_dir}/quantize.cu)
-@@ -2098,7 +2122,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
+@@ -2200,7 +2224,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
  endif()
  
  if(STRATA_BUILD_TESTS)
@@ -93,7 +93,7 @@ index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b
      add_executable(pool_affinity_test src/kernels/cpu/pool_affinity_test.cpp)
      target_link_libraries(pool_affinity_test PRIVATE strata_kernels_cpu)
      add_test(NAME pool_affinity_test COMMAND pool_affinity_test)
-@@ -2216,6 +2255,25 @@ if(STRATA_BUILD_TESTS)
+@@ -2318,6 +2357,25 @@ if(STRATA_BUILD_TESTS)
      target_include_directories(direct_file_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
      target_link_libraries(direct_file_async_test PRIVATE Threads::Threads)
      add_test(NAME direct_file_async_test COMMAND direct_file_async_test)
@@ -119,10 +119,11 @@ index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b
    endif()
    # --aux-cpus: the CPU-set derivation (pure) and the placement of live threads; header-only, no GPU
    add_executable(aux_cpus_test tests/platform/aux_cpus_test.cpp)
-@@ -2265,3 +2323,49 @@ if(STRATA_HIP_GFX906)
-   add_executable(gfx906_qsa_query_swizzle_probe bench/gfx906_qsa_query_swizzle_probe.cpp)
-   target_link_libraries(gfx906_qsa_query_swizzle_probe PRIVATE strata_kernels ${_strata_gpu_runtime_target})
+@@ -2383,3 +2441,50 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
+     target_compile_definitions(ds4_gg_bench PRIVATE STRATA_DSV41_TQ_CPU=1)
+   endif()
  endif()
++
 +
 +if(STRATA_PASCALLAMA AND STRATA_BUILD_TESTS)
 +  add_executable(sm61_graph_parity tests/cuda/sm61_graph_parity.cu)
@@ -171,10 +172,10 @@ index 7ae5f1f82ec4f0a1f12f73c67787a47f8ed5e3c7..f70b40df813f25ec1306f161a8c7414b
 +endif()
 diff --git a/cmake/strata_ivybridge_o3.cmake b/cmake/strata_ivybridge_o3.cmake
 new file mode 100644
-index 0000000000000000000000000000000000000000..bc943ce5c30e60082c0e9b05cc8eba915df86f1a
+index 00000000..9db8b4c9
 --- /dev/null
 +++ b/cmake/strata_ivybridge_o3.cmake
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,22 @@
 +# Local profile: genuine Clang O3 with an Ivy Bridge baseline. Preserve runtime-dispatched wider kernels.
 +option(STRATA_IVYBRIDGE_O3 "Local Windows Clang O3/Ivy Bridge profile" OFF)
 +if(STRATA_IVYBRIDGE_O3)
@@ -186,6 +187,9 @@ index 0000000000000000000000000000000000000000..bc943ce5c30e60082c0e9b05cc8eba91
 +    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide}
 +      /clang:-mavx512f /clang:-mavx512bw /clang:-mavx512vl /clang:-mavx512dq /clang:-mavx512vnni /clang:-mavx512vbmi)
 +  endforeach()
++  # New upstream exact IQ512 rows require these only in this guarded wide-ISA TU.
++  set_property(SOURCE src/kernels/cpu/iq_avx512.cpp APPEND PROPERTY COMPILE_OPTIONS
++    /clang:-mavx512vpopcntdq /clang:-mbmi2)
 +  foreach(_src src/kernels/cpu/q2_avx2.cpp src/kernels/cpu/iq_avx2.cpp src/kernels/cpu/kq_avx2.cpp src/kernels/cpu/nvfp4_avx2.cpp src/kernels/cpu/tq_avx2.cpp)
 +    set_property(SOURCE ${_src} APPEND PROPERTY COMPILE_OPTIONS ${_ivy_wide})
 +  endforeach()
@@ -196,7 +200,7 @@ index 0000000000000000000000000000000000000000..bc943ce5c30e60082c0e9b05cc8eba91
 +endif()
 diff --git a/cmake/strata_pascallama_overlay.cmake b/cmake/strata_pascallama_overlay.cmake
 new file mode 100644
-index 0000000000000000000000000000000000000000..753ef5f9dbd02b20779c1ca516a5cfb11117a4e5
+index 00000000..753ef5f9
 --- /dev/null
 +++ b/cmake/strata_pascallama_overlay.cmake
 @@ -0,0 +1,23 @@
@@ -224,7 +228,7 @@ index 0000000000000000000000000000000000000000..753ef5f9dbd02b20779c1ca516a5cfb1
 +  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
 +endfunction()
 diff --git a/docs/DETAILS.md b/docs/DETAILS.md
-index f037c65cbb46da1a99cf84dc86ef5183fc5cb3ab..a9e957646e72a0fe6835b6987c4fb89bf4ad3d94 100644
+index f037c65c..a9e95764 100644
 --- a/docs/DETAILS.md
 +++ b/docs/DETAILS.md
 @@ -1815,6 +1815,40 @@ test images.
@@ -269,7 +273,7 @@ index f037c65cbb46da1a99cf84dc86ef5183fc5cb3ab..a9e957646e72a0fe6835b6987c4fb89b
  
  A prompt chunk of a few thousand tokens (an agent's tool result, a test's output, a short follow-up) streams every routed
 diff --git a/include/strata/core/conversation_cache.hpp b/include/strata/core/conversation_cache.hpp
-index b2e6a74f7785264a0882cc4105c65acace51bd00..935de225389b971f57c77ac41038c6da0b747b6e 100644
+index b2e6a74f..935de225 100644
 --- a/include/strata/core/conversation_cache.hpp
 +++ b/include/strata/core/conversation_cache.hpp
 @@ -67,10 +67,14 @@ struct ConversationKvReuse {
@@ -328,7 +332,7 @@ index b2e6a74f7785264a0882cc4105c65acace51bd00..935de225389b971f57c77ac41038c6da
          return enabled() && held <= budget_ && incoming <= budget_ - held &&
                 entries_.size() < slots_ && bytes() <= budget_ - held - incoming;
 diff --git a/include/strata/core/expert_source.hpp b/include/strata/core/expert_source.hpp
-index 3ab77dc2a78a41003f2d19bd7a142a264ed30d18..126e16b7144b493bf320e41ad1f1cf151fca323d 100644
+index 3ab77dc2..126e16b7 100644
 --- a/include/strata/core/expert_source.hpp
 +++ b/include/strata/core/expert_source.hpp
 @@ -43,6 +43,10 @@
@@ -369,7 +373,7 @@ index 3ab77dc2a78a41003f2d19bd7a142a264ed30d18..126e16b7144b493bf320e41ad1f1cf15
      std::vector<const uint8_t*> dev_slice_;   ///< device alias of each registered slice (or of the whole range)
 diff --git a/include/strata/platform/cpu_pinning.hpp b/include/strata/platform/cpu_pinning.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..6108086ca1b9c4f81a4ca27ee7ca4373a0314cd1
+index 00000000..6108086c
 --- /dev/null
 +++ b/include/strata/platform/cpu_pinning.hpp
 @@ -0,0 +1,14 @@
@@ -389,7 +393,7 @@ index 0000000000000000000000000000000000000000..6108086ca1b9c4f81a4ca27ee7ca4373
 +}  // namespace strata
 diff --git a/include/strata/platform/win_numa_arena.hpp b/include/strata/platform/win_numa_arena.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e8763f0ec
+index 00000000..2eced255
 --- /dev/null
 +++ b/include/strata/platform/win_numa_arena.hpp
 @@ -0,0 +1,94 @@
@@ -488,7 +492,7 @@ index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e
 +} // namespace strata::platform::win_numa
 +#endif
 diff --git a/serve/server.py b/serve/server.py
-index 87f59459227129ad757d5f6f032f408483df45ea..d4449352da37f9fa48d939ef1a383fe01dec1893 100644
+index a53d1512..edf96583 100644
 --- a/serve/server.py
 +++ b/serve/server.py
 @@ -92,7 +92,11 @@ IMAGE_PAD = "<|image_pad|>"
@@ -504,7 +508,7 @@ index 87f59459227129ad757d5f6f032f408483df45ea..d4449352da37f9fa48d939ef1a383fe0
      try:
          return lifeline.popen(args, role, **kw)       # a child that cannot outlive this server (serve/lifeline.py)
      except OSError as e:
-@@ -5003,11 +5007,13 @@ class Service:
+@@ -5080,11 +5084,13 @@ class Service:
          """Yields ("event", Event) as text arrives, then ("done", {"finish": .., "completion_tokens": ..}).
          `force` (forced_call): the opening of the call the reply must make - see prepare()."""
          # the model card's sampling for this thinking state, then the config's block, then the Chat settings shared with
@@ -522,7 +526,7 @@ index 87f59459227129ad757d5f6f032f408483df45ea..d4449352da37f9fa48d939ef1a383fe0
          # #123: read after the merge, so a budget shared through POST /settings is seen like the other keys
          budget = self.reasoning_budget(sampling) if thinking else None
          if thinking and not budget and self.answer_room and max_new and max_new >= ANSWER_ROOM_MIN_CAP:
-@@ -6575,8 +6581,11 @@ def make_handler(svc: Service):
+@@ -6668,8 +6674,11 @@ def make_handler(svc: Service):
              elif path in ("/v1/models", "/models"):
                  if self._authorized():
                      loaded = svc.loaded()
@@ -535,7 +539,7 @@ index 87f59459227129ad757d5f6f032f408483df45ea..d4449352da37f9fa48d939ef1a383fe0
                               "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
                                                "output_modalities": ["text"]}}
                      if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
-@@ -7080,10 +7089,20 @@ def make_handler(svc: Service):
+@@ -7173,10 +7182,20 @@ def make_handler(svc: Service):
              if not req.get("stream"):
                  return self._json(200, openai_collect(chunks))
              self._sse()
@@ -556,7 +560,7 @@ index 87f59459227129ad757d5f6f032f408483df45ea..d4449352da37f9fa48d939ef1a383fe0
                      else:
                          self.wfile.write(b"data: " + json.dumps(c, ensure_ascii=False).encode() + b"\n\n")
                      self.wfile.flush()
-@@ -7973,6 +7992,49 @@ def model_card_sampling(arch, thinking) -> dict:
+@@ -8069,6 +8088,49 @@ def model_card_sampling(arch, thinking) -> dict:
      return dict(sets["thinking" if thinking else "instruct"]) if sets else {}
  
  
@@ -608,7 +612,7 @@ index 87f59459227129ad757d5f6f032f408483df45ea..d4449352da37f9fa48d939ef1a383fe0
      return cfg.get("model_name") or FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next")
 diff --git a/serve/test_sampling_merge.py b/serve/test_sampling_merge.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2ebc11fd096b70a0ef166852299f853ca7ef5e99
+index 00000000..2ebc11fd
 --- /dev/null
 +++ b/serve/test_sampling_merge.py
 @@ -0,0 +1,56 @@
@@ -669,7 +673,7 @@ index 0000000000000000000000000000000000000000..2ebc11fd096b70a0ef166852299f853c
 +if __name__ == "__main__":
 +    unittest.main()
 diff --git a/serve/test_server.py b/serve/test_server.py
-index 3e60dee4ee62653df7930b086fa63e38e898d2c1..771fd92e7e4466f3ea33892310748691613325dc 100644
+index 3e60dee4..771fd92e 100644
 --- a/serve/test_server.py
 +++ b/serve/test_server.py
 @@ -633,6 +633,20 @@ class VisionTempFiles(unittest.TestCase):
@@ -768,7 +772,7 @@ index 3e60dee4ee62653df7930b086fa63e38e898d2c1..771fd92e7e4466f3ea33892310748691
                                       ["text", "image"] if vision else ["text"])
                  code, _, body = self.get("/props?model=" + svc.model + "&autoload=false")
 diff --git a/src/core/conversation_cache_test.cpp b/src/core/conversation_cache_test.cpp
-index a21c0d7fee06b2bd0bda9b3616eccd2fa03dd8ae..fd6042b30b413e76059febc8540f5714779bcc2e 100644
+index a21c0d7f..fd6042b3 100644
 --- a/src/core/conversation_cache_test.cpp
 +++ b/src/core/conversation_cache_test.cpp
 @@ -502,6 +502,41 @@ int main() {
@@ -814,7 +818,7 @@ index a21c0d7fee06b2bd0bda9b3616eccd2fa03dd8ae..fd6042b30b413e76059febc8540f5714
          // the later stages' retained K/V, kept with the first stage's and limited together
          auto kv = [](size_t n) {
 diff --git a/src/core/conversation_copy.hpp b/src/core/conversation_copy.hpp
-index 7e8341b3aa1ba10daffc06029f6086e1d10173cb..fb14c9ddbe0d102853bd402dc48733ca60f4c2ea 100644
+index 7e8341b3..fb14c9dd 100644
 --- a/src/core/conversation_copy.hpp
 +++ b/src/core/conversation_copy.hpp
 @@ -24,9 +24,24 @@ inline cudaError_t private_stream(cudaStream_t& s) {
@@ -846,7 +850,7 @@ index 7e8341b3aa1ba10daffc06029f6086e1d10173cb..fb14c9ddbe0d102853bd402dc48733ca
          if (e != cudaSuccess) { streams[(size_t) dev] = nullptr; return e; }
 diff --git a/src/core/conversation_copy_lifetime_test.cpp b/src/core/conversation_copy_lifetime_test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..8323c9966353d9cfaaffc309185ca1272523cd65
+index 00000000..8323c996
 --- /dev/null
 +++ b/src/core/conversation_copy_lifetime_test.cpp
 @@ -0,0 +1,128 @@
@@ -979,7 +983,7 @@ index 0000000000000000000000000000000000000000..8323c9966353d9cfaaffc309185ca127
 +    std::puts("PASS: worker exit, stream reuse, concurrent devices, failure cleanup");
 +}
 diff --git a/src/core/conversation_validation_test.cpp b/src/core/conversation_validation_test.cpp
-index c670ef138ed46ca058434d4b44dd17231fa65520..e5f47acc7aa71a42b0e104857f723cf619d0bda5 100644
+index c670ef13..e5f47acc 100644
 --- a/src/core/conversation_validation_test.cpp
 +++ b/src/core/conversation_validation_test.cpp
 @@ -26,6 +26,8 @@ extern "C" cudaError_t __wrap_cudaMemcpy(void* dst, const void* src, size_t n, c
@@ -992,7 +996,7 @@ index c670ef138ed46ca058434d4b44dd17231fa65520..e5f47acc7aa71a42b0e104857f723cf6
      *s = reinterpret_cast<cudaStream_t>(static_cast<uintptr_t>(1)); return cudaSuccess;
  }
 diff --git a/src/core/expert_source.cpp b/src/core/expert_source.cpp
-index b8ad8fb42129e506365978f556cdcf6c67ffcfc9..5cb9487e090803f6cbb10c3b5e7bb44672c1b731 100644
+index b8ad8fb4..5cb9487e 100644
 --- a/src/core/expert_source.cpp
 +++ b/src/core/expert_source.cpp
 @@ -5675,12 +5675,29 @@ LoadStats load_experts_gguf(const std::string& gguf, uint8_t* dst, const strata:
@@ -1204,7 +1208,7 @@ index b8ad8fb42129e506365978f556cdcf6c67ffcfc9..5cb9487e090803f6cbb10c3b5e7bb446
      if (map_ != nullptr) munmap(map_, (size_t) map_bytes_);
  #endif
 diff --git a/src/core/native_dense.cpp b/src/core/native_dense.cpp
-index 25efb6f6217991100c2a1a6599a17917cba49cea..99e8d2f6d11e097001656b5a58cfc9bf29326962 100644
+index 25efb6f6..99e8d2f6 100644
 --- a/src/core/native_dense.cpp
 +++ b/src/core/native_dense.cpp
 @@ -22,6 +22,20 @@
@@ -1425,7 +1429,7 @@ index 25efb6f6217991100c2a1a6599a17917cba49cea..99e8d2f6d11e097001656b5a58cfc9bf
          weights_.reserve(pending.size());
          uint64_t packed_bytes = 0;
 diff --git a/src/core/pinned.cu b/src/core/pinned.cu
-index 0c45c051c5685a8581c1607f6d6f3bc7a7df2be5..026059e89e5623a861de524e1456af544ae8d945 100644
+index 0c45c051..026059e8 100644
 --- a/src/core/pinned.cu
 +++ b/src/core/pinned.cu
 @@ -6,6 +6,10 @@
@@ -1538,7 +1542,7 @@ index 0c45c051c5685a8581c1607f6d6f3bc7a7df2be5..026059e89e5623a861de524e1456af54
      // Register with CUDA BEFORE any page is touched: cudaHostRegister pins what is resident now, and a region
      // that has already been faulted in page by page is far more expensive to register and may fail outright.
 diff --git a/src/kernels/cpu/iq_avx2_parity.cpp b/src/kernels/cpu/iq_avx2_parity.cpp
-index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85b9123d82 100644
+index 67544c9d..46641b9a 100644
 --- a/src/kernels/cpu/iq_avx2_parity.cpp
 +++ b/src/kernels/cpu/iq_avx2_parity.cpp
 @@ -21,6 +21,7 @@
@@ -1557,8 +1561,26 @@ index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85
  #if defined(_WIN32)
      if (cpu_index < 0 || cpu_index >= 64) return false;
      return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;
+diff --git a/src/kernels/cpu/iq_avx512.cpp b/src/kernels/cpu/iq_avx512.cpp
+index 14330f6e..5f94d77a 100644
+--- a/src/kernels/cpu/iq_avx512.cpp
++++ b/src/kernels/cpu/iq_avx512.cpp
+@@ -568,11 +568,11 @@ static bool has_vpopcnt() {
+ #if defined(_MSC_VER)
+         int r[4];
+         __cpuidex(r, 7, 0);
+-        return ((r[2] >> 14) & 1) != 0;   // AVX512_VPOPCNTDQ
++        return ((r[2] >> 14) & 1) != 0 && ((r[1] >> 8) & 1) != 0;   // AVX512_VPOPCNTDQ and BMI2/pdep
+ #else
+         unsigned a, b, c, d;
+         __cpuid_count(7, 0, a, b, c, d);
+-        return ((c >> 14) & 1u) != 0;
++        return ((c >> 14) & 1u) != 0 && ((b >> 8) & 1u) != 0;
+ #endif
+     }();
+     return ok;
 diff --git a/src/kernels/cpu/pool.cpp b/src/kernels/cpu/pool.cpp
-index cdcc8d79249e5af774112383942228453331e7fe..e6daaa33826d3fe37322f0ece347255fab2cfd2b 100644
+index cdcc8d79..e6daaa33 100644
 --- a/src/kernels/cpu/pool.cpp
 +++ b/src/kernels/cpu/pool.cpp
 @@ -2,6 +2,7 @@
@@ -1605,7 +1627,7 @@ index cdcc8d79249e5af774112383942228453331e7fe..e6daaa33826d3fe37322f0ece347255f
      layout_ = logical_cpu_layout();   // now, before anything pins the caller (Linux reads the calling thread's allowed CPUs)
      if (const char* e = std::getenv("STRATA_POOL_SPIN_US"))   // a test knob; see kSpinBeforeSleep
 diff --git a/src/kernels/cpu/pool_affinity_win.hpp b/src/kernels/cpu/pool_affinity_win.hpp
-index 6f0e4020227a576269a07d5449cb05f936c020f9..c5ac8e1571bc67bb909b5e4fde25178eb1c7352e 100644
+index 6f0e4020..c5ac8e15 100644
 --- a/src/kernels/cpu/pool_affinity_win.hpp
 +++ b/src/kernels/cpu/pool_affinity_win.hpp
 @@ -9,13 +9,14 @@
@@ -1625,7 +1647,7 @@ index 6f0e4020227a576269a07d5449cb05f936c020f9..c5ac8e1571bc67bb909b5e4fde25178e
      target.Group = (WORD) (core / 64);
      target.Mask = KAFFINITY(1) << (core & 63);
 diff --git a/src/kernels/cuda/iq_kernels.cu b/src/kernels/cuda/iq_kernels.cu
-index d2f2e34e8f59262506dcbb33c6ef24afd1db3c83..b305ccd38925dca945da7e947f4c006f23419077 100644
+index d2f2e34e..b305ccd3 100644
 --- a/src/kernels/cuda/iq_kernels.cu
 +++ b/src/kernels/cuda/iq_kernels.cu
 @@ -5257,10 +5257,15 @@ void native_expert_grouped(const NativeExpertLayout& L, const unsigned long long
@@ -1649,7 +1671,7 @@ index d2f2e34e8f59262506dcbb33c6ef24afd1db3c83..b305ccd38925dca945da7e947f4c006f
          const dim3 gl((unsigned) ((L.n_embd + LDS_RB - 1) / LDS_RB), (unsigned) cap_groups);
          const size_t sh = (size_t) LDS_NT * (size_t) (L.n_ff / 32) * sizeof(block_q8_1);
 diff --git a/src/kernels/cuda/ple.cu b/src/kernels/cuda/ple.cu
-index f945ef3b8dd8999e2721a993f0ad131d921eb90c..776c720a8fc8c7308557ef155ed91d5177c10425 100644
+index f945ef3b..776c720a 100644
 --- a/src/kernels/cuda/ple.cu
 +++ b/src/kernels/cuda/ple.cu
 @@ -54,6 +54,8 @@ __global__ void history_advance_kernel(float* __restrict__ history, const float*
@@ -1662,7 +1684,7 @@ index f945ef3b8dd8999e2721a993f0ad131d921eb90c..776c720a8fc8c7308557ef155ed91d51
      return (uint16_t) (i >> 16);
  }
 diff --git a/src/ngram/ple_reader.cpp b/src/ngram/ple_reader.cpp
-index 9d2a05051e504b36ac0f433f89a02910cec6d8b8..96351582b37fc5efa302ccc36c30b763ee0a9ddf 100644
+index 9d2a0505..96351582 100644
 --- a/src/ngram/ple_reader.cpp
 +++ b/src/ngram/ple_reader.cpp
 @@ -347,12 +347,13 @@ bool PleReader::open(const std::string& path, uint64_t table_offset, uint64_t n_
@@ -1689,7 +1711,7 @@ index 9d2a05051e504b36ac0f433f89a02910cec6d8b8..96351582b37fc5efa302ccc36c30b763
      m.threaded = false;
      m.stop = false;
 diff --git a/src/prefill/kernels.cu b/src/prefill/kernels.cu
-index a4f56f10cf9dc2211bcfef403de828a4205f72bb..b0d871dcd1b7b2688080ef722fb540ce53943814 100644
+index a4f56f10..b0d871dc 100644
 --- a/src/prefill/kernels.cu
 +++ b/src/prefill/kernels.cu
 @@ -35,6 +35,8 @@ __device__ __forceinline__ float warp_max(float v) {
@@ -1702,7 +1724,7 @@ index a4f56f10cf9dc2211bcfef403de828a4205f72bb..b0d871dcd1b7b2688080ef722fb540ce
      return (uint16_t) (u >> 16);
  }
 diff --git a/src/prefill/prefill.cpp b/src/prefill/prefill.cpp
-index 6cb888e50a4ed516a1bb90566d7140d1315dc372..0ef5f24b5ad61f615a331f3a2692c9bfb544c7bd 100644
+index 6cb888e5..0ef5f24b 100644
 --- a/src/prefill/prefill.cpp
 +++ b/src/prefill/prefill.cpp
 @@ -3571,7 +3571,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
@@ -1726,7 +1748,7 @@ index 6cb888e50a4ed516a1bb90566d7140d1315dc372..0ef5f24b5ad61f615a331f3a2692c9bf
                          out[(size_t) i] = (uint16_t) (u >> 16);
                      }
 diff --git a/src/program/generate.cpp b/src/program/generate.cpp
-index 7bafd685073a102d2ad099d623643615b6cffc1f..d207a614cd7622b77fd3f0b47928480e18e45bc2 100644
+index 7bafd685..d207a614 100644
 --- a/src/program/generate.cpp
 +++ b/src/program/generate.cpp
 @@ -45,6 +45,7 @@
@@ -1858,7 +1880,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..d207a614cd7622b77fd3f0b47928480e
  #if defined(_WIN32)
                          const HANDLE self = GetCurrentThread();
 diff --git a/strata_control/procs.py b/strata_control/procs.py
-index b550c07b64fe2e04a9739dfb84652e742ea95b23..bf12810b73df3c41686c97263def05abcafc9b60 100644
+index b550c07b..bf12810b 100644
 --- a/strata_control/procs.py
 +++ b/strata_control/procs.py
 @@ -358,21 +358,27 @@ def orphans_of(engine_exe: str) -> list[Ident]:
@@ -1893,7 +1915,7 @@ index b550c07b64fe2e04a9739dfb84652e742ea95b23..bf12810b73df3c41686c97263def05ab
                  except psutil.NoSuchProcess:
                      pass
 diff --git a/sycl/src/program/generate.cpp b/sycl/src/program/generate.cpp
-index 2a4db4d163b2b57786253c359bf51906b1cee3db..5a111ea47accba1d81c821a9479e96fd2e74249d 100644
+index 2a4db4d1..5a111ea4 100644
 --- a/sycl/src/program/generate.cpp
 +++ b/sycl/src/program/generate.cpp
 @@ -7694,7 +7694,12 @@ int main(int argc, char **argv) try {
@@ -1930,7 +1952,7 @@ index 2a4db4d163b2b57786253c359bf51906b1cee3db..5a111ea47accba1d81c821a9479e96fd
                  std::fprintf(stderr, "strata serve: conversation cache: restored %lld tokens (%s) in %.1f ms; parked=%zu bytes=%zu\n",
 diff --git a/tests/cuda/bf16_nan_parity.cpp b/tests/cuda/bf16_nan_parity.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..39188efefb740c88aeaaac98ddc3d9a0c1c63157
+index 00000000..39188efe
 --- /dev/null
 +++ b/tests/cuda/bf16_nan_parity.cpp
 @@ -0,0 +1,55 @@
@@ -1991,7 +2013,7 @@ index 0000000000000000000000000000000000000000..39188efefb740c88aeaaac98ddc3d9a0
 +}
 diff --git a/tests/cuda/pascallama_mmq_screen.cpp b/tests/cuda/pascallama_mmq_screen.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..3d28f93d165ca49e159a74979ca475e3c3e15439
+index 00000000..3d28f93d
 --- /dev/null
 +++ b/tests/cuda/pascallama_mmq_screen.cpp
 @@ -0,0 +1,182 @@
@@ -2179,7 +2201,7 @@ index 0000000000000000000000000000000000000000..3d28f93d165ca49e159a74979ca475e3
 +}
 diff --git a/tests/cuda/sm61_graph_parity.cu b/tests/cuda/sm61_graph_parity.cu
 new file mode 100644
-index 0000000000000000000000000000000000000000..ab1c48426abceabd838348a7bf71140bc403c092
+index 00000000..ab1c4842
 --- /dev/null
 +++ b/tests/cuda/sm61_graph_parity.cu
 @@ -0,0 +1,25 @@
@@ -2210,7 +2232,7 @@ index 0000000000000000000000000000000000000000..ab1c48426abceabd838348a7bf71140b
 +}
 diff --git a/tests/platform/cpu_format_parity.cpp b/tests/platform/cpu_format_parity.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..3d43a868f80daa99d196d34cc4637a3b2a245099
+index 00000000..3d43a868
 --- /dev/null
 +++ b/tests/platform/cpu_format_parity.cpp
 @@ -0,0 +1,181 @@
@@ -2397,7 +2419,7 @@ index 0000000000000000000000000000000000000000..3d43a868f80daa99d196d34cc4637a3b
 +}
 diff --git a/tests/platform/no_cpu_pin_test.cpp b/tests/platform/no_cpu_pin_test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..631691ca42eb516e58a957e5b4e0399e570db7e2
+index 00000000..631691ca
 --- /dev/null
 +++ b/tests/platform/no_cpu_pin_test.cpp
 @@ -0,0 +1,245 @@
@@ -2648,7 +2670,7 @@ index 0000000000000000000000000000000000000000..631691ca42eb516e58a957e5b4e0399e
 +}
 diff --git a/tests/platform/ple_reader_lifecycle.cpp b/tests/platform/ple_reader_lifecycle.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..1f78f55613ab3c579a54a816703b40c0190162ba
+index 00000000..1f78f556
 --- /dev/null
 +++ b/tests/platform/ple_reader_lifecycle.cpp
 @@ -0,0 +1,127 @@
@@ -2781,7 +2803,7 @@ index 0000000000000000000000000000000000000000..1f78f55613ab3c579a54a816703b40c0
 +}
 diff --git a/tests/platform/windows_numa_arena_test.cpp b/tests/platform/windows_numa_arena_test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..8f24a8d815cbc1ed5e172fba23b1561c1d1a7ee3
+index 00000000..8f24a8d8
 --- /dev/null
 +++ b/tests/platform/windows_numa_arena_test.cpp
 @@ -0,0 +1,49 @@
