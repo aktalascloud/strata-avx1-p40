@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index acc764463e316ef2d8e020c59bbf63bef6111a61..f1cc7ca205a0b2787fc34180ea6fda6c94da6cd4 100644
+index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..8e51c83a98dd53414da6f918c432800bc1aefa05 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -88,6 +88,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
@@ -47,7 +47,7 @@ index acc764463e316ef2d8e020c59bbf63bef6111a61..f1cc7ca205a0b2787fc34180ea6fda6c
  else()
    set(CMAKE_REQUIRED_FLAGS "-mavx2 -mfma -mf16c")
  endif()
-@@ -1810,6 +1825,11 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1817,6 +1832,11 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_tq_llama "${strata_llamacpp_SOURCE_DIR}")
      endif()
      include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/strata_ggml_tq_overlay.cmake)
@@ -59,7 +59,7 @@ index acc764463e316ef2d8e020c59bbf63bef6111a61..f1cc7ca205a0b2787fc34180ea6fda6c
      set(_strata_tq_overlay_dir "${CMAKE_BINARY_DIR}/ggml-tq-overlay")
      strata_ggml_tq_overlay("${_strata_tq_llama}" "${_strata_tq_overlay_dir}")
      if(STRATA_TQ_OVERLAY_OK)
-@@ -1838,6 +1858,10 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1845,6 +1865,10 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_gg ${strata_llamacpp_SOURCE_DIR}/ggml)
      endif()
      set(_strata_mmq ${_strata_gg}/src/ggml-cuda)
@@ -70,7 +70,7 @@ index acc764463e316ef2d8e020c59bbf63bef6111a61..f1cc7ca205a0b2787fc34180ea6fda6c
      set(_strata_quantize_cu ${_strata_mmq}/quantize.cu)   # the overlay's copy when the trellis overlay is on: it includes mmq.cuh
      if(_strata_mmq_tq_overlay)
        set(_strata_quantize_cu ${_strata_tq_overlay_dir}/quantize.cu)
-@@ -2200,7 +2224,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
+@@ -2207,7 +2231,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
  endif()
  
  if(STRATA_BUILD_TESTS)
@@ -93,7 +93,7 @@ index acc764463e316ef2d8e020c59bbf63bef6111a61..f1cc7ca205a0b2787fc34180ea6fda6c
      add_executable(pool_affinity_test src/kernels/cpu/pool_affinity_test.cpp)
      target_link_libraries(pool_affinity_test PRIVATE strata_kernels_cpu)
      add_test(NAME pool_affinity_test COMMAND pool_affinity_test)
-@@ -2318,6 +2357,25 @@ if(STRATA_BUILD_TESTS)
+@@ -2325,6 +2364,25 @@ if(STRATA_BUILD_TESTS)
      target_include_directories(direct_file_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
      target_link_libraries(direct_file_async_test PRIVATE Threads::Threads)
      add_test(NAME direct_file_async_test COMMAND direct_file_async_test)
@@ -119,7 +119,7 @@ index acc764463e316ef2d8e020c59bbf63bef6111a61..f1cc7ca205a0b2787fc34180ea6fda6c
    endif()
    # --aux-cpus: the CPU-set derivation (pure) and the placement of live threads; header-only, no GPU
    add_executable(aux_cpus_test tests/platform/aux_cpus_test.cpp)
-@@ -2383,3 +2441,56 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
+@@ -2390,3 +2448,56 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
      target_compile_definitions(ds4_gg_bench PRIVATE STRATA_DSV41_TQ_CPU=1)
    endif()
  endif()
@@ -587,7 +587,7 @@ index 53f2b4599d08f1a2ca2b056b5d6380c708341810..a9c02944e7249592a099d0404e1e720f
              if raw_name != raw_name.strip() and name not in self.schemas:
                  raise ValueError("whitespace tool name is not declared")
 diff --git a/serve/server.py b/serve/server.py
-index a53d151200ceab441123841474ea2a74bafa3ab2..edf96583417b611d39b64313e3bae938471ef4cf 100644
+index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..222d69e4014902c66b8dfc20aaa90a57d4c01a45 100644
 --- a/serve/server.py
 +++ b/serve/server.py
 @@ -92,7 +92,11 @@ IMAGE_PAD = "<|image_pad|>"

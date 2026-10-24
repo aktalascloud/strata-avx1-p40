@@ -1,31 +1,18 @@
-# Portable installer verification
+# Installation and runtime verification
 
-Verified on **23 October 2026** on the reference Ivy Bridge / Tesla P40 Windows system.
-This was a fresh installation directory with spaces in its path, outside the maintainer's working project. It was not a fresh Windows installation or a reboot test.
+Qualified source: [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5), custom engine **0.1.49.2**. Qualification applies to the exact native/DLL fingerprints in source provenance, not every machine with similar hardware.
 
-| Check | Result |
+| Evidence | Scope |
 |---|---|
-| Published ZIP identity and extraction | Published SHA-256 matched; original package integrity check passed. |
-| Model inputs | All seven GGUF, projector, and MTP inputs independently verified against their pinned SHA-256 values. Existing downloads were exposed as NTFS hard links; no model bytes were downloaded again. |
-| Pack and tokenizer | Generated directly from the GGUF by the bundled Python; no original checkpoint, working pack, or personal configuration copied. |
-| Clean runtime environment | Both native executables reported their versions with a system-only PATH. NumPy, Pillow, psutil, Jinja2, and regex loaded from the extracted package. Private Python, CUDA, and Strata environment settings were removed. |
-| Installation paths | Generated configuration, Python, native engine, CPU vision, tokenizer, pack, and model paths all resolved inside the new directory. |
-| Independent launch | START.cmd returned before readiness. Task Scheduler owned the launcher; every server, engine, and vision process was outside the caller's Codex Job object. |
-| HTTP routes | UI, health, model list, status, and OpenAI-compatible chat API responded on the selected alternative port, 8094. |
-| Real model request | One synthetic image request passed through the CPU projector and GPU model and generated eight tokens. This was a functional smoke test, not a speed benchmark. |
-| Autostart | Actual registered tasks read back as S4U / least privilege, with a 45-second BootTrigger, no execution time limit, IgnoreNew, and hard termination disabled. The same startup action was exercised manually. No interactive logon or Codex process is required by the task definition. |
-| Shutdown and restoration | Schema3 graceful drain completed without cancellation or force kill. The production model was restored; its configuration, active runtime, launcher, bootstrap, and control-review hashes were unchanged. Test tasks were removed. |
-| Offline checks | Ten installer tests and six task-definition/guard checks passed. |
+| Native correctness | CPU/ISA/no-pin/lifetime checks, 360 bitwise fused-pool cases, 23 numerical/graph GPU runs, full 5,201-case DenseF32, BF16 direct/graph finite/NaN checks. |
+| Shared Python/API changes | 939-case offline coverage, 14 platform/optional-UI exclusions; 25 actual-Qwen tokenizer/decode and 15 reasoning-alias cases. Deterministic fixture reruns simulate the declared Qwen-only mock catalog, destination drive and ISA floor; production code/guards are unchanged. Four optional Rich/Textual screen cases are outside the minimal API-runtime qualification. |
+| Private live deployment | Exact schema3 drain, independent Windows-task launch, loaded API, context, CPU vision settings and owner proof. Direct text throughput is separately source-pinned in BENCHMARKS.md. |
+| Current public package | Offline installer/resume/corruption, task-definition and console-policy tests; isolated imports, native versions, PS/CMD CheckOnly, source/library/privacy/license and ZIP CRC/SHA checks. No new 85 GB download or fresh-Windows claim. |
+| Earlier clean-folder test | The r2 installer on source `011c9e6` was extracted into a separate path with spaces. All seven existing model inputs were hash-verified through hard links, a new pack was generated from GGUF, and a synthetic image request produced eight tokens on port 8094. This is an earlier functional smoke, not a new-source image benchmark. |
+| Startup independence | Actual Task Scheduler ancestry and absence from the caller's Codex Job were checked. Registered S4U tasks had a 45-second BootTrigger, no time limit, IgnoreNew and hard termination disabled. The startup action was exercised manually; no OS reboot or Codex-close test was performed. |
 
-The test found and fixed two packaging defects: the original task had no boot trigger, and the original bootstrap forced port 8093 instead of using the local preset. Installer revision r2 includes both fixes, isolated task names and control tasks, and preserved CMD failure exit codes.
+Installer/bootstrap/task helpers retain their previous qualification only when their bytes are unchanged. The strict console-owner fix additionally passed 12 policy cases and a matching private live drain/restart. Only canonical System32 conhost0x4 under an exact wrapper/native parent is accepted; unknown or restricted identities remain rejected.
 
-Limits: the operating system and Codex were not restarted or closed during the test. Independence was established from actual scheduler ancestry and Job membership. Existing NVIDIA and Microsoft runtimes satisfied the declared system prerequisites; the missing-runtime installation branch was not exercised on this host. Full network model downloads were not repeated; resumability and corruption handling were checked with the offline HTTP fixtures.
+NVIDIA and Microsoft runtimes already existed on the reference host. The missing-VC-Runtime installation branch was not exercised there; the installer obtains it from Microsoft and checks Authenticode. No public clean-folder model/image run is claimed for every newly compiled engine. Other GPUs/backends and full-128K throughput remain unqualified by these results.
 
-
-## Source0.1.48 /5c8dd322 follow-up
-
-The table above describes the earlier source011c9e6/r2 clean-folder test. New source5c8dd322 and its exact engine/vision bytes passed fresh CPU/ISA/private-DLL qualification and23 numerical/graph GPU runs, including the full5201-case DenseF32 sweep and BF16 bit parity. It was loaded through the independent private S4U task with128K/Q4/MTPQ2/CPU vision and all selected settings preserved. No new-source model generation or throughput benchmark was run.
-
-One control helper changed: native Windows engine children may own a canonical System32 conhost.exe with the exact0x4 argument. Acceptance requires an exactly identified native parent in the captured owner tree and valid creation order. Unknown executables, paths, arguments, parent identities, restricted parents and earlier creation times remain rejected. The12 portable policy tests cover these decisions. This function, full owner verification and controlled drain have the same AST as the private helper that completed an actual schema3 graceful stop and independent restart on the new engine. No force kill, bootstrap/review overwrite while alive, DACL change or admission/drain guard bypass occurred.
-
-All other installer/launcher/bootstrap/scheduler helper bytes remain identical to r2. Their earlier clean-folder/boot-definition qualification is reused; offline installer/task/import/package checks were rerun. The full public clean-folder/model test, OS reboot, Codex-close test and85GB network transfer were not repeated.
+[Current performance evidence](BENCHMARKS.md) · [Changes](CHANGES.md) · [Reviewed contributions](COMMUNITY-FIXES.md)

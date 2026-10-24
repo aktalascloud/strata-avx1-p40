@@ -1,14 +1,14 @@
 {
-  "tag": "v0.1.49-avx1-p40-06e51df-32f7d5a6",
-  "source_sha": "06e51dfaef7003f01f23b85e63c800b10efe4066",
-  "engine_sha256": "32F7D5A61A7079DBF89540E9D930B7ADEE273E706D8273D490093107D8889DDE",
-  "zip_name": "Strata-AVX1-P40-v0.1.49-avx1-p40-06e51df-32f7d5a6-win-x64.zip",
-  "zip_bytes": 619867647,
-  "zip_sha256": "d89524abad021dc84476626d74cbd375c397327ef0289ffc360a8e284dba2363",
-  "download_url": "https://github.com/aktalascloud/strata-avx1-p40/releases/download/v0.1.49-avx1-p40-06e51df-32f7d5a6/Strata-AVX1-P40-v0.1.49-avx1-p40-06e51df-32f7d5a6-win-x64.zip",
+  "tag": "v0.1.49.2-avx1-p40-7dd5cf1-c3a9145c",
+  "source_sha": "7dd5cf18e68c639a8773e096c5c79f971ea2a9f5",
+  "engine_sha256": "C3A9145C61BFA3A57BC6FCF8AC4733B265D78EF9EC94C3025806266B06DEDF92",
+  "zip_name": "Strata-AVX1-P40-v0.1.49.2-avx1-p40-7dd5cf1-c3a9145c-win-x64.zip",
+  "zip_bytes": 619867792,
+  "zip_sha256": "ae8d3b3e18c6003997c39993779a7b954ae1d5ba876e39d52a71c3f4d028f3b1",
+  "download_url": "https://github.com/aktalascloud/strata-avx1-p40/releases/download/v0.1.49.2-avx1-p40-7dd5cf1-c3a9145c/Strata-AVX1-P40-v0.1.49.2-avx1-p40-7dd5cf1-c3a9145c-win-x64.zip",
   "weights_included": false,
   "logs_included": false,
   "caches_included": false,
   "credentials_included": false,
-  "qualification": "Exact native/vision/CUDA bytes passed23 numerical/graph runs, including full5201DenseF32 and BF16 bit parity. Offline installer/task/import/package gates rerun. Unchanged helpers reuse r2 clean-folder/S4U qualification; the strict native-console identity fix additionally passed12 public policy cases and a matching private live graceful restart. No new-source model, throughput, OS reboot or fresh-Windows test claimed."
+  "qualification": "Exact native/vision/CUDA bytes passed CPU/ISA/private-DLL checks and 23 numerical/graph GPU runs, including the full 5,201-case DenseF32 sweep and BF16 bit parity. Offline installer/task/import/package checks passed. Unchanged launcher helpers retain their exact-byte clean-folder/S4U proof. No OS reboot or fresh-Windows test is claimed. Direct model throughput was measured on this exact source; see the source-pinned original/latest record."
 }

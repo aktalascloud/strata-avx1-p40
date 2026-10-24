@@ -2,7 +2,7 @@
 
 [English](README.md) · [Русский](README.ru.md) · [Download](https://github.com/aktalascloud/strata-avx1-p40/releases/latest)
 
-A Windows build of [Strata](https://github.com/Niko1221/Strata) for **Ivy Bridge Xeons and Tesla P40 (sm_61)**. Engine **0.1.49.1**, upstream [`8183c6b67162`](https://github.com/Niko1221/Strata/commit/8183c6b67162340c09b67360860177c577a65f2e). Reviewed patches, reproducible measurements, portable runtime.
+A Windows build of [Strata](https://github.com/Niko1221/Strata) for **Ivy Bridge Xeons and Tesla P40 (sm_61)**. Engine **0.1.49.2**, upstream [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5). Reviewed patches, reproducible measurements, portable runtime.
 
 Reference model: **DavidAU Qwen3.8-Flash-Next IQ3_S**, MTP Q2, CPU vision. No weights, keys, private settings, logs, caches, SDKs or compilers are included.
 
@@ -10,10 +10,10 @@ Reference model: **DavidAU Qwen3.8-Flash-Next IQ3_S**, MTP Q2, CPU vision. No we
 
 | Generation | First installation | Latest selected result |
 |---|---|---|
-| Engine tokens/s | 16.40 | 50.28 |
-| Whole-request API tokens/s | 11.65 | 47.63 |
+| Engine tokens/s | 16.40 | 47.66 |
+| Whole-request API tokens/s | 11.65 | 42.71 |
 
-Latest measurement: **2026-10-22**, engine **0.1.47**, source `011c9e600a93`. Cached 4K engine decode: 49.95 tokens/s.
+Latest measurement: **2026-10-24**, engine **0.1.49.2**, source `7dd5cf18e68c`. Cached 4K engine decode: 46.11 tokens/s.
 
 First installation: one cold response of 64 tokens, 32K/FP16, no MTP or reasoning. Latest: median of five warmed responses of 128 tokens after two warmups; 128K/Q4, MTP Q2, xhigh, temperature 0, seed 12345. Settings differ: overall progress is not an isolated patch gain. Full 128K throughput was not measured.
 
@@ -47,7 +47,7 @@ Use that NUMA choice only after checking your GPU's node; generic default is off
 
 PGO, ThinLTO, extra CUDA vectorization and I128 lost the reference comparisons. DenseF32 remains experimental; its +0.12% prefill observation does not establish a speedup. No expert dropping, affinity, power or clock changes.
 
-[Current changes](p40/CHANGES.md) · [11 reviewed community fixes](p40/COMMUNITY-FIXES.md) · [External sources](p40/RESEARCH.md) · [Installation qualification and limits](p40/INSTALLATION-VERIFICATION.md)
+[Current changes](p40/CHANGES.md) · [Reviewed contributions](p40/COMMUNITY-FIXES.md) · [External sources](p40/RESEARCH.md) · [Installation qualification and limits](p40/INSTALLATION-VERIFICATION.md)
 
 ## Licenses
 
