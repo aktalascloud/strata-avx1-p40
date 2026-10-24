@@ -5130,7 +5130,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
     {
         const auto b0 = std::chrono::steady_clock::now();
         if (njobs > 0) {
-            if (native) d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
+            if (native) {
+                static const bool fused = [] { const char* v = std::getenv("STRATA_POOL_FUSED"); return v != nullptr && std::atoi(v) != 0; }();
+                if (fused) d.pool->run_fused_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
+                else d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
+            }
             else d.pool->run_split_multi(d.jobs_multi.data(), njobs);
             ++d.cold_batches;
         }
@@ -5175,7 +5179,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
     if (d.plan != nullptr) d.plan->cpu_jobs = njobs;
     pt("run", njobs);
     if (njobs > 0 && npend == 0) {
-        if (native) d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
+        if (native) {
+                static const bool fused = [] { const char* v = std::getenv("STRATA_POOL_FUSED"); return v != nullptr && std::atoi(v) != 0; }();
+                if (fused) d.pool->run_fused_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
+                else d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
+            }
         else d.pool->run_split_multi(d.jobs_multi.data(), njobs);
     }
     if (d.remote_count > 0) {

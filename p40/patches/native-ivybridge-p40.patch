@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bbe296b2..b623e705 100644
+index acc764463e316ef2d8e020c59bbf63bef6111a61..f1cc7ca205a0b2787fc34180ea6fda6c94da6cd4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -88,6 +88,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
@@ -119,7 +119,7 @@ index bbe296b2..b623e705 100644
    endif()
    # --aux-cpus: the CPU-set derivation (pure) and the placement of live threads; header-only, no GPU
    add_executable(aux_cpus_test tests/platform/aux_cpus_test.cpp)
-@@ -2383,3 +2441,50 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
+@@ -2383,3 +2441,56 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
      target_compile_definitions(ds4_gg_bench PRIVATE STRATA_DSV41_TQ_CPU=1)
    endif()
  endif()
@@ -170,9 +170,15 @@ index bbe296b2..b623e705 100644
 +    add_test(NAME bf16_nan_parity COMMAND bf16_nan_parity)
 +  endif()
 +endif()
++
++if(STRATA_BUILD_TESTS AND STRATA_NATIVE_EXPERTS)
++  add_executable(cpu_pool_fused_parity tests/platform/cpu_pool_fused_parity.cpp)
++  target_link_libraries(cpu_pool_fused_parity PRIVATE strata_kernels_cpu)
++  add_test(NAME cpu_pool_fused_parity COMMAND cpu_pool_fused_parity)
++endif()
 diff --git a/cmake/strata_ivybridge_o3.cmake b/cmake/strata_ivybridge_o3.cmake
 new file mode 100644
-index 00000000..9db8b4c9
+index 0000000000000000000000000000000000000000..9db8b4c98f48ac99e96215f43f6eef24f45f47d6
 --- /dev/null
 +++ b/cmake/strata_ivybridge_o3.cmake
 @@ -0,0 +1,22 @@
@@ -200,7 +206,7 @@ index 00000000..9db8b4c9
 +endif()
 diff --git a/cmake/strata_pascallama_overlay.cmake b/cmake/strata_pascallama_overlay.cmake
 new file mode 100644
-index 00000000..753ef5f9
+index 0000000000000000000000000000000000000000..753ef5f9dbd02b20779c1ca516a5cfb11117a4e5
 --- /dev/null
 +++ b/cmake/strata_pascallama_overlay.cmake
 @@ -0,0 +1,23 @@
@@ -228,7 +234,7 @@ index 00000000..753ef5f9
 +  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
 +endfunction()
 diff --git a/docs/DETAILS.md b/docs/DETAILS.md
-index f037c65c..a9e95764 100644
+index f037c65cbb46da1a99cf84dc86ef5183fc5cb3ab..a9e957646e72a0fe6835b6987c4fb89bf4ad3d94 100644
 --- a/docs/DETAILS.md
 +++ b/docs/DETAILS.md
 @@ -1815,6 +1815,40 @@ test images.
@@ -273,7 +279,7 @@ index f037c65c..a9e95764 100644
  
  A prompt chunk of a few thousand tokens (an agent's tool result, a test's output, a short follow-up) streams every routed
 diff --git a/include/strata/core/conversation_cache.hpp b/include/strata/core/conversation_cache.hpp
-index b2e6a74f..935de225 100644
+index b2e6a74f7785264a0882cc4105c65acace51bd00..935de225389b971f57c77ac41038c6da0b747b6e 100644
 --- a/include/strata/core/conversation_cache.hpp
 +++ b/include/strata/core/conversation_cache.hpp
 @@ -67,10 +67,14 @@ struct ConversationKvReuse {
@@ -332,7 +338,7 @@ index b2e6a74f..935de225 100644
          return enabled() && held <= budget_ && incoming <= budget_ - held &&
                 entries_.size() < slots_ && bytes() <= budget_ - held - incoming;
 diff --git a/include/strata/core/expert_source.hpp b/include/strata/core/expert_source.hpp
-index 3ab77dc2..126e16b7 100644
+index 3ab77dc2a78a41003f2d19bd7a142a264ed30d18..126e16b7144b493bf320e41ad1f1cf151fca323d 100644
 --- a/include/strata/core/expert_source.hpp
 +++ b/include/strata/core/expert_source.hpp
 @@ -43,6 +43,10 @@
@@ -371,9 +377,39 @@ index 3ab77dc2..126e16b7 100644
      void* map_ = nullptr;            ///< STRATA_ARENA_MMAP: the arena file, mapped read-only (not the PinnedArena)
      uint64_t map_bytes_ = 0;
      std::vector<const uint8_t*> dev_slice_;   ///< device alias of each registered slice (or of the whole range)
+diff --git a/include/strata/kernels/cpu/pool.hpp b/include/strata/kernels/cpu/pool.hpp
+index 6c21d2d210a39760369f7adbf1522ef037910e25..402ad4c4212fbb5c0b1b5049cef37976cd6be589 100644
+--- a/include/strata/kernels/cpu/pool.hpp
++++ b/include/strata/kernels/cpu/pool.hpp
+@@ -248,6 +248,9 @@ public:
+     void run_split_multi(ExpertJobMulti* jobs, int n);
+     /// Plan v0.3 P6: the same for a native pack's layer (ggml-cpu arithmetic, `nact` activations).
+     void run_split_multi_native(const NativeFmt& f, ExpertJobMulti* jobs, int n);
++    // StrataFast PR16 / Francesco Albano: identical native rows in one phase.
++    // NUMA-split pools and oversized batches retain the upstream two-phase path.
++    void run_fused_native(const NativeFmt& f, ExpertJobMulti* jobs, int n);
+     static constexpr int kMaxSplitMulti = 96;
+     /// run_split_multi's phases, accumulated ms: gate/up rows, the intermediate quantization, down rows.
+     double ms_multi_gu = 0, ms_multi_q = 0, ms_multi_down = 0;
+@@ -367,6 +370,15 @@ private:
+     };
+     const NativeFmt* nfmt_ = nullptr;
+     std::vector<SplitBufMulti> split_multi_;
++    struct FusedState {
++        alignas(64) std::atomic<int> gu_done{0};
++        std::atomic<int> ready{0};
++    };
++    std::unique_ptr<FusedState[]> fstate_;
++    int fn_ = 0, fa_ = 1, fb_ = 1;
++    void native_gu_part(int e, int r0, int r1);
++    void native_quant_part(int e);
++    void native_down_part(int e, int r0, int r1);
+     // STRATA_NUMA_SPLIT=1 (opt-in, Linux, exactly 2 nodes): in the native row phases (modes 5/6) every expert's rows
+     // are cut into one slice per NUMA node (slice k = rows [per*k/2, per*(k+1)/2) of the gate/up or down matrix, the
+     // part the resident complement places on node k in step B), and each node's threads claim and count on their own
 diff --git a/include/strata/platform/cpu_pinning.hpp b/include/strata/platform/cpu_pinning.hpp
 new file mode 100644
-index 00000000..6108086c
+index 0000000000000000000000000000000000000000..6108086ca1b9c4f81a4ca27ee7ca4373a0314cd1
 --- /dev/null
 +++ b/include/strata/platform/cpu_pinning.hpp
 @@ -0,0 +1,14 @@
@@ -393,7 +429,7 @@ index 00000000..6108086c
 +}  // namespace strata
 diff --git a/include/strata/platform/win_numa_arena.hpp b/include/strata/platform/win_numa_arena.hpp
 new file mode 100644
-index 00000000..2eced255
+index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e8763f0ec
 --- /dev/null
 +++ b/include/strata/platform/win_numa_arena.hpp
 @@ -0,0 +1,94 @@
@@ -491,8 +527,67 @@ index 00000000..2eced255
 +}
 +} // namespace strata::platform::win_numa
 +#endif
+diff --git a/serve/frontend.py b/serve/frontend.py
+index 53f2b4599d08f1a2ca2b056b5d6380c708341810..a9c02944e7249592a099d0404e1e720fa2ddb6a7 100644
+--- a/serve/frontend.py
++++ b/serve/frontend.py
+@@ -1158,7 +1158,9 @@ class OutputParser:
+                 raw_name = rest[a + 10:b]
+                 name = raw_name.strip()
+                 name = self.aliases.get(name, name)
+-                if raw_name != raw_name.strip() and name not in self.schemas:
++                if name not in self.schemas:
++                    # Only this request's declared, canonicalized names authorize tool events.
++                    self.ss = "blocked"
+                     return out
+                 self.scall = ToolCall(name=name, arguments={})
+                 props = ((self.schemas.get(name) or {}).get("parameters") or {}).get("properties") or {}
+@@ -1167,6 +1169,8 @@ class OutputParser:
+                 args("{")
+                 self.sp += b + 1
+                 self.ss = "between"
++            elif self.ss == "blocked":
++                return out
+             elif self.ss == "between":
+                 stripped = rest.lstrip()
+                 self.sp += len(rest) - len(stripped)
+@@ -1533,7 +1537,7 @@ class OutputParser:
+                 self.buf = self.buf[i + drop:]
+                 batch, self.batch = self.batch, False
+                 out += self._finish_call(body)
+-                if batch and out[-1].kind == "tool_call":
++                if batch and out and out[-1].kind == "tool_call":
+                     self.state, self.lead = "call", False
+ 
+     def finish(self, reason: str | None = None) -> list[Event]:
+@@ -1565,6 +1569,14 @@ class OutputParser:
+             return out
+         if self.state == "reasoning" and self.buf == THINK_END:   # the output ends on a held `</think>`: its end
+             self.buf, self.state = "", "content"
++        if self.state == "call" and self.scall is None:
++            candidate = self.buf.lstrip()
++            if candidate.startswith(FUNC_START) and ">" in candidate:
++                name = candidate[len(FUNC_START):candidate.index(">")].strip()
++                if self.aliases.get(name, name) not in self.schemas:
++                    self.buf = ""
++                    self._reset_scan()
++                    return out
+         if self.buf:
+             # an unfinished call inside the reasoning (#804) is reasoning text, never a call
+             kind = {"reasoning": "reasoning", "rcall": "reasoning", "content": "content"}.get(self.state, "content")
+@@ -1580,6 +1592,10 @@ class OutputParser:
+         name = raw_name.strip()
+         name = self.aliases.get(name, name)
+         bare, self.bare = self.bare, False
++        if name not in self.schemas:
++            self._reset_scan()
++            self.state, self.lead = "content", True
++            return []
+         try:
+             if raw_name != raw_name.strip() and name not in self.schemas:
+                 raise ValueError("whitespace tool name is not declared")
 diff --git a/serve/server.py b/serve/server.py
-index a53d1512..edf96583 100644
+index a53d151200ceab441123841474ea2a74bafa3ab2..edf96583417b611d39b64313e3bae938471ef4cf 100644
 --- a/serve/server.py
 +++ b/serve/server.py
 @@ -92,7 +92,11 @@ IMAGE_PAD = "<|image_pad|>"
@@ -610,9 +705,109 @@ index a53d1512..edf96583 100644
  def default_model_name(cfg: dict) -> str:
      """The config's "model_name", else its family's name ("arch": qwen4exp, qwen35moe), else Flash-Next's."""
      return cfg.get("model_name") or FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next")
+diff --git a/serve/test_declared_tool_boundary.py b/serve/test_declared_tool_boundary.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8422f3ceca0820dd8aed4c97f31e725640675b58
+--- /dev/null
++++ b/serve/test_declared_tool_boundary.py
+@@ -0,0 +1,73 @@
++"""Declared-tool boundaries with the current canonical namespace aliases."""
++import unittest
++from serve.frontend import OutputParser
++
++DECLARED = [{"name": "write", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}}}]
++GOOD = "<tool_call>\n<function=write>\n<parameter=path>\nhello\n</parameter>\n</function>\n</tool_call>"
++BAD = "<tool_call>\n<function=delete_everything>\n<parameter=path>\n/\n</parameter>\n</function>\n</tool_call>"
++
++def events(text, tools, stream, step):
++    p = OutputParser(thinking=False, tools=tools, stream_tools=stream)
++    result = []
++    for i in range(0, len(text), step):
++        result.extend(p.feed(text[i:i+step]))
++    result.extend(p.finish())
++    return result
++
++class DeclaredToolBoundary(unittest.TestCase):
++    def test_undeclared_never_executable(self):
++        for stream in (False, True):
++            for step in (1, 7, 4096):
++                with self.subTest(stream=stream, step=step):
++                    found = events(BAD, DECLARED, stream, step)
++                    self.assertFalse(any(e.kind.startswith("tool_") for e in found), found)
++    def test_no_tools_no_executable_call(self):
++        self.assertFalse(any(e.kind.startswith("tool_") for e in events(BAD, [], True, 1)))
++    def test_truncated_undeclared_suppressed(self):
++        for stream in (False, True):
++            found = events(BAD[:-24], DECLARED, stream, 1)
++            self.assertFalse(any(e.kind.startswith("tool_") for e in found), found)
++    def test_declared_namespace_alias(self):
++        declared = [{"name": "mcp__websearch.web_search", "parameters": {"type": "object",
++                     "properties": {"query": {"type": "string"}}}}]
++        output = "<tool_call>\n<function=mcp__websearch__web_search>\n<parameter=query>\nstrata\n</parameter>\n</function>\n</tool_call>"
++        for stream in (False, True):
++            found = events(output, declared, stream, 1)
++            self.assertTrue(any(e.kind == "tool_call" and
++                                e.call.name == "mcp__websearch.web_search" for e in found), found)
++            self.assertFalse(any(e.kind == "tool_start" and
++                                 e.call.name != "mcp__websearch.web_search" for e in found), found)
++    def test_mixed_declared_and_undeclared_calls(self):
++        for stream in (False, True):
++            for step in (1, 7, 4096):
++                with self.subTest(stream=stream, step=step):
++                    for payload in (GOOD + BAD, BAD + GOOD):
++                        found = events(payload, DECLARED, stream, step)
++                        calls = [e.call.name for e in found if e.kind == "tool_call"]
++                        self.assertEqual(calls, ["write"], found)
++                        self.assertFalse(any(e.kind == "tool_start" and
++                                             e.call.name != "write" for e in found), found)
++
++    def test_recovery_json_rejects_undeclared(self):
++        payload = '<tool_call>{"name": "delete_everything", "arguments": {"path": "/"}}</tool_call>'
++        for stream in (False, True):
++            parser = OutputParser(thinking=False, tools=DECLARED, stream_tools=stream, recover=True)
++            found = []
++            for i in range(0, len(payload), 3):
++                found.extend(parser.feed(payload[i:i+3]))
++            found.extend(parser.finish())
++            self.assertFalse(any(e.kind.startswith("tool_") for e in found), found)
++
++    def test_cutoff_unknown_call_never_started(self):
++        for stream in (False, True):
++            parser = OutputParser(thinking=False, tools=DECLARED, stream_tools=stream)
++            found = parser.feed(BAD[:-10]) + parser.finish("length")
++            self.assertFalse(any(e.kind.startswith("tool_") for e in found), found)
++
++    def test_declared_preserved(self):
++        for stream in (False, True):
++            found = events(GOOD, DECLARED, stream, 1)
++            self.assertTrue(any(e.kind == "tool_call" and e.call.name == "write" for e in found), found)
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/serve/test_responses.py b/serve/test_responses.py
+index 3e6188a1175fa5dbc9d2f92c73c0628b824b6b47..de93128b7f18747f36528ff3f70991c7d7ad3026 100644
+--- a/serve/test_responses.py
++++ b/serve/test_responses.py
+@@ -737,10 +737,12 @@ class CodexCompactionOverHttp(Server):
+         self.assertIn("multi_agent_v1.spawn_agent", prompt[:prompt.index("<|im_end|>")])
+         self.assertEqual(self.parser_tools[-1], None)    # the parser gets the request's tools: none
+         self.assertEqual(r["tools"], [])
+-        # the calls come back as for any request without tools: no namespace, no custom tool
+-        outputs = [(o["type"], o["name"], o.get("namespace")) for o in r["output"]]
+-        self.assertEqual(outputs, [("function_call", "multi_agent_v1.spawn_agent", None),
+-                                   ("function_call", "apply_patch", None)])
++        # Security boundary: the compaction request supplies tools=[], so any
++        # model-emitted tool markup must not become executable tool calls. The
++        # kept tool definitions shape prompt history only, not this turn's authority.
++        outputs = [(o["type"], o["name"], o.get("namespace")) for o in r["output"]
++                   if o["type"] in ("function_call", "custom_tool_call")]
++        self.assertEqual(outputs, [])
+         # the same request without Codex's metadata (upstream's behaviour): the same answer, but its prompt starts
+         # differently, so the engine reads it from the start
+         plain, code, r2 = self.compaction({})
 diff --git a/serve/test_sampling_merge.py b/serve/test_sampling_merge.py
 new file mode 100644
-index 00000000..2ebc11fd
+index 0000000000000000000000000000000000000000..2ebc11fd096b70a0ef166852299f853ca7ef5e99
 --- /dev/null
 +++ b/serve/test_sampling_merge.py
 @@ -0,0 +1,56 @@
@@ -673,7 +868,7 @@ index 00000000..2ebc11fd
 +if __name__ == "__main__":
 +    unittest.main()
 diff --git a/serve/test_server.py b/serve/test_server.py
-index 3e60dee4..771fd92e 100644
+index 3e60dee4ee62653df7930b086fa63e38e898d2c1..771fd92e7e4466f3ea33892310748691613325dc 100644
 --- a/serve/test_server.py
 +++ b/serve/test_server.py
 @@ -633,6 +633,20 @@ class VisionTempFiles(unittest.TestCase):
@@ -772,7 +967,7 @@ index 3e60dee4..771fd92e 100644
                                       ["text", "image"] if vision else ["text"])
                  code, _, body = self.get("/props?model=" + svc.model + "&autoload=false")
 diff --git a/src/core/conversation_cache_test.cpp b/src/core/conversation_cache_test.cpp
-index a21c0d7f..fd6042b3 100644
+index a21c0d7fee06b2bd0bda9b3616eccd2fa03dd8ae..fd6042b30b413e76059febc8540f5714779bcc2e 100644
 --- a/src/core/conversation_cache_test.cpp
 +++ b/src/core/conversation_cache_test.cpp
 @@ -502,6 +502,41 @@ int main() {
@@ -818,7 +1013,7 @@ index a21c0d7f..fd6042b3 100644
          // the later stages' retained K/V, kept with the first stage's and limited together
          auto kv = [](size_t n) {
 diff --git a/src/core/conversation_copy.hpp b/src/core/conversation_copy.hpp
-index 7e8341b3..fb14c9dd 100644
+index 7e8341b3aa1ba10daffc06029f6086e1d10173cb..fb14c9ddbe0d102853bd402dc48733ca60f4c2ea 100644
 --- a/src/core/conversation_copy.hpp
 +++ b/src/core/conversation_copy.hpp
 @@ -24,9 +24,24 @@ inline cudaError_t private_stream(cudaStream_t& s) {
@@ -850,7 +1045,7 @@ index 7e8341b3..fb14c9dd 100644
          if (e != cudaSuccess) { streams[(size_t) dev] = nullptr; return e; }
 diff --git a/src/core/conversation_copy_lifetime_test.cpp b/src/core/conversation_copy_lifetime_test.cpp
 new file mode 100644
-index 00000000..8323c996
+index 0000000000000000000000000000000000000000..8323c9966353d9cfaaffc309185ca1272523cd65
 --- /dev/null
 +++ b/src/core/conversation_copy_lifetime_test.cpp
 @@ -0,0 +1,128 @@
@@ -983,7 +1178,7 @@ index 00000000..8323c996
 +    std::puts("PASS: worker exit, stream reuse, concurrent devices, failure cleanup");
 +}
 diff --git a/src/core/conversation_validation_test.cpp b/src/core/conversation_validation_test.cpp
-index c670ef13..e5f47acc 100644
+index c670ef138ed46ca058434d4b44dd17231fa65520..e5f47acc7aa71a42b0e104857f723cf619d0bda5 100644
 --- a/src/core/conversation_validation_test.cpp
 +++ b/src/core/conversation_validation_test.cpp
 @@ -26,6 +26,8 @@ extern "C" cudaError_t __wrap_cudaMemcpy(void* dst, const void* src, size_t n, c
@@ -996,10 +1191,36 @@ index c670ef13..e5f47acc 100644
      *s = reinterpret_cast<cudaStream_t>(static_cast<uintptr_t>(1)); return cudaSuccess;
  }
 diff --git a/src/core/expert_source.cpp b/src/core/expert_source.cpp
-index b8ad8fb4..5cb9487e 100644
+index b8ad8fb42129e506365978f556cdcf6c67ffcfc9..5ed3f7bd3ce68ce6620c43dfb77b40f7cb23c06b 100644
 --- a/src/core/expert_source.cpp
 +++ b/src/core/expert_source.cpp
-@@ -5675,12 +5675,29 @@ LoadStats load_experts_gguf(const std::string& gguf, uint8_t* dst, const strata:
+@@ -5130,7 +5130,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
+     {
+         const auto b0 = std::chrono::steady_clock::now();
+         if (njobs > 0) {
+-            if (native) d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
++            if (native) {
++                static const bool fused = [] { const char* v = std::getenv("STRATA_POOL_FUSED"); return v != nullptr && std::atoi(v) != 0; }();
++                if (fused) d.pool->run_fused_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
++                else d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
++            }
+             else d.pool->run_split_multi(d.jobs_multi.data(), njobs);
+             ++d.cold_batches;
+         }
+@@ -5175,7 +5179,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
+     if (d.plan != nullptr) d.plan->cpu_jobs = njobs;
+     pt("run", njobs);
+     if (njobs > 0 && npend == 0) {
+-        if (native) d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
++        if (native) {
++                static const bool fused = [] { const char* v = std::getenv("STRATA_POOL_FUSED"); return v != nullptr && std::atoi(v) != 0; }();
++                if (fused) d.pool->run_fused_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
++                else d.pool->run_split_multi_native(lay.fmt[(size_t) d.layers], d.jobs_multi.data(), njobs);
++            }
+         else d.pool->run_split_multi(d.jobs_multi.data(), njobs);
+     }
+     if (d.remote_count > 0) {
+@@ -5675,12 +5683,29 @@ LoadStats load_experts_gguf(const std::string& gguf, uint8_t* dst, const strata:
      return st;
  }
  
@@ -1021,15 +1242,15 @@ index b8ad8fb4..5cb9487e 100644
 +#ifdef STRATA_EARLY_ARENA_BUILT
 +    std::shared_ptr<EarlyLoad> early_load = std::move(early_);   // close() would drop it (the early arena load)
 +    std::thread early_thread = std::move(early_thread_);
-+    close();
+     close();
 +    if (early_thread.joinable()) early_thread.join();          // the early read is complete before anything uses it
 +#else
-     close();
++    close();
 +#endif
      const std::string path = pack_dir + "/experts.bin";
      // plan v0.3 P6: the layout (canonical, or a native pack's per-layer blobs) was loaded by the driver
      const strata::kernels::cpu::ExpertLayout& lay = strata::kernels::cpu::expert_layout();
-@@ -5764,7 +5781,13 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -5764,7 +5789,13 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
      // engine still exiting) is only a warning - the OS may make room - per the recommend-not-force rule.
      ram_warning_.clear();
      // (a shared arena, --shared-expert-arena, may already be in RAM for another engine: not checked)
@@ -1043,7 +1264,7 @@ index b8ad8fb4..5cb9487e 100644
          const uint64_t need = want + (uint64_t) blob;
          const double gib = 1073741824.0;
          char buf[512];
-@@ -5864,11 +5887,33 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -5864,11 +5895,33 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
  #else
      const bool deferred = false;
  #endif
@@ -1077,7 +1298,7 @@ index b8ad8fb4..5cb9487e 100644
      if (!a->valid()) {
          const std::string why = a->note;
          delete a;
-@@ -5889,10 +5934,21 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -5889,10 +5942,21 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
      } else {
          files.push_back(path);
      }
@@ -1099,7 +1320,7 @@ index b8ad8fb4..5cb9487e 100644
      std::atomic<int> ready{0};
      std::thread reg;
      if (deferred) {
-@@ -5904,6 +5960,11 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -5904,6 +5968,11 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
          });
      }
      const std::atomic<int>* rp = deferred ? &ready : nullptr;
@@ -1111,7 +1332,7 @@ index b8ad8fb4..5cb9487e 100644
      if (from_gguf) {
          st = load_experts_gguf(gguf_, a->data(), lay, readers, unbuffered, rp, padded_ ? &pad_ : nullptr);
      } else {
-@@ -6008,8 +6069,95 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -6008,8 +6077,95 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
      record_inputs(path, gguf_, lay, from_gguf);
      return true;
  }
@@ -1208,7 +1429,7 @@ index b8ad8fb4..5cb9487e 100644
      if (map_ != nullptr) munmap(map_, (size_t) map_bytes_);
  #endif
 diff --git a/src/core/native_dense.cpp b/src/core/native_dense.cpp
-index 25efb6f6..99e8d2f6 100644
+index 25efb6f6217991100c2a1a6599a17917cba49cea..99e8d2f6d11e097001656b5a58cfc9bf29326962 100644
 --- a/src/core/native_dense.cpp
 +++ b/src/core/native_dense.cpp
 @@ -22,6 +22,20 @@
@@ -1429,7 +1650,7 @@ index 25efb6f6..99e8d2f6 100644
          weights_.reserve(pending.size());
          uint64_t packed_bytes = 0;
 diff --git a/src/core/pinned.cu b/src/core/pinned.cu
-index 0c45c051..026059e8 100644
+index 0c45c051c5685a8581c1607f6d6f3bc7a7df2be5..026059e89e5623a861de524e1456af544ae8d945 100644
 --- a/src/core/pinned.cu
 +++ b/src/core/pinned.cu
 @@ -6,6 +6,10 @@
@@ -1542,7 +1763,7 @@ index 0c45c051..026059e8 100644
      // Register with CUDA BEFORE any page is touched: cudaHostRegister pins what is resident now, and a region
      // that has already been faulted in page by page is far more expensive to register and may fail outright.
 diff --git a/src/kernels/cpu/iq_avx2_parity.cpp b/src/kernels/cpu/iq_avx2_parity.cpp
-index 67544c9d..46641b9a 100644
+index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85b9123d82 100644
 --- a/src/kernels/cpu/iq_avx2_parity.cpp
 +++ b/src/kernels/cpu/iq_avx2_parity.cpp
 @@ -21,6 +21,7 @@
@@ -1562,7 +1783,7 @@ index 67544c9d..46641b9a 100644
      if (cpu_index < 0 || cpu_index >= 64) return false;
      return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;
 diff --git a/src/kernels/cpu/iq_avx512.cpp b/src/kernels/cpu/iq_avx512.cpp
-index 14330f6e..5f94d77a 100644
+index 14330f6ecb7c0264ddd41ac4a3f13f3f7d1f9810..5f94d77a69d62aada9a90d6dbe09785d925424bf 100644
 --- a/src/kernels/cpu/iq_avx512.cpp
 +++ b/src/kernels/cpu/iq_avx512.cpp
 @@ -568,11 +568,11 @@ static bool has_vpopcnt() {
@@ -1579,8 +1800,115 @@ index 14330f6e..5f94d77a 100644
  #endif
      }();
      return ok;
+diff --git a/src/kernels/cpu/kq_cpu_bench.cpp b/src/kernels/cpu/kq_cpu_bench.cpp
+index 0655bc0ea525874030bd36261194f779e5547424..3a2f9b8d3ddf78e3b386d03893a43292f264197b 100644
+--- a/src/kernels/cpu/kq_cpu_bench.cpp
++++ b/src/kernels/cpu/kq_cpu_bench.cpp
+@@ -53,19 +53,23 @@ std::vector<std::string> split(const std::string& s) {
+ }
+ 
+ // one expert blob in the GGUF form: gate rows, up rows (n_ff x n_embd each), down rows (n_embd x n_ff), from random
+-// weights quantized by ggml-cpu (valid scales, as a real file has)
++// weights quantized by ggml (valid scales, as a real file has).  ggml_quantize_chunk, not the CPU traits' from_float:
++// ggml-cpu has no from_float for the i-quants (IQ3_S called a null pointer: an access violation on Windows)
+ void make_blob(const cpu::NativeFmt& f, uint8_t* blob, std::mt19937& rng) {
+     std::normal_distribution<float> nd(0.f, 0.02f);
+     std::vector<float> row((size_t) std::max(kH, kFF));
+-    const auto* tg = ggml_get_type_traits_cpu((ggml_type) f.gu_type);
+-    const auto* td = ggml_get_type_traits_cpu((ggml_type) f.d_type);
++    const std::vector<float> imatrix((size_t) std::max(kH, kFF), 1.0f);
++    auto quant = [&](int type, uint8_t* dst, int64_t n) {
++        ggml_quantize_chunk((ggml_type) type, row.data(), dst, 0, 1, n,
++                            ggml_quantize_requires_imatrix((ggml_type) type) ? imatrix.data() : nullptr);
++    };
+     for (int64_t r = 0; r < 2 * kFF; ++r) {
+         for (int64_t i = 0; i < kH; ++i) row[(size_t) i] = nd(rng);
+-        tg->from_float(row.data(), blob + (size_t) r * f.gu_row, kH);
++        quant(f.gu_type, blob + (size_t) r * f.gu_row, kH);
+     }
+     for (int64_t r = 0; r < kH; ++r) {
+         for (int64_t i = 0; i < kFF; ++i) row[(size_t) i] = nd(rng);
+-        td->from_float(row.data(), blob + f.down_off + (size_t) r * f.d_row, kFF);
++        quant(f.d_type, blob + f.down_off + (size_t) r * f.d_row, kFF);
+     }
+ }
+ 
+@@ -123,16 +127,36 @@ int main(int argc, char** argv) {
+             ha(kMaxT, std::vector<uint8_t>(cpu::kNativeHBytes));
+         const void* act[kMaxT];
+         const void* hq[kMaxT];
++        // a Q2_0 down takes the pool's own path (pool.cpp, run_split_multi_native and drain mode 6): the activation
++        // as an ActQ (act_quant_any) and Strata's Q2_0 rows (q2_rows_any), not ggml-cpu's Q2_0 dot
++        const bool q2_down = cpu::q2_native_kernels(f.d_type);
++        std::vector<cpu::ActQ> h2(q2_down ? kMaxT : 0);
++        const cpu::ActQ* a2[kMaxT] = {};
++        // a Q2_0 gate/up the same (pool.cpp mode 5): x as an ActQ, gate and up on q2_rows_any, then SwiGLU
++        const bool q2_gu = cpu::q2_native_kernels(f.gu_type);
++        std::vector<cpu::ActQ> x2(q2_gu ? kMaxT : 0);
++        const cpu::ActQ* ax[kMaxT] = {};
+         for (int t = 0; t < kMaxT; ++t) {
+             std::vector<float> x(kH), h(kFF);
+             for (auto& v : x) v = nd(rng);
+             for (auto& v : h) v = 0.1f * nd(rng);
+-            cpu::native_quant_act(f, x.data(), xa[t].data());
+-            cpu::native_quant_h(f, h.data(), ha[t].data());
++            if (q2_gu) {
++                cpu::act_quant_any(x.data(), (int) kH, x2[(size_t) t]);
++                ax[t] = &x2[(size_t) t];
++            } else {
++                cpu::native_quant_act(f, x.data(), xa[t].data());
++            }
++            if (q2_down) {
++                cpu::act_quant_any(h.data(), (int) kFF, h2[(size_t) t]);
++                a2[t] = &h2[(size_t) t];
++            } else {
++                cpu::native_quant_h(f, h.data(), ha[t].data());
++            }
+             act[t] = xa[t].data();
+             hq[t] = ha[t].data();
+         }
+-        std::printf("\n%s: %zu experts of %.3f MB (%.0f MB)\n", pair.c_str(), E, f.bytes / 1e6, E * (double) f.bytes / 1e6);
++        std::printf("\n%s: %zu experts of %.3f MB (%.0f MB)%s%s\n", pair.c_str(), E, f.bytes / 1e6, E * (double) f.bytes / 1e6,
++                    q2_gu ? ", Q2_0 gate/up" : "", q2_down ? ", Q2_0 down on Strata's rows (the pool's path)" : "");
+         for (int nt : nts) {
+             for (int T : threads) {
+                 if (T < 1) continue;
+@@ -141,6 +165,11 @@ int main(int argc, char** argv) {
+                     std::atomic<size_t> next{0};
+                     auto work = [&] {
+                         std::vector<float> ffb((size_t) kMaxT * kFF), outb((size_t) kMaxT * kH);
++                        std::vector<float> gb(q2_gu ? (size_t) kMaxT * kFF : 0), ub(q2_gu ? (size_t) kMaxT * kFF : 0);
++                        float* gp[kMaxT] = {};
++                        float* up[kMaxT] = {};
++                        if (q2_gu)
++                            for (int t = 0; t < kMaxT; ++t) { gp[t] = &gb[(size_t) t * kFF]; up[t] = &ub[(size_t) t * kFF]; }
+                         float* ff[kMaxT];
+                         float* out[kMaxT];
+                         for (int t = 0; t < kMaxT; ++t) { ff[t] = &ffb[(size_t) t * kFF]; out[t] = &outb[(size_t) t * kH]; }
+@@ -149,8 +178,19 @@ int main(int argc, char** argv) {
+                             const size_t e = next.fetch_add(1);
+                             if (e >= E) break;
+                             const uint8_t* blob = blobs + e * f.bytes;
+-                            cpu::native_gu_rows(f, blob, act, nt, ff, 0, (int) kFF);
+-                            cpu::native_down_rows(f, blob, hq, nt, out, 0, (int) kH);
++                            if (q2_gu) {
++                                cpu::q2_rows_any(blob, f.gu_row, (int) (kH / 64), ax, nt, gp, 0, (int) kFF);
++                                cpu::q2_rows_any(blob + f.up_off, f.gu_row, (int) (kH / 64), ax, nt, up, 0, (int) kFF);
++                                for (int t = 0; t < nt; ++t)
++                                    for (int64_t r = 0; r < kFF; ++r)
++                                        ff[t][r] = (gp[t][r] / (1.f + std::exp(-gp[t][r]))) * up[t][r];
++                            } else {
++                                cpu::native_gu_rows(f, blob, act, nt, ff, 0, (int) kFF);
++                            }
++                            if (q2_down)
++                                cpu::q2_rows_any(blob + f.down_off, f.d_row, (int) (f.n_ff / 64), a2, nt, out, 0, (int) kH);
++                            else
++                                cpu::native_down_rows(f, blob, hq, nt, out, 0, (int) kH);
+                         }
+                         volatile float sink = outb[0] + ffb[0];
+                         (void) sink;
 diff --git a/src/kernels/cpu/pool.cpp b/src/kernels/cpu/pool.cpp
-index cdcc8d79..e6daaa33 100644
+index cdcc8d79249e5af774112383942228453331e7fe..5587618b63fe66441572a01ba9c8f74bb1454819 100644
 --- a/src/kernels/cpu/pool.cpp
 +++ b/src/kernels/cpu/pool.cpp
 @@ -2,6 +2,7 @@
@@ -1626,8 +1954,140 @@ index cdcc8d79..e6daaa33 100644
      pinned_ = pin;
      layout_ = logical_cpu_layout();   // now, before anything pins the caller (Linux reads the calling thread's allowed CPUs)
      if (const char* e = std::getenv("STRATA_POOL_SPIN_US"))   // a test knob; see kSpinBeforeSleep
+@@ -1196,6 +1198,22 @@ void ExpertPool::drain(int id, ExpertScratch& scratch, uint32_t epoch) {
+             const int e = (int) i / parts_b_, part = (int) i % parts_b_;
+             const int r0 = H * part / parts_b_, r1 = H * (part + 1) / parts_b_;
+             s2_expert_down_rows(jobs_[e].blob, split_[(size_t) e].a2, jobs_[e].out, r0, r1);
++        } else if (mode_ == 7) {
++            // All GU tasks are claimed before any down task. The last GU task
++            // quantizes and publishes its expert; the down rows acquire it.
++            const int na = fn_ * fa_;
++            if ((int) i < na) {
++                const int e = (int) i / fa_, part = (int) i % fa_;
++                native_gu_part(e, (int) nfmt_->n_ff * part / fa_, (int) nfmt_->n_ff * (part + 1) / fa_);
++                if (fstate_[(size_t) e].gu_done.fetch_add(1, std::memory_order_acq_rel) + 1 == fa_) {
++                    native_quant_part(e);
++                    fstate_[(size_t) e].ready.store(1, std::memory_order_release);
++                }
++            } else {
++                const int j = (int) i - na, e = j / fb_, part = j % fb_;
++                while (fstate_[(size_t) e].ready.load(std::memory_order_acquire) == 0) _mm_pause();
++                native_down_part(e, (int) nfmt_->n_embd * part / fb_, (int) nfmt_->n_embd * (part + 1) / fb_);
++            }
+         } else if (mode_ >= 5) {
+             // plan v0.3 P6: native layers, 5 = gate/up rows, 6 = down rows (the layer's own n_ff / n_embd: Flash-Next's
+             // FF / H, or another family's smaller expert)
+@@ -1214,35 +1232,8 @@ void ExpertPool::drain(int id, ExpertScratch& scratch, uint32_t epoch) {
+                 const int e = (int) (g / h), l0 = (int) (g % h);
+                 const int l1 = (int) std::min<int64_t>(h, l0 + (g1 - g));
+                 const int r0 = row0 + l0, r1 = row0 + l1;
+-                SplitBufMulti& sb = split_multi_[(size_t) e];
+-                const NativeFmt* const nfmt = mjobs_[e].fmt != nullptr ? mjobs_[e].fmt : nfmt_;   // 149-cold: same types and rows
+-                if (mode_ == 5 && q2_native_kernels(nfmt->gu_type)) {
+-                    // a native Q2_0 pack: gate and up rows on the Q2_0 kernels, then SwiGLU
+-                    thread_local float gbuf[MAXT][FF], ubuf[MAXT][FF];
+-                    float* gp[MAXT];
+-                    float* up[MAXT];
+-                    for (int t = 0; t < mjobs_[e].nt; ++t) { gp[t] = gbuf[t]; up[t] = ubuf[t]; }
+-                    const int nbk = (int) (nfmt->n_embd / 64);
+-                    q2_rows_any(mjobs_[e].blob, nfmt->gu_row, nbk, mjobs_[e].act, mjobs_[e].nt, gp, r0, r1);
+-                    q2_rows_any(mjobs_[e].blob + nfmt->up_off, nfmt->gu_row, nbk, mjobs_[e].act, mjobs_[e].nt, up, r0, r1);
+-                    for (int t = 0; t < mjobs_[e].nt; ++t)
+-                        for (int r = r0; r < r1; ++r)
+-                            sb.ff[t][r] = (gbuf[t][r] / (1.f + std::exp(-gbuf[t][r]))) * ubuf[t][r];
+-                } else if (mode_ == 5) {
+-                    float* ff[MAXT];
+-                    for (int t = 0; t < mjobs_[e].nt; ++t) ff[t] = sb.ff[t];
+-                    native_gu_rows(*nfmt, mjobs_[e].blob, mjobs_[e].nact, mjobs_[e].nt, ff, r0, r1);
+-                } else if (q2_native_kernels(nfmt->d_type)) {
+-                    // Q2_0 down (most IQ layers): the AVX-512 kernel, ggml-cpu has only a scalar one on x86
+-                    const ActQ* a2[MAXT];
+-                    for (int t = 0; t < mjobs_[e].nt; ++t) a2[t] = &sb.a2[t];
+-                    q2_rows_any(mjobs_[e].blob + nfmt->down_off, nfmt->d_row, (int) (nfmt->n_ff / 64), a2,
+-                                mjobs_[e].nt, mjobs_[e].out, r0, r1);
+-                } else {
+-                    const void* hq[MAXT];
+-                    for (int t = 0; t < mjobs_[e].nt; ++t) hq[t] = sb.hq[t];
+-                    native_down_rows(*nfmt, mjobs_[e].blob, hq, mjobs_[e].nt, mjobs_[e].out, r0, r1);
+-                }
++                if (mode_ == 5) native_gu_part(e, r0, r1);
++                else native_down_part(e, r0, r1);
+                 g += l1 - l0;
+             }
+         } else {
+@@ -1387,6 +1378,70 @@ void ExpertPool::run_split_multi_native(const NativeFmt& f, ExpertJobMulti* jobs
+     ms_drain_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+ }
+ 
++// Same arithmetic as upstream drain modes 5/6, including per-job GGUF offsets,
++// q2_native_kernels dispatch, and the format's own dimensions.
++void ExpertPool::native_gu_part(int e, int r0, int r1) {
++    SplitBufMulti& sb = split_multi_[(size_t) e];
++    const NativeFmt* const nfmt = mjobs_[e].fmt != nullptr ? mjobs_[e].fmt : nfmt_;
++    if (q2_native_kernels(nfmt->gu_type)) {
++        thread_local float gbuf[MAXT][FF], ubuf[MAXT][FF];
++        float* gp[MAXT]; float* up[MAXT];
++        for (int t = 0; t < mjobs_[e].nt; ++t) { gp[t] = gbuf[t]; up[t] = ubuf[t]; }
++        const int nbk = (int) (nfmt->n_embd / 64);
++        q2_rows_any(mjobs_[e].blob, nfmt->gu_row, nbk, mjobs_[e].act, mjobs_[e].nt, gp, r0, r1);
++        q2_rows_any(mjobs_[e].blob + nfmt->up_off, nfmt->gu_row, nbk, mjobs_[e].act, mjobs_[e].nt, up, r0, r1);
++        for (int t = 0; t < mjobs_[e].nt; ++t)
++            for (int r = r0; r < r1; ++r)
++                sb.ff[t][r] = (gbuf[t][r] / (1.f + std::exp(-gbuf[t][r]))) * ubuf[t][r];
++    } else {
++        float* ff[MAXT];
++        for (int t = 0; t < mjobs_[e].nt; ++t) ff[t] = sb.ff[t];
++        native_gu_rows(*nfmt, mjobs_[e].blob, mjobs_[e].nact, mjobs_[e].nt, ff, r0, r1);
++    }
++}
++
++void ExpertPool::native_quant_part(int e) {
++    SplitBufMulti& sb = split_multi_[(size_t) e];
++    for (int t = 0; t < mjobs_[e].nt; ++t)
++        if (q2_native_kernels(nfmt_->d_type)) act_quant_any(sb.ff[t], FF, sb.a2[t]);
++        else native_quant_h(*nfmt_, sb.ff[t], sb.hq[t]);
++}
++
++void ExpertPool::native_down_part(int e, int r0, int r1) {
++    SplitBufMulti& sb = split_multi_[(size_t) e];
++    const NativeFmt* const nfmt = mjobs_[e].fmt != nullptr ? mjobs_[e].fmt : nfmt_;
++    if (q2_native_kernels(nfmt->d_type)) {
++        const ActQ* a2[MAXT];
++        for (int t = 0; t < mjobs_[e].nt; ++t) a2[t] = &sb.a2[t];
++        q2_rows_any(mjobs_[e].blob + nfmt->down_off, nfmt->d_row, (int) (nfmt->n_ff / 64), a2,
++                    mjobs_[e].nt, mjobs_[e].out, r0, r1);
++    } else {
++        const void* hq[MAXT];
++        for (int t = 0; t < mjobs_[e].nt; ++t) hq[t] = sb.hq[t];
++        native_down_rows(*nfmt, mjobs_[e].blob, hq, mjobs_[e].nt, mjobs_[e].out, r0, r1);
++    }
++}
++
++void ExpertPool::run_fused_native(const NativeFmt& f, ExpertJobMulti* jobs, int n) {
++    // Keep upstream NUMA slice counters and its bounded batching unchanged.
++    if (numa_n_ > 0 || n <= 0 || n > kMaxSplitMulti) { run_split_multi_native(f, jobs, n); return; }
++    wait_parked("before a fused phase");
++    if (!fstate_) fstate_.reset(new FusedState[(size_t) kMaxSplitMulti]);
++    const auto t0 = std::chrono::steady_clock::now();
++    mjobs_ = jobs; nfmt_ = &f; fn_ = n;
++    const int threads = n_ + (host_works_ ? 1 : 0);
++    fa_ = (std::max)(1, (3 * threads + n - 1) / n); fb_ = fa_;
++    for (int e = 0; e < n; ++e) {
++        fstate_[(size_t) e].gu_done.store(0, std::memory_order_relaxed);
++        fstate_[(size_t) e].ready.store(0, std::memory_order_relaxed);
++    }
++    // The original epoch/CAS claim, done/parked and host-worker protocol remains.
++    run_phase(7, n * fa_ + n * fb_);
++    const double elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
++    ms_multi_gu += elapsed; ms_drain_ += elapsed;
++    multi_bytes += (int64_t) n * (int64_t) f.bytes; mode_ = 0;
++}
++
+ void ExpertPool::run(ExpertJob* jobs, int n) {
+     if (n <= 0) return;
+     if (n_ == 1) {   // no workers: run inline, so a single-core machine still produces a token
 diff --git a/src/kernels/cpu/pool_affinity_win.hpp b/src/kernels/cpu/pool_affinity_win.hpp
-index 6f0e4020..c5ac8e15 100644
+index 6f0e4020227a576269a07d5449cb05f936c020f9..c5ac8e1571bc67bb909b5e4fde25178eb1c7352e 100644
 --- a/src/kernels/cpu/pool_affinity_win.hpp
 +++ b/src/kernels/cpu/pool_affinity_win.hpp
 @@ -9,13 +9,14 @@
@@ -1647,7 +2107,7 @@ index 6f0e4020..c5ac8e15 100644
      target.Group = (WORD) (core / 64);
      target.Mask = KAFFINITY(1) << (core & 63);
 diff --git a/src/kernels/cuda/iq_kernels.cu b/src/kernels/cuda/iq_kernels.cu
-index d2f2e34e..b305ccd3 100644
+index d2f2e34e8f59262506dcbb33c6ef24afd1db3c83..b305ccd38925dca945da7e947f4c006f23419077 100644
 --- a/src/kernels/cuda/iq_kernels.cu
 +++ b/src/kernels/cuda/iq_kernels.cu
 @@ -5257,10 +5257,15 @@ void native_expert_grouped(const NativeExpertLayout& L, const unsigned long long
@@ -1671,7 +2131,7 @@ index d2f2e34e..b305ccd3 100644
          const dim3 gl((unsigned) ((L.n_embd + LDS_RB - 1) / LDS_RB), (unsigned) cap_groups);
          const size_t sh = (size_t) LDS_NT * (size_t) (L.n_ff / 32) * sizeof(block_q8_1);
 diff --git a/src/kernels/cuda/ple.cu b/src/kernels/cuda/ple.cu
-index f945ef3b..776c720a 100644
+index f945ef3b8dd8999e2721a993f0ad131d921eb90c..776c720a8fc8c7308557ef155ed91d5177c10425 100644
 --- a/src/kernels/cuda/ple.cu
 +++ b/src/kernels/cuda/ple.cu
 @@ -54,6 +54,8 @@ __global__ void history_advance_kernel(float* __restrict__ history, const float*
@@ -1684,7 +2144,7 @@ index f945ef3b..776c720a 100644
      return (uint16_t) (i >> 16);
  }
 diff --git a/src/ngram/ple_reader.cpp b/src/ngram/ple_reader.cpp
-index 9d2a0505..96351582 100644
+index 9d2a05051e504b36ac0f433f89a02910cec6d8b8..96351582b37fc5efa302ccc36c30b763ee0a9ddf 100644
 --- a/src/ngram/ple_reader.cpp
 +++ b/src/ngram/ple_reader.cpp
 @@ -347,12 +347,13 @@ bool PleReader::open(const std::string& path, uint64_t table_offset, uint64_t n_
@@ -1711,7 +2171,7 @@ index 9d2a0505..96351582 100644
      m.threaded = false;
      m.stop = false;
 diff --git a/src/prefill/kernels.cu b/src/prefill/kernels.cu
-index a4f56f10..b0d871dc 100644
+index a4f56f10cf9dc2211bcfef403de828a4205f72bb..b0d871dcd1b7b2688080ef722fb540ce53943814 100644
 --- a/src/prefill/kernels.cu
 +++ b/src/prefill/kernels.cu
 @@ -35,6 +35,8 @@ __device__ __forceinline__ float warp_max(float v) {
@@ -1724,7 +2184,7 @@ index a4f56f10..b0d871dc 100644
      return (uint16_t) (u >> 16);
  }
 diff --git a/src/prefill/prefill.cpp b/src/prefill/prefill.cpp
-index 6cb888e5..0ef5f24b 100644
+index 6cb888e50a4ed516a1bb90566d7140d1315dc372..0ef5f24b5ad61f615a331f3a2692c9bfb544c7bd 100644
 --- a/src/prefill/prefill.cpp
 +++ b/src/prefill/prefill.cpp
 @@ -3571,7 +3571,7 @@ bool Prefill::run_impl(const int64_t* tokens, int64_t n, int64_t pos0, std::stri
@@ -1748,7 +2208,7 @@ index 6cb888e5..0ef5f24b 100644
                          out[(size_t) i] = (uint16_t) (u >> 16);
                      }
 diff --git a/src/program/generate.cpp b/src/program/generate.cpp
-index 7bafd685..d207a614 100644
+index 7bafd685073a102d2ad099d623643615b6cffc1f..d207a614cd7622b77fd3f0b47928480e18e45bc2 100644
 --- a/src/program/generate.cpp
 +++ b/src/program/generate.cpp
 @@ -45,6 +45,7 @@
@@ -1880,7 +2340,7 @@ index 7bafd685..d207a614 100644
  #if defined(_WIN32)
                          const HANDLE self = GetCurrentThread();
 diff --git a/strata_control/procs.py b/strata_control/procs.py
-index b550c07b..bf12810b 100644
+index b550c07b64fe2e04a9739dfb84652e742ea95b23..bf12810b73df3c41686c97263def05abcafc9b60 100644
 --- a/strata_control/procs.py
 +++ b/strata_control/procs.py
 @@ -358,21 +358,27 @@ def orphans_of(engine_exe: str) -> list[Ident]:
@@ -1915,7 +2375,7 @@ index b550c07b..bf12810b 100644
                  except psutil.NoSuchProcess:
                      pass
 diff --git a/sycl/src/program/generate.cpp b/sycl/src/program/generate.cpp
-index 2a4db4d1..5a111ea4 100644
+index 2a4db4d163b2b57786253c359bf51906b1cee3db..5a111ea47accba1d81c821a9479e96fd2e74249d 100644
 --- a/sycl/src/program/generate.cpp
 +++ b/sycl/src/program/generate.cpp
 @@ -7694,7 +7694,12 @@ int main(int argc, char **argv) try {
@@ -1952,7 +2412,7 @@ index 2a4db4d1..5a111ea4 100644
                  std::fprintf(stderr, "strata serve: conversation cache: restored %lld tokens (%s) in %.1f ms; parked=%zu bytes=%zu\n",
 diff --git a/tests/cuda/bf16_nan_parity.cpp b/tests/cuda/bf16_nan_parity.cpp
 new file mode 100644
-index 00000000..39188efe
+index 0000000000000000000000000000000000000000..39188efefb740c88aeaaac98ddc3d9a0c1c63157
 --- /dev/null
 +++ b/tests/cuda/bf16_nan_parity.cpp
 @@ -0,0 +1,55 @@
@@ -2013,7 +2473,7 @@ index 00000000..39188efe
 +}
 diff --git a/tests/cuda/pascallama_mmq_screen.cpp b/tests/cuda/pascallama_mmq_screen.cpp
 new file mode 100644
-index 00000000..3d28f93d
+index 0000000000000000000000000000000000000000..3d28f93d165ca49e159a74979ca475e3c3e15439
 --- /dev/null
 +++ b/tests/cuda/pascallama_mmq_screen.cpp
 @@ -0,0 +1,182 @@
@@ -2201,7 +2661,7 @@ index 00000000..3d28f93d
 +}
 diff --git a/tests/cuda/sm61_graph_parity.cu b/tests/cuda/sm61_graph_parity.cu
 new file mode 100644
-index 00000000..ab1c4842
+index 0000000000000000000000000000000000000000..ab1c48426abceabd838348a7bf71140bc403c092
 --- /dev/null
 +++ b/tests/cuda/sm61_graph_parity.cu
 @@ -0,0 +1,25 @@
@@ -2232,7 +2692,7 @@ index 00000000..ab1c4842
 +}
 diff --git a/tests/platform/cpu_format_parity.cpp b/tests/platform/cpu_format_parity.cpp
 new file mode 100644
-index 00000000..3d43a868
+index 0000000000000000000000000000000000000000..3d43a868f80daa99d196d34cc4637a3b2a245099
 --- /dev/null
 +++ b/tests/platform/cpu_format_parity.cpp
 @@ -0,0 +1,181 @@
@@ -2417,9 +2877,113 @@ index 00000000..3d43a868
 +                kCases, kAbsTolerance, kRelTolerance, failures);
 +    return failures ? 1 : 0;
 +}
+diff --git a/tests/platform/cpu_pool_fused_parity.cpp b/tests/platform/cpu_pool_fused_parity.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..dbac7de23701175894f414854caf48a610e0f00c
+--- /dev/null
++++ b/tests/platform/cpu_pool_fused_parity.cpp
+@@ -0,0 +1,98 @@
++// Scheduling parity for the semantically ported StrataFast PR16.
++// No GPU/model, pinning, benchmark or timing-based assertions.
++#include "strata/kernels/cpu/pool.hpp"
++#include "strata/kernels/cpu/expert_layout.hpp"
++#include "ggml.h"
++#include "ggml-cpu.h"
++#include <algorithm>
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++#include <random>
++#include <string>
++#include <vector>
++
++namespace cpu = strata::kernels::cpu;
++constexpr int kH = 2560, kFF = 640;
++
++static int type(const char* name) {
++    for (int t = 0; t < GGML_TYPE_COUNT; ++t) {
++        const char* candidate = ggml_type_name((ggml_type) t);
++        if (candidate != nullptr && std::strcmp(candidate, name) == 0) return t;
++    }
++    return -1;
++}
++
++static void blob(const cpu::NativeFmt& f, std::vector<uint8_t>& bytes) {
++    std::mt19937 rng(12345);
++    std::normal_distribution<float> nd(0.f, 0.02f);
++    std::vector<float> row(kH), importance(kH, 1.f);
++    auto quant = [&](int kind, uint8_t* dst, int width) {
++        for (int i = 0; i < width; ++i) row[i] = nd(rng);
++        ggml_quantize_chunk((ggml_type) kind, row.data(), dst, 0, 1, width,
++                           ggml_quantize_requires_imatrix((ggml_type) kind) ? importance.data() : nullptr);
++    };
++    for (int i = 0; i < 2 * kFF; ++i) quant(f.gu_type, bytes.data() + i * f.gu_row, kH);
++    for (int i = 0; i < kH; ++i) quant(f.d_type, bytes.data() + f.down_off + i * f.d_row, kFF);
++}
++
++int main() {
++    ggml_cpu_init();
++    int cases = 0;
++    for (const char* gu : {"iq3_s", "q2_0", "q8_0"}) {
++        const char* down = std::strcmp(gu, "q8_0") == 0 ? "q8_0" : "q2_0";
++        cpu::NativeFmt f; std::string error;
++        if (!cpu::native_fmt(type(gu), type(down), kH, kFF, f, error)) {
++            std::fprintf(stderr, "format: %s\n", error.c_str()); return 1;
++        }
++        std::vector<uint8_t> weights(f.bytes); blob(f, weights);
++        auto padded = f; padded.up_off += 64; padded.down_off += 128; padded.bytes += 128;
++        std::vector<uint8_t> scattered(padded.bytes);
++        std::memcpy(scattered.data(), weights.data(), f.up_off);
++        std::memcpy(scattered.data() + padded.up_off, weights.data() + f.up_off, f.down_off - f.up_off);
++        std::memcpy(scattered.data() + padded.down_off, weights.data() + f.down_off, f.bytes - f.down_off);
++        std::vector<float> x(kH);
++        for (int i = 0; i < kH; ++i) x[i] = 0.1f * std::sin((float) i);
++        cpu::ActQ aq[3];
++        std::vector<std::vector<uint8_t>> native(3, std::vector<uint8_t>(cpu::kNativeActBytes));
++        for (int t = 0; t < 3; ++t) {
++            cpu::act_quant_any(x.data(), kH, aq[t]);
++            if (!cpu::q2_native_kernels(f.gu_type)) cpu::native_quant_act(f, x.data(), native[t].data());
++        }
++        for (int setup : {1, 4, 14, -4}) {
++            const int workers = std::abs(setup);
++            cpu::ExpertPool pool(workers, false, setup > 0);
++            for (int n : {0, 1, 4, 14, 97}) for (int nt : {1, 3}) {
++                std::vector<cpu::ExpertJobMulti> jobs(n);
++                std::vector<std::vector<float>> expected(n * nt, std::vector<float>(kH + 8, -777.f));
++                std::vector<std::vector<float>> actual = expected;
++                for (int e = 0; e < n; ++e) {
++                    auto& j = jobs[e]; j.nt = nt;
++                    j.blob = e % 2 ? scattered.data() : weights.data();
++                    j.fmt = e % 2 ? &padded : nullptr;
++                    for (int t = 0; t < nt; ++t) {
++                        j.act[t] = &aq[t]; j.nact[t] = native[t].data();
++                        j.out[t] = expected[e * nt + t].data();
++                    }
++                }
++                pool.run_split_multi_native(f, jobs.data(), n);
++                for (int round = 0; round < 3; ++round) {
++                    for (int e = 0; e < n; ++e) for (int t = 0; t < nt; ++t)
++                        jobs[e].out[t] = actual[e * nt + t].data();
++                    pool.run_fused_native(f, jobs.data(), n);
++                    for (int e = 0; e < n * nt; ++e) {
++                        if (std::memcmp(expected[e].data(), actual[e].data(), (kH + 8) * sizeof(float))) {
++                            std::fprintf(stderr, "mismatch %s/%s workers=%d n=%d nt=%d round=%d\n", gu, down, workers, n, nt, round);
++                            return 1;
++                        }
++                        for (int i = 0; i < kH; ++i) if (!std::isfinite(actual[e][i])) return 2;
++                        for (int i = kH; i < kH + 8; ++i) if (actual[e][i] != -777.f) return 3;
++                    }
++                    ++cases;
++                }
++            }
++        }
++    }
++    std::printf("cpu_pool_fused_parity: %d bitwise scheduling/reset/batching/offset cases passed\n", cases);
++    return 0;
++}
 diff --git a/tests/platform/no_cpu_pin_test.cpp b/tests/platform/no_cpu_pin_test.cpp
 new file mode 100644
-index 00000000..631691ca
+index 0000000000000000000000000000000000000000..631691ca42eb516e58a957e5b4e0399e570db7e2
 --- /dev/null
 +++ b/tests/platform/no_cpu_pin_test.cpp
 @@ -0,0 +1,245 @@
@@ -2670,7 +3234,7 @@ index 00000000..631691ca
 +}
 diff --git a/tests/platform/ple_reader_lifecycle.cpp b/tests/platform/ple_reader_lifecycle.cpp
 new file mode 100644
-index 00000000..1f78f556
+index 0000000000000000000000000000000000000000..1f78f55613ab3c579a54a816703b40c0190162ba
 --- /dev/null
 +++ b/tests/platform/ple_reader_lifecycle.cpp
 @@ -0,0 +1,127 @@
@@ -2803,7 +3367,7 @@ index 00000000..1f78f556
 +}
 diff --git a/tests/platform/windows_numa_arena_test.cpp b/tests/platform/windows_numa_arena_test.cpp
 new file mode 100644
-index 00000000..8f24a8d8
+index 0000000000000000000000000000000000000000..8f24a8d815cbc1ed5e172fba23b1561c1d1a7ee3
 --- /dev/null
 +++ b/tests/platform/windows_numa_arena_test.cpp
 @@ -0,0 +1,49 @@

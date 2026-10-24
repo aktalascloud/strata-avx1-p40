@@ -737,10 +737,12 @@ class CodexCompactionOverHttp(Server):
         self.assertIn("multi_agent_v1.spawn_agent", prompt[:prompt.index("<|im_end|>")])
         self.assertEqual(self.parser_tools[-1], None)    # the parser gets the request's tools: none
         self.assertEqual(r["tools"], [])
-        # the calls come back as for any request without tools: no namespace, no custom tool
-        outputs = [(o["type"], o["name"], o.get("namespace")) for o in r["output"]]
-        self.assertEqual(outputs, [("function_call", "multi_agent_v1.spawn_agent", None),
-                                   ("function_call", "apply_patch", None)])
+        # Security boundary: the compaction request supplies tools=[], so any
+        # model-emitted tool markup must not become executable tool calls. The
+        # kept tool definitions shape prompt history only, not this turn's authority.
+        outputs = [(o["type"], o["name"], o.get("namespace")) for o in r["output"]
+                   if o["type"] in ("function_call", "custom_tool_call")]
+        self.assertEqual(outputs, [])
         # the same request without Codex's metadata (upstream's behaviour): the same answer, but its prompt starts
         # differently, so the engine reads it from the start
         plain, code, r2 = self.compaction({})

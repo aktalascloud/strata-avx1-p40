@@ -248,6 +248,9 @@ public:
     void run_split_multi(ExpertJobMulti* jobs, int n);
     /// Plan v0.3 P6: the same for a native pack's layer (ggml-cpu arithmetic, `nact` activations).
     void run_split_multi_native(const NativeFmt& f, ExpertJobMulti* jobs, int n);
+    // StrataFast PR16 / Francesco Albano: identical native rows in one phase.
+    // NUMA-split pools and oversized batches retain the upstream two-phase path.
+    void run_fused_native(const NativeFmt& f, ExpertJobMulti* jobs, int n);
     static constexpr int kMaxSplitMulti = 96;
     /// run_split_multi's phases, accumulated ms: gate/up rows, the intermediate quantization, down rows.
     double ms_multi_gu = 0, ms_multi_q = 0, ms_multi_down = 0;
@@ -367,6 +370,15 @@ private:
     };
     const NativeFmt* nfmt_ = nullptr;
     std::vector<SplitBufMulti> split_multi_;
+    struct FusedState {
+        alignas(64) std::atomic<int> gu_done{0};
+        std::atomic<int> ready{0};
+    };
+    std::unique_ptr<FusedState[]> fstate_;
+    int fn_ = 0, fa_ = 1, fb_ = 1;
+    void native_gu_part(int e, int r0, int r1);
+    void native_quant_part(int e);
+    void native_down_part(int e, int r0, int r1);
     // STRATA_NUMA_SPLIT=1 (opt-in, Linux, exactly 2 nodes): in the native row phases (modes 5/6) every expert's rows
     // are cut into one slice per NUMA node (slice k = rows [per*k/2, per*(k+1)/2) of the gate/up or down matrix, the
     // part the resident complement places on node k in step B), and each node's threads claim and count on their own

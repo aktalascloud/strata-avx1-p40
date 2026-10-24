@@ -1158,7 +1158,9 @@ class OutputParser:
                 raw_name = rest[a + 10:b]
                 name = raw_name.strip()
                 name = self.aliases.get(name, name)
-                if raw_name != raw_name.strip() and name not in self.schemas:
+                if name not in self.schemas:
+                    # Only this request's declared, canonicalized names authorize tool events.
+                    self.ss = "blocked"
                     return out
                 self.scall = ToolCall(name=name, arguments={})
                 props = ((self.schemas.get(name) or {}).get("parameters") or {}).get("properties") or {}
@@ -1167,6 +1169,8 @@ class OutputParser:
                 args("{")
                 self.sp += b + 1
                 self.ss = "between"
+            elif self.ss == "blocked":
+                return out
             elif self.ss == "between":
                 stripped = rest.lstrip()
                 self.sp += len(rest) - len(stripped)
@@ -1533,7 +1537,7 @@ class OutputParser:
                 self.buf = self.buf[i + drop:]
                 batch, self.batch = self.batch, False
                 out += self._finish_call(body)
-                if batch and out[-1].kind == "tool_call":
+                if batch and out and out[-1].kind == "tool_call":
                     self.state, self.lead = "call", False
 
     def finish(self, reason: str | None = None) -> list[Event]:
@@ -1565,6 +1569,14 @@ class OutputParser:
             return out
         if self.state == "reasoning" and self.buf == THINK_END:   # the output ends on a held `</think>`: its end
             self.buf, self.state = "", "content"
+        if self.state == "call" and self.scall is None:
+            candidate = self.buf.lstrip()
+            if candidate.startswith(FUNC_START) and ">" in candidate:
+                name = candidate[len(FUNC_START):candidate.index(">")].strip()
+                if self.aliases.get(name, name) not in self.schemas:
+                    self.buf = ""
+                    self._reset_scan()
+                    return out
         if self.buf:
             # an unfinished call inside the reasoning (#804) is reasoning text, never a call
             kind = {"reasoning": "reasoning", "rcall": "reasoning", "content": "content"}.get(self.state, "content")
@@ -1580,6 +1592,10 @@ class OutputParser:
         name = raw_name.strip()
         name = self.aliases.get(name, name)
         bare, self.bare = self.bare, False
+        if name not in self.schemas:
+            self._reset_scan()
+            self.state, self.lead = "content", True
+            return []
         try:
             if raw_name != raw_name.strip() and name not in self.schemas:
                 raise ValueError("whitespace tool name is not declared")
