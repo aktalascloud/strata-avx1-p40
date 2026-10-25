@@ -1,44 +1,30 @@
 # Optional model backends
 
-These sources extend the fork; the released Qwen/P40 runtime remains the production default.
-No weights, model downloads, HTTP service, global SDK or driver installation is performed by these targets.
+Experimental source work; the released and running Qwen/P40 package remains separate.
+No model weights are downloaded, no profiles/tasks are activated and no live files are overwritten.
 
-| Engine | Models | Devices | MTP |
-| --- | --- | --- | --- |
-| Existing `strata` | Qwen3.8 Flash Next | Qualified P40 CUDA + CPU experts | Existing trained Q2 pack |
-| `strata-poly` | GLM5-next, Qwen35 MoE, Gemma4, DeepSeek4, LFM2 MoE, Flint | Experimental P40 CUDA + AVX1 experts | GLM/Qwen trained NextN; Gemma uses its separate assistant; other families are not native MTP |
-| `strata-ggml` | Architectures implemented by pinned GGML/llama library | CPU or Vulkan, including experimental Polaris | Reviewed native graphs: deepseek2/4, glm-dsa, qwen35/qwen35moe; compatible trained tensors required |
+| Engine | Scope | Predictor |
+| --- | --- | --- |
+| Existing `strata` | Qualified Qwen3.8/P40 + AVX1 experts | Existing Q2 MTP, two drafts |
+| `strata-poly` | Experimental GLM5-next/Qwen35 MoE CUDA sm61 + AVX1 experts | Compatible native NextN; other Poly assistants are not called MTP |
+| `strata-ggml` | GLM5-next, GLM-DSA, DeepSeek V4, Qwen35 on CPU/CUDA/Vulkan | Compatible native NextN; explicit required/off policy |
+| Existing `strata-dsv41` | Separate DeepSeek V4.1/Engram CUDA sm61 build experiment | Trained DSpark blocks; not NextN, pack/model/GPU checks pending |
+| RX5808GB | Vulkan + AVX1 CPU, explicit device and memory fitting | Hardware validation pending; no HIP gfx803 bypass |
 
-`--require-mtp` never falls back silently. It cannot create a prediction head absent from a model.
-The native Qwen3.8 MTP pack is not interchangeable with a GGUF NextN head or a GLM head.
-Model compatibility still needs real-model validation; RX580 has not been hardware-qualified here.
+The separate official model library is pinned to `b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea`.
+The production GGML/Pascal overlay keeps its original pin. Never apply its overlay to the new library mechanically.
+`--require-mtp` refuses missing/incompatible canonical heads; it cannot train a head or substitute another model's pack.
 
-## Source builds
+[API integration, source builds and local profile preparation](API-AND-MTP.md) · [Source-only fingerprints](source-manifest.json).
+CPU fixtures check real native drafts, rejection/partial/full acceptance, seeded sampling, repeated state reset,
+and normal/SSE OpenAI requests. These are not learned GLM/DeepSeek, GPU or speed results.
+Qwen's existing tokenizer and author effort templates are checked for exact equality; its runtime stays unchanged.
 
-The GGML adapter is embedded: no separate llama-server runtime is built or installed.
-Its exact dependency is Strata's existing `3cf03257f219afbe7334045ff7c6a06ac68c627d`.
+Poly uses current Strata kernels and the pinned Pascal build copy. Missing foreign slot/ID/fused APIs retain
+reference fallbacks; no speed gain is claimed. DSV41 compatibility changes only pinned build copies:
+const by-value descriptors, unreachable WMMA compile guards and the proper Clang CPU-detection runtime.
+All original ISA/SM/SRAM/runtime feature guards are retained. DSV41 stays OFF in production.
 
-```sh
-cmake -S backends/ggml -B build-ggml -DSTRATA_LLAMA_SOURCE=/path/to/pinned/llama.cpp -DSTRATA_DEVICE=vulkan -DGGML_CCACHE=OFF
-cmake --build build-ggml --target strata-ggml --parallel 12
-```
-
-Use an AVX1-safe compiler profile: O3, Ivy Bridge, no AVX2/FMA/F16C baseline and no fast-math.
-Vulkan needs a local SDK with `glslc` and SPIRV-Headers; neither a driver nor a global SDK is installed by this build.
-Device feature detection retains the F32 fallback; do not force FP16, integer-dot or cooperative-matrix features on Polaris.
-
-Poly targets are injected after the reviewed core's CMake configuration through `inject.cmake`.
-They use CUDA12.9/sm61, the existing Pascal build copy and current Strata kernels.
-Optional foreign slot/ID kernels currently take their documented per-matrix fallback; the missing fused RMS operation takes its separate reference operations.
-Those fallbacks have no claimed speed gain. GDN tensor-core prefill is not enabled on Pascal.
-
-Example engine arguments for a future compatible GLM file: `--model MODEL.gguf --serve --require-mtp --window 3 --lookup 0 --kv-whole --any-node --threads 14`.
-Check `--help`: these options differ from Qwen's `--spec 3`; KV q4_0 is not a universal Poly format.
-Do not substitute this example into an active production profile without complete API/tokenizer/parser and model qualification.
-
-## Provenance
-
-[Xolotl](https://github.com/Indras-Mirror/Xolotl), [PolyStrata](https://github.com/VecSzn/PolyStrata),
-[polaris-local-ai](https://github.com/AvilaCarlosDev/polaris-local-ai), [Project Maya](https://github.com/mw00/project-maya).
-Poly's exact origin, MIT license, compatibility diff and pre-build review are retained in `poly/`.
-Maya's Pascal/AVX guards, MTP state handling and issues are reviewed separately; its speed reports are not measurements of this fork.
+Sources: [Strata](https://github.com/Niko1221/Strata), [Xolotl](https://github.com/Indras-Mirror/Xolotl),
+[PolyStrata](https://github.com/VecSzn/PolyStrata), [Maya](https://github.com/mw00/project-maya),
+[polaris-local-ai](https://github.com/AvilaCarlosDev/polaris-local-ai). Licenses, origins and reviews are retained.

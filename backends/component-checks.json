@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "status": "experimental_source_and_CPU_checked",
+  "regression": {
+    "tests": 400,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 6
+  },
+  "family_tests": {
+    "tests": 26,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "profile_tests": 9,
+  "protocol_cases_per_ggml_backend": 15,
+  "native_MTP_cases": [
+    "rejection",
+    "partial",
+    "full",
+    "seeded_sampling"
+  ],
+  "real_CPU_worker_OpenAI_normal_and_SSE": true,
+  "existing_Qwen_tokenizer_and_author_templates_equal": true,
+  "author_DS4_templates_checked": 2,
+  "unchanged_server_functions": 321,
+  "binaries": {
+    "ggml-cpu": {
+      "sha256": "1511c2e3340cb01dbaabc99269cc5f74dcdd50f07dc2018a98d7dbb979379491",
+      "imports": [
+        "ADVAPI32.dll",
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "SHELL32.dll",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "WS2_32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libomp.dll"
+      ],
+      "GLM5Next_compiled": true
+    },
+    "ggml-vulkan": {
+      "sha256": "9293e1dd8163c7650e2cc7681e6b6e5466e7a5233ab20c5d66d9e62bb9c92a75",
+      "imports": [
+        "ADVAPI32.dll",
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "SHELL32.dll",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "WS2_32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libomp.dll",
+        "vulkan-1.dll"
+      ],
+      "GLM5Next_compiled": true
+    },
+    "ggml-cuda": {
+      "sha256": "ee8adb1150cdc6ab0e07aee8b37c21e6a1a9548c2b91013e2aec718e657c555a",
+      "imports": [
+        "ADVAPI32.dll",
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "SHELL32.dll",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "WS2_32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "cublas64_12.dll",
+        "cudart64_12.dll",
+        "libomp.dll",
+        "nvcuda.dll"
+      ],
+      "GLM5Next_compiled": true
+    },
+    "poly-cuda": {
+      "sha256": "803726ba8ed1fda83fbb0474d20d182e9c6d2374b61dddf77aedb1d56524f20b"
+    },
+    "dsv41-cuda": {
+      "sha256": "ad13d51dfffa7043d9125cdab442277b561291ce529879c5961498064a8b162d",
+      "prediction": "DSpark, not native NextN",
+      "compile_startup_only": true
+    }
+  },
+  "compile_audit": {
+    "cpu": {
+      "cpu_commands": 130,
+      "cuda_commands": 0,
+      "IVY_O3": true,
+      "no_AVX2_FMA_F16C_baseline": true
+    },
+    "vulkan": {
+      "cpu_commands": 288,
+      "cuda_commands": 0,
+      "IVY_O3": true,
+      "no_AVX2_FMA_F16C_baseline": true
+    },
+    "cuda": {
+      "cpu_commands": 130,
+      "cuda_commands": 144,
+      "IVY_O3": true,
+      "no_AVX2_FMA_F16C_baseline": true
+    }
+  },
+  "poly_CPU_checks": {
+    "poly_workers_test": "workers_test: 4000 checks passed",
+    "poly_guesses_test": "guesses_test: 7 checks passed",
+    "poly_conversations_test": "conversations_test: 54950 checks passed"
+  },
+  "production_changed": false,
+  "trained_model_qualified": false,
+  "gpu_numerical_qualified": false,
+  "rx580_hardware_qualified": false,
+  "model_downloads": false,
+  "speed_benchmark": false,
+  "limits": "Untrained CPU fixtures are not GLM/DeepSeek quality or speed measurements. RX580 absent. DSV41 stays OFF; new owner/model/GPU qualification required before deployment."
+}

@@ -9,11 +9,14 @@
 | Model / GPU | Backend | Status |
 | --- | --- | --- |
 | Qwen3.8 Flash Next / P40 | Strata CUDA + CPU experts | Verified; MTP Q2, two draft tokens |
-| GLM 5.3 Flash (`glm5-next`) | Optional Poly CUDA | Experimental; trained NextN head required |
-| GLM-DSA, DeepSeek V3/V4 | Embedded GGML CPU / Vulkan | Experimental; MTP needs compatible NextN tensors |
+| GLM 5.3 Flash (`glm5-next`) | Poly CUDA / GGML CPU, CUDA, Vulkan | Experimental; trained NextN head required |
+| GLM-DSA, DeepSeek V4 | Embedded GGML CPU / CUDA / Vulkan | Experimental; MTP needs compatible NextN tensors |
+| DeepSeek V4.1 / Engram | Separate DSV41 CUDA | Build/startup checked on AVX1; DSpark/model/GPU qualification pending |
 | Polaris / RX580 8 GB | Embedded GGML Vulkan + AVX1 CPU | Experimental; not tested on RX580 hardware |
 
 **MTP needs a compatible trained head.** Strict MTP requests fail when it is unavailable; repetition lookup and external assistants are not called native MTP. The Poly DeepSeek V4 path has no MTP graph; a compatible GGML path is required. No new weights are downloaded for development. RX580 uses Vulkan, not modern HIP; its 8 GB needs model-specific CPU offload.
+
+[API/MTP checks and source instructions](backends/API-AND-MTP.md). Compilation and CPU fixtures do not establish trained-model or RX580 qualification.
 
 Sources: [Xolotl](https://github.com/Indras-Mirror/Xolotl), [PolyStrata](https://github.com/VecSzn/PolyStrata), [polaris-local-ai](https://github.com/AvilaCarlosDev/polaris-local-ai) · [Project Maya](https://github.com/mw00/project-maya).
 

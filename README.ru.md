@@ -9,11 +9,14 @@
 | Модель / GPU | Бэкенд | Состояние |
 | --- | --- | --- |
 | Qwen3.8 Flash Next / P40 | Strata CUDA + эксперты на CPU | Проверено; MTP Q2, два draft-токена |
-| GLM 5.3 Flash (`glm5-next`) | Дополнительный Poly CUDA | Экспериментально; нужна обученная NextN-голова |
-| GLM-DSA, DeepSeek V3/V4 | Встроенный GGML CPU / Vulkan | Экспериментально; MTP требует совместимых NextN-тензоров |
+| GLM 5.3 Flash (`glm5-next`) | Poly CUDA / GGML CPU, CUDA, Vulkan | Экспериментально; нужна обученная NextN-голова |
+| GLM-DSA, DeepSeek V4 | Встроенный GGML CPU / CUDA / Vulkan | Экспериментально; MTP требует совместимых NextN-тензоров |
+| DeepSeek V4.1 / Engram | Отдельный DSV41 CUDA | Сборка и старт на AVX1 проверены; DSpark/модель/GPU ещё не квалифицированы |
 | Polaris / RX580 8 ГБ | Встроенный GGML Vulkan + AVX1 CPU | Экспериментально; на самой RX580 ещё не проверено |
 
 **Для MTP нужна совместимая обученная голова.** Строгий запрос MTP отклоняется, если её нет; поиск повторов и отдельная вспомогательная модель не называются нативным MTP. В пути Poly для DeepSeek V4 графа MTP нет; для него нужен совместимый путь GGML. Новые веса для разработки не скачиваются. RX580 использует Vulkan, а не современный HIP; для 8 ГБ нужна выгрузка части вычислений на CPU.
+
+[Проверки API/MTP и инструкции](backends/API-AND-MTP.md). Компиляция и CPU-фикстуры не заменяют проверку обученных моделей и RX580.
 
 Источники: [Xolotl](https://github.com/Indras-Mirror/Xolotl), [PolyStrata](https://github.com/VecSzn/PolyStrata), [polaris-local-ai](https://github.com/AvilaCarlosDev/polaris-local-ai) · [Project Maya](https://github.com/mw00/project-maya).
 

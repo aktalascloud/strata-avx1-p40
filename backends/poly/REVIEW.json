@@ -44,7 +44,7 @@
   },
   "qualification": "Pending; compile-only and synthetic checks are not real-model qualification",
   "files": {
-    "compatibility.patch": "7d45cb1d3200c7c705d69d36bf16eb98de567e9a0d9ddad3b6f3c68acd2f33fa",
+    "compatibility.patch": "f2ae10e5243fc7a0cf70a7984a70725c18c62456c977837299aaa26d0b033df2",
     "LICENSE": "f93600213c509b193a55ee9afb34b63582828911c289f907863e0d3acc8be0d3",
     "ORIGIN.json": "896835ca7347186c299c46797652c83f0180eb6939af4ec164ba02d5e190db22",
     "src/poly/attend_test.cu": "9e7e7d68cb609216af22bdd9f24a5040d062bfe0e282976efa81bb9c643fbd64",
@@ -78,7 +78,7 @@
     "src/poly/legacy_mmvq.hpp": "a75cf676d253a6f25d3299a97d928b6c2e0be335cdc49293de64884f9d95df89",
     "src/poly/lfm2moe.cpp": "80cffb73017ebfa8816615e57783775779f7287ae189ca06f0223dedf768cfe2",
     "src/poly/lfm2moe.hpp": "c035a0413ecbba18faa4bda513b2b3ad765e75facdc985f94d1ac70c4d68d998",
-    "src/poly/main.cpp": "38f9c026d8c169ee0f6772bf4fccb40103e268801fb2d675b10286a428c00de5",
+    "src/poly/main.cpp": "179e31583e4818da82ce1bd28fe478b30a11155fc321afc84da63853cd493e7b",
     "src/poly/mmq.cu": "98a6bef2f606ecc5127b27bc87fc0b0a0ba1078265a639c1e680fb3d807d44ea",
     "src/poly/mmq.hpp": "8b200c26e4196f82df2d2b9b80ddb3c6bd1657d4597dda8f0b7e3b2ad52b1a09",
     "src/poly/norm_q8_test.cu": "bf64c6a03c0ae6b503242c27bf75d2e909b659fae8cd91cf63982b0c458546a0",

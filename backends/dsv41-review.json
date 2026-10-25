@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "source": "Niko1221/Strata@7dd5cf18e68c639a8773e096c5c79f971ea2a9f5 plus the unchanged qualified native aggregate",
+  "scope": "Isolated STRATA_BUILD_DSV41 build, never enable it in the active Qwen recipe",
+  "pascal_compatibility": "Pinned moe_win.cu SHA9ddae29b4814c808733db7851db51e4c5806f017d610d1be479a2a41ee0a896e has one unguarded __grid_constant__ argument qualifier, supported only on sm70+. A build-copy feature guard keeps the original const by-value descriptor on sm61. Only thread0 consumes it; no descriptor mutation, math or launch-size change. The original source and all ISA/SM/SRAM guards remain untouched.",
+  "iq_compatibility": "Pinned ds4_iq.cu SHA515bbf415f5765c6288e33322fdedaf2af46a11c6a7eca5ac1566b64f0c48416 already dispatches tensor cores only when major>=7; its WMMA body nevertheless failed compilation on sm61. Guard only that unreachable body with CUDA_ARCH>=700 in the build copy. Preserve the host major>=7 guard, original F32 fallback, all weights/math and every other function.",
+  "gguf_compatibility": "Apply the same compile-only WMMA namespace/body guards to MXFP4 ds4_gguf.cu SHAd0d368e04d19f1f5b8107432f5438e233f609e7d3fcb370dd21388c202f6639f. Its existing tc_ok requires major>=7; Pascal retains its original F32 path. Source pins, host checks, unique anchors and target-source counts are mandatory.",
+  "link_compatibility": "NVCC's final MSVC linker omits Clang's __cpu_model/__cpu_indicator_init runtime. Link the configured compiler's clang_rt.builtins-x86_64.lib from its reported resource directory, preserving the vendor CPU feature checks. Do not remove dispatch guards or hardcode AVX2 availability.",
+  "review": "Existing DeepSeek-V4.1 path includes direct GGUF/Engram loading, CPU expert lanes and a pre-sm80 EXL3 legacy kernel. Compile with the existing explicit sm61 experimental path, CUDA12.9 and Ivy Bridge O3; retain all ISA/SM/SRAM guards.",
+  "speculation": "Its checkpoint mtp.* blocks implement DSpark. Keep that distinct from GLM/Qwen native NextN and from lookup guesses. Do not silently use dspark_auto to satisfy an explicit predictor requirement.",
+  "limits": "Compile/startup experiment only. No pack/weights, trained predictor, numerical GPU, throughput or production qualification. The active DSV41 setting stays OFF.",
+  "semantic_reviewed_for_compile_experiment": true
+}

@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "repository": "ggml-org/llama.cpp",
+  "source_sha": "b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea",
+  "base_source_sha": "3cf03257f219afbe7334045ff7c6a06ac68c627d",
+  "scope": "Separate experimental model library, never a replacement for the production Qwen GGML/Pascal overlay",
+  "feature": "Official GLM5Next native NextN graph, merged PR29928; CPU/Vulkan/CUDA device scheduling",
+  "reviewed_components": ["GLM5Next trunk/MTP graph and hybrid-indexer state", "common native speculative driver and checkpoint API", "AVX-only CPU build options", "Vulkan runtime feature selection and F32 fallback"],
+  "limits": "Upstream contains 412 commits after the production dependency. This is component-scoped review, not approval of every unrelated model or commit. No trained-model or RX580 qualification is implied.",
+  "requirements": ["Clean exact source checkout and recorded file hashes", "O3 Ivy Bridge without AVX2/FMA/F16C baseline", "No native CPU auto tuning or all-variants constructor", "No forced unsupported Vulkan features", "No downloads of model weights or source setup execution", "Synthetic numerical/protocol checks before use", "Full hardware/model/API gates before production deployment"],
+  "semantic_reviewed_for_experimental_build": true
+}
