@@ -1,54 +1,34 @@
-# Strata · AVX1 / Tesla P40
+# Strata Legacy GPU
 
-[English](README.md) · [Русский](README.ru.md) · [Скачать](https://github.com/aktalascloud/strata-avx1-p40/releases/latest)
+[English](README.md) · [Русский](README.ru.md) · [Релиз Windows](https://github.com/aktalascloud/strata-legacy-gpu/releases/latest)
 
-Windows-сборка [Strata](https://github.com/Niko1221/Strata) для **Xeon Ivy Bridge и Tesla P40 (sm_61)**. Движок **0.1.49.3**, официальные исходники [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5). Проверенные патчи, воспроизводимые замеры, переносимая среда запуска.
+[Strata](https://github.com/Niko1221/Strata) для **AVX1/Ivy Bridge и Tesla P40 (sm_61)**. Проверенный движок **0.1.49.3**, официальная основа [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5). Текущий ZIP — проверенный пакет **Qwen/P40**; новые адаптеры пока экспериментальные.
 
-Тестовая модель: **DavidAU Qwen3.8-Flash-Next IQ3_S**, MTP Q2, изображения на CPU. В архиве нет весов, ключей, личных настроек, логов, кэшей, SDK и компиляторов.
+## Модели, бэкенды и MTP
 
-## До / после
+| Модель / GPU | Бэкенд | Состояние |
+| --- | --- | --- |
+| Qwen3.8 Flash Next / P40 | Strata CUDA + эксперты на CPU | Проверено; MTP Q2, два draft-токена |
+| GLM 5.3 Flash (`glm5-next`) | Дополнительный Poly CUDA | Экспериментально; нужна обученная NextN-голова |
+| GLM-DSA, DeepSeek V3/V4 | Встроенный GGML CPU / Vulkan | Экспериментально; MTP требует совместимых NextN-тензоров |
+| Polaris / RX580 8 ГБ | Встроенный GGML Vulkan + AVX1 CPU | Экспериментально; на самой RX580 ещё не проверено |
 
-| Генерация | Первая установка | Свежий замер |
-|---|---|---|
-| Движок, токенов/с | 16,45 | 48,77 |
-| Полный API-запрос, токенов/с | 11,65 | 44,65 |
+**Для MTP нужна совместимая обученная голова.** Строгий запрос MTP отклоняется, если её нет; поиск повторов и отдельная вспомогательная модель не называются нативным MTP. В пути Poly для DeepSeek V4 графа MTP нет; для него нужен совместимый путь GGML. Новые веса для разработки не скачиваются. RX580 использует Vulkan, а не современный HIP; для 8 ГБ нужна выгрузка части вычислений на CPU.
 
-Последний замер: **2026-10-25**, движок **0.1.49.3**, бинарник `45B99DC2`, исходники `7dd5cf18e68c`. Закэшированный контекст 4К: **50,15** токена/с в движке, **45,48** через полный API.
+Источники: [Xolotl](https://github.com/Indras-Mirror/Xolotl), [PolyStrata](https://github.com/VecSzn/PolyStrata), [polaris-local-ai](https://github.com/AvilaCarlosDev/polaris-local-ai) · [Project Maya](https://github.com/mw00/project-maya).
 
-Первая установка: сохранённый исторический замер одного холодного ответа, 64 токена, 32К/FP16, без MTP и reasoning; сток заново не запускался. Последний результат: медиана 3 прогретых ответов по 128 токенов после 2 прогревов; 128К/Q4, MTP Q2, xhigh, temperature 0, seed 12345. Режимы различаются: это историческое сравнение, не одновременный A/B и не изолированный прирост от патча. Скорость при заполненных 128К не измерена.
+## Замеры Qwen / P40
 
-Контрольные опыты подтвердили вклад CPU (14 потоков: +3,307%; NUMA 0: +1,454%) и GPU (IQ/QFUSE/GR: +5,101%; B6/EXPDEC: +2,793%). Это отдельные сравнения всей модели на `011c9e6`; проценты не складываются. Промежуточные релизы и таблицы перебора не публикуются.
+**16.45 → 48.77 токена/с** в движке; полный API: 11.65 → 44.65. Замер 2026-10-25, движок 0.1.49.3, `45B99DC2`. Исторический холодный ответ без MTP против прогретого MTP/xhigh: разные режимы, не одновременный A/B. Полные 128К и новые модели не измерены. [Методика и доказательства CPU/GPU](p40/BENCHMARKS.md).
 
-[Доказательства и методика](p40/BENCHMARKS.md) · [JSON](p40/results/benchmarks.json)
+## Быстрый запуск Windows
 
-## Установка
+1. Скачайте ZIP и `SHA256SUMS.txt` из [Releases](https://github.com/aktalascloud/strata-legacy-gpu/releases), проверьте SHA-256 и распакуйте.
+2. Нужен совместимый с Pascal драйвер NVIDIA с поддержкой CUDA 12.9. Запустите **`INSTALL.cmd`**, затем **`START.cmd`**. GGUF/mmproj/MTP загружаются с **докачкой и SHA-256**, без исходного checkpoint. Около **85,6 ГБ загрузки / 100 ГБ на диске**.
+3. Панель: `http://127.0.0.1:8093/`; OpenAI API: `http://127.0.0.1:8093/v1`. **`STOP.cmd`** штатно завершает запросы; **`CHECK.cmd`** проверяет пакет без загрузки весов. **`AUTOSTART.cmd`** регистрирует независимые задачи Windows для запуска и управления; Codex не требуется.
 
-1. Скачайте ZIP и `SHA256SUMS.txt` из [Releases](https://github.com/aktalascloud/strata-avx1-p40/releases). Проверьте `Get-FileHash -Algorithm SHA256`; распакуйте в папку с коротким путём, например `C:\Strata-P40`.
-2. Установите совместимый с P40 драйвер NVIDIA с поддержкой CUDA 12.9. Запустите **`INSTALL.cmd`**; разрешите повышение прав для задач автозапуска и управления этой установкой.
-3. Установщик скачает закреплённые GGUF, mmproj и MTP с **докачкой и SHA-256**, затем создаст pack прямо из GGUF. Исходный checkpoint не нужен. Загрузка: примерно **85,6 ГБ**; требуется около **100 ГБ диска**. Системы с меньшим объёмом RAM/VRAM отдельно не проверены.
-4. Запустите **`START.cmd`**. Панель: `http://127.0.0.1:8093/`; OpenAI API: `http://127.0.0.1:8093/v1`. **`STOP.cmd`** штатно завершает принятые запросы и сервер.
+Профиль: **128К / KV q4_0 / авторский xhigh / MTP Q2 / `--spec 3` / 14 потоков / PLE RAM / CPU vision**. Дополнительно: `INSTALL.cmd --models-dir D:\Models --port 8094`; `--numa-node 0` выбирайте после проверки топологии.
 
-**Автозапуск независим от Codex:** задача Windows стартует через 45 секунд после загрузки ОС, до входа пользователя. `AUTOSTART.cmd` повторно регистрирует задачи; `CHECK.cmd` проверяет пакет без сервера и загрузки весов. Разные папки получают разные имена задач.
+CPU: Clang **O3, `-march=ivybridge -mtune=ivybridge`**, базовый путь без AVX2/FMA/F16C, строгая FP. GPU: **CUDA 12.9, O3, sm_61**; host MSVC `/O2 /Ob3 /favor:INTEL64 /fp:precise`. Применены исправления AVX1/управления/NUMA, Pascal MMQ I64/J96, B6, EXPDEC, IQ staging, QFUSE/GR и проверенные исправления кэша/prefill. [Патчи](p40/PATCHES.md) · [Границы проверки](p40/INSTALLATION-VERIFICATION.md).
 
-```bat
-INSTALL.cmd --workers 14 --numa-node 0
-```
-
-Выбирайте NUMA 0 только после проверки узла своей GPU; по умолчанию предпочтение выключено. `--models-dir` задаёт папку весов, `--port 8094` — свободный порт новой установки. Существующие настройки сохраняются. После переноса папки заново создайте локальную конфигурацию и зарегистрируйте задачи для нового пути.
-
-## Сборка и параметры
-
-| CPU | CUDA / P40 |
-|---|---|
-| Clang 23.1.4, `-O3 -march=ivybridge -mtune=ivybridge` | CUDA 12.9, `-O3`, `CMAKE_CUDA_ARCHITECTURES=61` |
-| Базовый код без AVX2/FMA/F16C, строгая FP | MSVC host: `/O2 /Ob3 /favor:INTEL64 /fp:precise` |
-
-[Основной патч](p40/patches/native-ivybridge-p40.patch) **уже применён**; широкие CPU-ядра сохраняют проверки ISA. [Pascal MMQ](p40/patches/pascallama-sm61.patch) изменяет только отдельную копию закреплённого GGML. Профиль: **128К, KV q4_0, xhigh, MTP Q2/два draft-токена (`--spec 3`), prefill 512, PLE RAM, PCIe auto, изображения на CPU**, B6=1/EXPDEC=1/R=1, I64/J96 и четыре IQ/GR-флага.
-
-PGO, ThinLTO, дополнительная CUDA-векторизация и I128 проиграли в контрольных сравнениях. DenseF32 оставлен экспериментально: наблюдавшиеся +0,12% prefill не доказывают ускорение. Пропуск экспертов, affinity, питание и частоты не меняются.
-
-[Изменения версии](p40/CHANGES.md) · [Исправления и авторы](p40/COMMUNITY-FIXES.md) · [Внешние источники](p40/RESEARCH.md) · [Проверка установки и её границы](p40/INSTALLATION-VERIFICATION.md)
-
-## Лицензии
-
-Strata и изменения исходников сохраняют уведомления **MIT**. Для зависимостей действуют собственные условия: [лицензии компонентов](THIRD_PARTY_NOTICES.md). Microsoft VC Runtime загружается прямо у Microsoft с проверкой подписи. Лицензии моделей действуют отдельно: [GGUF](https://huggingface.co/DavidAU/Qwen3.8-Flash-Next-Abliterated-Uncensored-Turbo-Brilliance-50x-Reasoning-Instruct-GSQ-RCO-GGUF), [MTP](https://huggingface.co/Maximilian228/Qwen3.8-Flash-Next-NVFP4-GPTQ-Strata). Независимая общественная сборка, без одобрения авторов Strata, NVIDIA или Microsoft.
+Уведомления MIT и условия зависимостей: [лицензии](THIRD_PARTY_NOTICES.md). VC Runtime получается у Microsoft с проверкой подписи; лицензии моделей действуют отдельно. В релизе нет весов, ключей, приватных настроек, логов, кэшей и компиляторов.

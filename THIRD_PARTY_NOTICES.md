@@ -30,3 +30,7 @@ Official terms:
 - LLVM:https://github.com/llvm/llvm-project/blob/main/LICENSE.TXT
 
 This package contains no model license grant. Review each pinned Hugging Face repository before downloading.
+
+## Optional experimental source
+
+PolyStrata source retains its MIT license and origin in `backends/poly/`. The GGML adapter links the existing MIT library. These experimental engines are excluded from the current binary release and have not received trained-model, GPU numerical or RX580 hardware qualification. Research attribution: Xolotl, Project Maya and polaris-local-ai; see `backends/README.md`.

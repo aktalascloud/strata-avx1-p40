@@ -1,0 +1,234 @@
+--- a/src/poly/main.cpp
++++ b/src/poly/main.cpp
+@@ -1038,7 +1038,7 @@
+                  "                         exit and by --serve after an answer, every 10 s at most\n"
+                  "  --no-gpu-experts       keep every routed expert on the CPU\n"
+                  "  --any-node             on a PC with several NUMA nodes, let the CPU threads run on any of them\n"
+-                 "                         (default: on the node whose memory holds most of the experts)\n"
++                 "                         (default: no forced CPU affinity)\n"
+                  "  --window N             the most tokens that go through the model at once while an answer is\n"
+                  "                         written: the one that is known and guesses at the ones after it, which\n"
+                  "                         count when they turn out right (1 = no guesses; default 8, of which\n"
+@@ -1046,6 +1046,7 @@
+                  "  --lookup N             guess what followed an earlier repeat of the last N or more tokens\n"
+                  "                         (default 3, 0 = never)\n"
+                  "  --no-draft             do not run the block that guesses ahead\n"
++                 "  --require-mtp          fail if a compatible trained draft head or usable window is absent\n"
+                  "  --draft-model FILE     a file of the same model to take that block from, when --model has none;\n"
+                  "                         for Gemma 4, its draft model (a gemma4-assistant file)\n"
+                  "  --draft-vocab N        the block guesses among the vocabulary's first N tokens (default:\n"
+@@ -1125,11 +1126,19 @@
+ }
+ 
+ int main(int argc, char** argv) {
+-    no_power_throttling();
++    if (argc == 2 && std::string(argv[1]) == "--help") { usage(); return 0; }
++    if (argc == 2 && std::string(argv[1]) == "--version") {
++        std::printf("strata-poly experimental (PolyStrata c174f35 + legacy compatibility)\n"); return 0;
++    }
++    if (argc == 2 && std::string(argv[1]) == "--capabilities") {
++        std::printf("{\"backend\":\"cuda\",\"native_mtp_architectures\":[\"glm5-next\",\"qwen35moe\"],\"universal_mtp\":false,\"model_downloads\":false}\n"); return 0;
++    }
++    // Host policy belongs to the operator; this backend never changes power settings.
+     Options o;
+     CacheFlags cache;
+     Sampling s;
+     bool want_serve = false;
++    bool require_mtp = false;
+     long long max_new = 32;
+     int top_probs = 0, lookup = 3, image_pad = -1, check = 0;
+     std::string images;
+@@ -1145,6 +1154,7 @@
+         };
+         if (a == "--model") o.model = val();
+         else if (a == "--serve") want_serve = true;
++        else if (a == "--require-mtp") require_mtp = true;
+         else if (a == "--max-context") o.max_context = std::atoi(val());
+         else if (a == "--threads") o.threads = std::atoi(val());
+         else if (a == "--vram-reserve-mib") o.vram_reserve_mib = std::atoi(val());
+@@ -1239,6 +1249,9 @@
+         const Clock::time_point t0 = Clock::now();
+         loaded = Engine::open(o);
+         Engine& engine = *loaded;
++        if (require_mtp && (!engine.native_mtp() || engine.max_window() < 2)) {
++            throw std::runtime_error("MTP_REQUIRED: this model has no supported trained draft head, or its draft window is disabled; supply a matching --draft-model or explicitly use --no-draft without --require-mtp");
++        }
+         std::fprintf(stderr, "strata-poly: loaded in %.1f s; %d of %d routed experts in VRAM (%.1f GiB), %d CPU threads\n",
+                      ms_since(t0) / 1000.0, engine.cached_experts(), engine.total_experts(), engine.cached_gib(),
+                      engine.threads());
+--- a/src/poly/engine.cpp
++++ b/src/poly/engine.cpp
+@@ -11,7 +11,7 @@
+ #include "qwen35.hpp"
+ #include "runtime.hpp"
+ #include "strata/poly/kernels.hpp"
+-#include "strata/kernels/native_mmvq.hpp"
++#include "legacy_mmvq.hpp"
+ 
+ #include "ggml.h"
+ 
+--- a/src/poly/engine.hpp
++++ b/src/poly/engine.hpp
+@@ -71,7 +71,7 @@
+                                   ///< below 0: as the two took the time between them; 0: none
+     int expert_swaps = 64;        ///< experts on their way into the cache at a time while an answer is written, each
+                                   ///< to the slot of one the answer uses less; 0: the cache stays as it was loaded
+-    bool stay_near = true;        ///< with several NUMA nodes, keep the CPU threads on the one that holds the experts
++    bool stay_near = false;       ///< opt-in NUMA affinity; this portable backend preserves the host's CPU policy
+     bool graphs = true;           ///< a token's fixed launches are recorded once, a CUDA graph a layer, and replayed
+     bool kv_grow = true;          ///< the attention caches get VRAM as the sequence grows, where the card can map it
+                                   ///< so; false: for the whole context at load, as the expert cache gets the rest
+@@ -260,6 +260,8 @@
+     /// context.  logits() is left alone.  An architecture may guess with a small model of its own instead of a
+     /// block (draft_step()); the calls are the same.
+     bool drafts() const { return next_ ? next_->drafts() : draft_; }
++    /// An architecture's own NextN block, excluding a separate assistant model.
++    bool native_mtp() const { return next_ ? next_->native_mtp() : draft_ && block_layer_; }
+     /// Test only: the calls read()'s layer-major path gave the draft block's rows (draft_rows()) on the card that has
+     /// the block, since load.  Two or more in one read are back-to-back refills of its pinned input rows.
+     int64_t read_draft_calls_for_test() const { return next_ ? next_->read_draft_calls_for_test() : read_draft_calls_; }
+--- a/src/poly/deepseek4.cpp
++++ b/src/poly/deepseek4.cpp
+@@ -3,7 +3,7 @@
+ #include "deepseek4.hpp"
+ 
+ #include "runtime.hpp"
+-#include "strata/kernels/native_mmvq.hpp"
++#include "legacy_mmvq.hpp"
+ 
+ #include "ggml.h"
+ 
+--- a/src/poly/lfm2moe.cpp
++++ b/src/poly/lfm2moe.cpp
+@@ -4,7 +4,7 @@
+ 
+ #include "runtime.hpp"
+ #include "strata/poly/kernels.hpp"
+-#include "strata/kernels/native_mmvq.hpp"
++#include "legacy_mmvq.hpp"
+ 
+ #include <algorithm>
+ #include <cmath>
+--- a/src/poly/flint.cpp
++++ b/src/poly/flint.cpp
+@@ -4,7 +4,7 @@
+ 
+ #include "runtime.hpp"
+ #include "strata/poly/kernels.hpp"
+-#include "strata/kernels/native_mmvq.hpp"
++#include "legacy_mmvq.hpp"
+ 
+ #include <algorithm>
+ #include <cmath>
+--- a/src/poly/kernels.cu
++++ b/src/poly/kernels.cu
+@@ -1,6 +1,7 @@
+ // src/poly/kernels.cu - see the header.  The reference for every formula is llama.cpp's graph of the model and the
+ // ggml ops it builds.  Where a kernel takes several tokens, blockIdx.y is the token unless it says otherwise.
+ #include "strata/poly/kernels.hpp"
++#include "strata/kernels/dp4a.hpp"
+ #ifdef STRATA_POLY_GDN_MMA
+ #include "gdn_mma.hpp"
+ #include "strata/kernels/gdn_mma_policy.hpp"
+@@ -2449,7 +2450,7 @@
+     const half* a = (const half*) p;
+     cublasGemmStridedBatchedEx(h, CUBLAS_OP_T, CUBLAS_OP_N, n, n, n, &one, a, CUDA_R_16F, n, n * n, a + n * n,
+                                CUDA_R_16F, n, n * n, &zero, (float*) (a + 2 * n * n), CUDA_R_32F, n, n * n, 1,
+-                               CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
++                               CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT);
+     cudaStreamSynchronize(cs(stream));
+     cudaFree(p);
+     return h;
+@@ -2999,7 +3000,7 @@
+ #pragma unroll
+     for (int j = 0; j < PER / SCORE_VALUES; ++j)
+ #pragma unroll
+-        for (int i = 0; i < N; ++i) sumi[i] = __dp4a(q8_pack4(qc + (size_t) i * dim, base + SCORE_VALUES * j),
++        for (int i = 0; i < N; ++i) sumi[i] = STRATA_DP4A(q8_pack4(qc + (size_t) i * dim, base + SCORE_VALUES * j),
+                                                      k4[j], sumi[i]);
+     float acc[N];
+ #pragma unroll
+@@ -3053,7 +3054,7 @@
+         int sumi = 0;
+ #pragma unroll
+         for (int j = 0; j < PER / SCORE_VALUES; ++j)
+-            sumi = __dp4a(q8_pack4(qch, base + SCORE_VALUES * j), k4[j], sumi);
++            sumi = STRATA_DP4A(q8_pack4(qch, base + SCORE_VALUES * j), k4[j], sumi);
+         float acc = (float) sumi * (dk * q8_half(qdh[block]));
+ #pragma unroll
+         for (int off = LANES / 2; off > 0; off >>= 1) acc += __shfl_xor_sync(0xffffffffu, acc, off);
+@@ -3144,7 +3145,7 @@
+             for (int i = 0; i < N; ++i) {
+                 int sum = 0;
+ #pragma unroll
+-                for (int s = 0; s < STEPS; ++s) sum = __dp4a(qcode[i][s], kcode[s], sum);
++                for (int s = 0; s < STEPS; ++s) sum = STRATA_DP4A(qcode[i][s], kcode[s], sum);
+                 acc[i] = (float) sum * (dk * qdel[i]);
+             }
+             int which;
+@@ -3546,10 +3547,10 @@
+     for (int i = 0; i < iters; ++i) {
+ #pragma unroll
+         for (int j = 0; j < 64; ++j) {
+-            a0 = __dp4a(xa, xb, a0);
+-            a1 = __dp4a(xa, xb, a1);
+-            a2 = __dp4a(xa, xb, a2);
+-            a3 = __dp4a(xa, xb, a3);
++            a0 = STRATA_DP4A(xa, xb, a0);
++            a1 = STRATA_DP4A(xa, xb, a1);
++            a2 = STRATA_DP4A(xa, xb, a2);
++            a3 = STRATA_DP4A(xa, xb, a3);
+         }
+     }
+     C[lane] = (a0 + a1) + (a2 + a3);
+@@ -3675,7 +3676,7 @@
+             blas_ck(cublasGemmStridedBatchedEx(h, CUBLAS_OP_T, CUBLAS_OP_N, m, (int) cols, dim, &scale,
+                                                krow, CUDA_R_16F, width, dim, qg,
+                                                CUDA_R_16F, dim, cols * dim, &zero, score, CUDA_R_32F, m, cols * m,
+-                                               kv_heads, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP),
++                                               kv_heads, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT),
+                     "attention scores");
+             attn_softmax_block_kernel<<<c * n_head, 128, 0, cs(stream)>>>(score, weight, m, lo0 + k0, (long long) pos,
+                                                                          first, window, c, per, last, top, sum,
+@@ -3686,7 +3687,7 @@
+                                                vrow, CUDA_R_16F, width, dim,
+                                                weight, CUDA_R_16F, m, cols * m, k0 > 0 ? &one : &zero, og, CUDA_R_32F,
+                                                dim, cols * dim, kv_heads, CUBLAS_COMPUTE_32F,
+-                                               CUBLAS_GEMM_DEFAULT_TENSOR_OP),
++                                               CUBLAS_GEMM_DEFAULT),
+                     "attention values");
+         }
+         if (sinks)
+--- /dev/null
++++ b/src/poly/legacy_mmvq.hpp
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: MIT
++// PolyStrata's optional multi-matrix API over the reviewed Strata kernel library.
++// False means nothing was launched, as its API specifies. Callers take their
++// original per-matrix path; no unqualified foreign CUDA kernel is substituted.
++#pragma once
++#include "strata/kernels/native_mmvq.hpp"
++#include "strata/poly/kernels.hpp"
++namespace strata::kernels {
++struct MmvqSlots { const void* w[8]; const void* x[8]; float* y[8]; };
++inline bool native_mmvq_slots(int, const MmvqSlots&, int, int, int, void*) { return false; }
++struct MmvqIds {
++    const void* const* table;
++    const int32_t* ids;
++    std::size_t offset;
++    const void* x;
++    std::size_t x_stride;
++    int x_every;
++    float* y;
++    std::size_t y_stride;
++};
++inline bool native_mmvq_ids_supported(int) { return false; }
++inline bool native_mmvq_ids(int, const MmvqIds&, int, int, int, void*) { return false; }
++inline void native_add_rms_norm_q8_1(float* x, const float* add, const float* w, float* y,
++                                   void* q, int n, int rows, float eps, int, void* stream) {
++    // Preserve the reference operations until the foreign fused kernel has its own parity proof.
++    if (add) strata::poly::axpy(add, 1.0f, x, n * rows, true, stream);
++    strata::poly::rms_norm(x, w, y, n, rows, eps, stream);
++    native_quantize_q8_1(y, q, n, rows, stream);
++}
++}
