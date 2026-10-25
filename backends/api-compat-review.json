@@ -390,5 +390,19 @@
     "No learned GLM/DeepSeek model or RX580 hardware qualification",
     "No speed comparison",
     "No vision qualification for optional profiles"
-  ]
+  ],
+  "integrated_native_aggregate": {
+    "source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
+    "patch_sha256": "670B865E8629AF79EB3BC07CF281E799F41AF8FB83E5AEB04D36EE8E1A55D878",
+    "lf_sha256": {
+      "serve/frontend.py": "431e1db4fdd157b7f1eabe63ef0042ac608c6ec70a97cec57494ad1b4ada0265",
+      "serve/server.py": "1fd698e7aed1922a4e1af61f39c3b508689044d3310486805ec36607a46e69b7",
+      "serve/dsml.py": "cb218d016f0106bb662c6ab727ff9fbbadb0134308393fd3b57081d39fa8371b",
+      "tools/strata_tokenizer.py": "a8824fa10e5c83e9ec1638fbb899b1d8ccaebcccfc2e43fc81638ae9dca51757",
+      "serve/glm.py": "1dcf8997bddd6f955cc6f367b97f0b151f476f6c3f9854075e53900dd5e8f7c6",
+      "serve/model_backends.py": "2d528849803654dde6b38b42b11fa995397bfb63e31b98b2d8c751daeec05246",
+      "serve/test_legacy_models.py": "7c0daab57be017d92738ec0d32043542dc2ef14ce4568f34bfcfdccd7769903a"
+    },
+    "scope": "Integrated reviewed API ports; no second application of the historical7dd5cf overlay"
+  }
 }

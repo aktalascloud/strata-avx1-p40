@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-import struct
+import struct,re
 
 @dataclass(frozen=True)
 class Tensor:
@@ -72,14 +72,47 @@ class Header:
         layers=self.metadata.get(a+'.block_count');embd=self.metadata.get(a+'.embedding_length')
         if type(n) is not int or n!=1 or type(layers) is not int or layers<n or type(embd) is not int or embd<1:return False
         p='blk.'+str(layers-n)+'.nextn.'
-        for name,shape in (('eh_proj.weight',(2*embd,embd)),('enorm.weight',(embd,)),('hnorm.weight',(embd,))):
+        shapes=[('eh_proj.weight',(2*embd,embd)),('enorm.weight',(embd,)),('hnorm.weight',(embd,))]
+        if a=='qwen4exp':
+            hc=self.metadata.get(a+'.hyper_connection.count');rank=self.metadata.get(a+'.hyper_connection.low_rank')
+            if type(hc) is not int or not 2<=hc<=64 or type(rank) is not int or not 1<=rank<=hc*embd:return False
+            shapes=[('eh_proj.weight',(2*embd,embd)),('enorm.weight',(embd,)),('hnorm.weight',(embd,hc)),
+                ('hc_head_norm.weight',(embd,hc)),('hc_head_down.weight',(embd*hc,rank)),('hc_head_up.weight',(rank,embd*hc))]
+        for name,shape in shapes:
             t=self.tensors.get(p+name)
-            if t is None or t.shape!=shape:return False
+            # The model loader explicitly accepts flattened HC norm tensors via TENSOR_ALLOW_RESHAPE.
+            flattened=a=='qwen4exp' and name in ('hnorm.weight','hc_head_norm.weight') and t is not None and t.shape==(embd*hc,)
+            if t is None or t.shape!=shape and not flattened:return False
         return True
+
+class ModelHeader(Header):
+    """Combine only canonical local split headers; never read model tensor payloads."""
+    def __init__(self,path):
+        super().__init__(path)
+        count=self.metadata.get('split.count',1)
+        if type(count) is not int or not 1<=count<=256:raise ValueError('Invalid GGUF shard count')
+        self.shards=[self.path]
+        if count==1:return
+        match=re.fullmatch(r'(.+)-([0-9]{5})-of-([0-9]{5})\.gguf',self.path.name)
+        if not match or int(match[2])!=1 or int(match[3])!=count or self.metadata.get('split.no')!=0:
+            raise ValueError('Select the first canonical GGUF shard (-00001-of-xxxxx.gguf)')
+        for i in range(1,count):
+            other=Header(self.path.with_name(f'{match[1]}-{i+1:05d}-of-{count:05d}.gguf'))
+            if other.metadata.get('split.count')!=count or other.metadata.get('split.no')!=i:raise ValueError('GGUF shard identity does not match')
+            if other.metadata.get('general.architecture',self.architecture)!=self.architecture:raise ValueError('GGUF shard architecture does not match')
+            for key in (self.architecture+'.embedding_length',self.architecture+'.block_count','tokenizer.ggml.tokens'):
+                if key in other.metadata and other.metadata[key]!=self.metadata.get(key):raise ValueError('GGUF shard model/tokenizer metadata does not match')
+            if self.tensors.keys() & other.tensors.keys():raise ValueError('Duplicate tensor across GGUF shards')
+            self.tensors.update(other.tensors);self.shards.append(other.path)
+            self.data_start+=other.data_start;self.size+=other.size
+            if self.data_start>self.LIMIT:raise ValueError('Combined GGUF headers exceed the inspection limit')
+        total=self.metadata.get('split.tensors.count')
+        if total is not None and (type(total) is not int or total!=len(self.tensors)):raise ValueError('GGUF total tensor count does not match')
 
 def compatible_head(target:Header,draft:Header):
     a=target.architecture
     if draft.architecture!=a or not draft.nextn():raise ValueError('Draft architecture or NextN tensor contract is incompatible')
     if target.metadata.get(a+'.embedding_length')!=draft.metadata.get(a+'.embedding_length'):raise ValueError('Draft embedding dimensions do not match')
+    if a=='qwen4exp' and any(target.metadata.get(a+'.'+k)!=draft.metadata.get(a+'.'+k) for k in ('hyper_connection.count','hyper_connection.low_rank')):raise ValueError('Draft hyper-connection dimensions do not match')
     for key in ('tokenizer.ggml.tokens','tokenizer.ggml.merges','tokenizer.ggml.token_type'):
         if key not in target.metadata or target.metadata[key]!=draft.metadata.get(key):raise ValueError('Draft tokenizer does not match the target: '+key)

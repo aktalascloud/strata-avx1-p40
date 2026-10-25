@@ -49,9 +49,13 @@ class ChatTemplate:
 
         env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, extensions=["jinja2.ext.loopcontrols"])
         env.filters["tojson"] = tojson
+        env.filters["from_json"] = json.loads
         env.globals["raise_exception"] = raise_exception
         self.source = Path(path).read_text(encoding="utf-8")
         self.template = env.from_string(self.source)
+        self.tool_style = "flat"
+        self.model_family = None
+        self.model_tokens = {}
         self.caps = self._detect_caps()
 
     def render(self, messages: list[dict], tools: list[dict] | None = None, add_generation_prompt: bool = True,
@@ -62,8 +66,25 @@ class ChatTemplate:
                     if i == len(messages) - 1 or os.environ.get("STRATA_KEEP_EMPTY_TURNS") == "1" or not (isinstance(m, dict) and m.get("role") == "assistant"
                                                       and not _text_of(m.get("content")).strip()
                                                       and not _has_image(m.get("content")) and not m.get("tool_calls"))]
-        return self.template.render(messages=messages, tools=tools, add_generation_prompt=add_generation_prompt,
-                                    **kwargs)
+        if self.tool_style == "openai":
+            tools = [{"type": "function", "function": t} if "function" not in t else t for t in tools or []]
+            shaped = []
+            for m in messages:
+                if not m.get("tool_calls"):
+                    shaped.append(m); continue
+                calls = []
+                for call in m["tool_calls"]:
+                    function = dict(call.get("function") or {})
+                    if isinstance(function.get("arguments"), (dict, list)):
+                        function["arguments"] = json.dumps(function["arguments"], ensure_ascii=False)
+                    calls.append({**call, "function": function})
+                shaped.append({**m, "tool_calls": calls})
+            messages = shaped
+        text = self.template.render(messages=messages, tools=tools, add_generation_prompt=add_generation_prompt,
+                                    **{**kwargs, **self.model_tokens})
+        if self.model_family == "glm" and add_generation_prompt and kwargs.get("enable_thinking") is False and text.endswith("<think>"):
+            text += "</think>"
+        return text
 
     def _detect_caps(self) -> dict[str, bool]:
         """llama.cpp's capability names, checked at load time against this template and Strata's tool-call format.
@@ -82,6 +103,7 @@ class ChatTemplate:
                   "parameters": {"type": "object", "properties": {"arg": {"type": "string"}}}}
                  for i in range(2)]
         tool_prompt = render([user], tools)
+        glm_format = "<arg_key>" in self.source and "<arg_value>" in self.source
 
         def calls_supported(count):
             calls = [{"name": f"strata_caps_call_{i}", "arguments": {"arg": f"strata_caps_arg_{i}"}}
@@ -93,20 +115,35 @@ class ChatTemplate:
             prompt = render(messages, tools)
             # Instructions include example XML and literal tag names, which are not model output. Parse only
             # complete calls to our probe functions, using the same body parser as OutputParser.
-            bodies = re.findall(r"<tool_call>\s*(<function=strata_caps_call_\d+>.*?</function>)\s*</tool_call>",
-                                prompt, re.S)
-            try:
-                parsed = [parse_tool_call(body) for body in bodies]
-            except ValueError:
-                return False
-            return [{"name": call.name, "arguments": call.arguments} for call in parsed] == calls \
-                and all(reply in prompt for reply in replies)
+            bodies = re.findall(r"<tool_call>\s*(<function=strata_caps_call_\d+>.*?</function>)\s*</tool_call>",prompt,re.S)
+            candidates = [(bodies, parse_tool_call)]
+            if glm_format:
+                from serve.glm import parse_call
+                bodies = [s for s in re.findall(r"<tool_call>(.*?)</tool_call>", prompt, re.S)
+                          if s.strip().startswith("strata_caps_call_")]
+                candidates.append((bodies, parse_call))
+            if "｜DSML｜" in self.source:
+                from serve.dsml import DsmlTranslator
+                translator = DsmlTranslator();converted = translator.feed(prompt) + translator.flush()
+                bodies = re.findall(r"<tool_call>\s*(<function=strata_caps_call_\d+>.*?</function>)\s*</tool_call>",converted,re.S)
+                candidates.append((bodies,parse_tool_call))
+            for bodies,parse in candidates:
+                try:
+                    parsed = [parse(body) for body in bodies]
+                except ValueError:
+                    continue
+                if ([{"name": call.name, "arguments": call.arguments} for call in parsed] == calls
+                        and all(reply in prompt for reply in replies)):
+                    return True
+            return False
 
         history = [user, {"role": "assistant", "content": "strata_caps_answer",
                           "reasoning_content": "strata_caps_reasoning"}, user]
-        return {"supports_tools": all(s in tool_prompt for s in
-                                      ("strata_caps_call_0", "strata_caps_description", "<tool_call>", "<function=")),
-                "supports_tool_calls": calls_supported(1),
+        one_call = calls_supported(1)
+        return {"supports_tools": all(s in tool_prompt for s in ("strata_caps_call_0", "strata_caps_description"))
+                                 and (("<tool_call>" in tool_prompt and "<function=" in tool_prompt)
+                                      or ((glm_format or "｜DSML｜" in self.source) and one_call)),
+                "supports_tool_calls": one_call,
                 "supports_system_role": "strata_caps_system" in render(
                     [{"role": "system", "content": "strata_caps_system"}, user]),
                 "supports_parallel_tool_calls": calls_supported(2),
@@ -141,14 +178,16 @@ EFFORT_DEEPSEEK = {"none": None, "off": None, "minimal": None, "disabled": None,
                    "low": "low", "medium": "medium", "high": "high", "xhigh": "max", "max": "max", "maximum": "max"}
 _EFFORT_QWEN = dict(EFFORT)
 _NUMERIC_EFFORT = False
+_BINARY_THINKING = False
 
 
 def use_family(family: str | None) -> None:
     """The reasoning-effort words of the model family this server runs (module state, like ENV_TO_USER)."""
-    global _NUMERIC_EFFORT
+    global _NUMERIC_EFFORT, _BINARY_THINKING
     EFFORT.clear()
     EFFORT.update(EFFORT_DEEPSEEK if family == "deepseek41" else _EFFORT_QWEN)
     _NUMERIC_EFFORT = family == "deepseek41"
+    _BINARY_THINKING = family in ("glm", "deepseek4")
 
 
 def effort_kwargs(value) -> dict:
@@ -166,6 +205,8 @@ def effort_kwargs(value) -> dict:
         raise ValueError(f"unknown reasoning effort {value!r}: use none, low, medium or high"
                          + (", max or 1..100" if _NUMERIC_EFFORT else ""))
     level = EFFORT[key]
+    if _BINARY_THINKING:
+        return {"enable_thinking": level is not None}
     return {"enable_thinking": False} if level is None else {"reasoning_effort": level}
 
 
@@ -175,6 +216,8 @@ def budget_effort(tokens) -> dict:
         n = int(tokens)
     except (TypeError, ValueError):
         return {}
+    if _BINARY_THINKING:
+        return {"enable_thinking": n > 0}
     return {"reasoning_effort": "low" if n < 2048 else "medium" if n < 8192 else EFFORT["high"]}
 
 
@@ -1143,7 +1186,19 @@ class OutputParser:
                 self._call_end_checked = len(self.buf)
                 return -1
             self._call_end_checked = -1
-        return call_end(self.buf)
+        return self._body_end(self.buf)
+
+    # Family hooks keep the canonical parser and its declared-name boundary intact.
+    native_call_format = False
+
+    def _body_end(self, body: str) -> int:
+        return call_end(body)
+
+    def _body_name(self, body: str) -> str:
+        return body.strip()[len(FUNC_START):].split(">", 1)[0]
+
+    def _parse_body(self, body: str, schema):
+        return parse_tool_call(body, schema)
 
     def _scan(self) -> list[Event]:
         """Advance the streaming view of the call body in self.buf (see stream_tools)."""
@@ -1281,14 +1336,14 @@ class OutputParser:
                 # #804: a `<tool_call>` inside the reasoning, with tools declared.  It is held whole (never streamed
                 # as a call) until it ends: a declared name is then a tool call, anything else stays reasoning text.
                 body = self.buf[len(CALL_START):]
-                end, think = call_end(body), body.find(THINK_END)
+                end, think = self._body_end(body), body.find(THINK_END)
                 if end >= 0 and (think < 0 or think >= end):
                     call = None
                     try:
-                        name = body[:end].strip()[len("<function="):].split(">", 1)[0].strip()
+                        name = self._body_name(body[:end]).strip()
                         name = self.aliases.get(name, name)
                         if name in self.schemas:
-                            call = parse_tool_call(body[:end], self.schemas.get(name))
+                            call = self._parse_body(body[:end], self.schemas.get(name))
                             call.name = name
                     except ValueError:
                         pass
@@ -1410,6 +1465,10 @@ class OutputParser:
                 if in_code:
                     out.append(Event("content", self._track(self.buf[:i + len(CALL_START)])))
                     self.buf = self.buf[i + len(CALL_START):]
+                    continue
+                if self.native_call_format:
+                    if self._native_open(i, out) == "wait":
+                        return out
                     continue
                 # A call is `<tool_call>` and then (after whitespace) `<function=`; the tag with anything else after
                 # it is prose that names the format ("I'll use a <tool_call> block") - content, not a malformed call
@@ -1592,7 +1651,7 @@ class OutputParser:
     def _finish_call(self, body: str) -> list[Event]:
         """A whole call body in the template's form -> its tool_call event.  With recover, one that still does not
         parse is the text it is instead of an error that ends the request."""
-        raw_name = body.strip()[len(FUNC_START):].split(">", 1)[0]
+        raw_name = self._body_name(body)
         name = raw_name.strip()
         name = self.aliases.get(name, name)
         bare, self.bare = self.bare, False
@@ -1603,7 +1662,7 @@ class OutputParser:
         try:
             if raw_name != raw_name.strip() and name not in self.schemas:
                 raise ValueError("whitespace tool name is not declared")
-            call = parse_tool_call(body, self.schemas.get(name))
+            call = self._parse_body(body, self.schemas.get(name))
             call.name = name
         except ValueError:
             if not self.recover:

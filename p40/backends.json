@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "native_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
+  "engines": {
+    "cpu": {
+      "path": "runtime/backends/cpu/strata-ggml.exe",
+      "sha256": "4b96b711855391a67b277839cc0de5cdf8257631c8d52b39e3be69a947daa538",
+      "backend": "cpu",
+      "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending",
+      "trained_model_qualified": false,
+      "rx580_hardware_qualified": false
+    },
+    "cuda": {
+      "path": "runtime/backends/cuda/strata-ggml.exe",
+      "sha256": "ccc9f2708065e83fba7e66ba1058515d4647fea804d1138654b5a1e12e28c417",
+      "backend": "cuda",
+      "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending",
+      "trained_model_qualified": false,
+      "rx580_hardware_qualified": false
+    },
+    "vulkan": {
+      "path": "runtime/backends/vulkan/strata-ggml.exe",
+      "sha256": "eb12ee13656bc6bb002587fb29a194cd7a3ceb7ae5483543359d52e13215480e",
+      "backend": "vulkan",
+      "qualification": "protocol/security/CPU fixtures; Vulkan hardware pending",
+      "trained_model_qualified": false,
+      "rx580_hardware_qualified": false
+    },
+    "poly": {
+      "path": "runtime/backends/poly/strata-poly.exe",
+      "sha256": "a0512e20205eacc1babfb1b4bda024ad272e095b11564f7d1dc7f49879335a7f",
+      "backend": "cuda",
+      "qualification": "compiled, capability/version and worker/guesses/conversation tests; trained model/GPU math pending",
+      "trained_model_qualified": false,
+      "rx580_hardware_qualified": false
+    }
+  }
+}

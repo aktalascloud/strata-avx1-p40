@@ -1,16 +1,7 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..e011d2c2ba14bbd0b00bca709081b94273935588 100644
+index 46ebf034aa22e7b723a2cd69b82f49ed9bd61578..1f80fd63a7279ab812349cee8b05c16456019ba5 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -8,7 +8,7 @@
- # below refuses anything older: silently building for a pre-Ampere arch would produce a binary that runs
- # and is wrong about its own performance, which is the worst of both outcomes.
- cmake_minimum_required(VERSION 3.24)
--project(strata VERSION 0.1.49.2 LANGUAGES CXX)
-+project(strata VERSION 0.1.49.3 LANGUAGES CXX)
- # EXPERIMENTAL: the Intel Arc engine, the SYCL port in sycl/ (PR #423; icpx + oneMKL, docs/INTEL_ARC.md). It is its
- # own project that takes the unported sources from src/; with this on, nothing below is configured.
- option(STRATA_ENABLE_SYCL "EXPERIMENTAL: build the Intel Arc (SYCL) engine from sycl/ - docs/INTEL_ARC.md" OFF)
 @@ -88,6 +88,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
  # HIP a code object loads on first use, so they cost other models nothing there (R9700: the same slots).  Used at run
  # time with STRATA_MMQ_KQ=1 (opt-in: it changes the prompt's rounding against the FP16 path).
@@ -55,7 +46,7 @@ index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..e011d2c2ba14bbd0b00bca709081b942
          -Wl,--wrap=cudaDeviceSynchronize -Wl,--wrap=cudaGetLastError)
        target_link_libraries(conversation_transfer_test PRIVATE strata_engine)
        add_test(NAME conversation_transfer_test COMMAND conversation_transfer_test)
-@@ -1617,6 +1633,9 @@ endif()
+@@ -1626,6 +1642,9 @@ endif()
  include(CheckCXXSourceCompiles)
  if(MSVC)
    set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
@@ -65,7 +56,7 @@ index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..e011d2c2ba14bbd0b00bca709081b942
  else()
    set(CMAKE_REQUIRED_FLAGS "-mavx2 -mfma -mf16c")
  endif()
-@@ -1817,6 +1836,11 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1834,6 +1853,11 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_tq_llama "${strata_llamacpp_SOURCE_DIR}")
      endif()
      include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/strata_ggml_tq_overlay.cmake)
@@ -77,7 +68,7 @@ index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..e011d2c2ba14bbd0b00bca709081b942
      set(_strata_tq_overlay_dir "${CMAKE_BINARY_DIR}/ggml-tq-overlay")
      strata_ggml_tq_overlay("${_strata_tq_llama}" "${_strata_tq_overlay_dir}")
      if(STRATA_TQ_OVERLAY_OK)
-@@ -1845,6 +1869,10 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -1862,6 +1886,10 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_gg ${strata_llamacpp_SOURCE_DIR}/ggml)
      endif()
      set(_strata_mmq ${_strata_gg}/src/ggml-cuda)
@@ -88,7 +79,7 @@ index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..e011d2c2ba14bbd0b00bca709081b942
      set(_strata_quantize_cu ${_strata_mmq}/quantize.cu)   # the overlay's copy when the trellis overlay is on: it includes mmq.cuh
      if(_strata_mmq_tq_overlay)
        set(_strata_quantize_cu ${_strata_tq_overlay_dir}/quantize.cu)
-@@ -2207,7 +2235,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
+@@ -2224,7 +2252,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
  endif()
  
  if(STRATA_BUILD_TESTS)
@@ -111,7 +102,7 @@ index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..e011d2c2ba14bbd0b00bca709081b942
      add_executable(pool_affinity_test src/kernels/cpu/pool_affinity_test.cpp)
      target_link_libraries(pool_affinity_test PRIVATE strata_kernels_cpu)
      add_test(NAME pool_affinity_test COMMAND pool_affinity_test)
-@@ -2325,6 +2368,25 @@ if(STRATA_BUILD_TESTS)
+@@ -2342,6 +2385,25 @@ if(STRATA_BUILD_TESTS)
      target_include_directories(direct_file_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
      target_link_libraries(direct_file_async_test PRIVATE Threads::Threads)
      add_test(NAME direct_file_async_test COMMAND direct_file_async_test)
@@ -137,7 +128,7 @@ index 989f5cdb8fe095c937d41e1df088ef943cf13aa9..e011d2c2ba14bbd0b00bca709081b942
    endif()
    # --aux-cpus: the CPU-set derivation (pure) and the placement of live threads; header-only, no GPU
    add_executable(aux_cpus_test tests/platform/aux_cpus_test.cpp)
-@@ -2390,3 +2452,58 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
+@@ -2407,3 +2469,58 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
      target_compile_definitions(ds4_gg_bench PRIVATE STRATA_DSV41_TQ_CPU=1)
    endif()
  endif()
@@ -254,13 +245,14 @@ index 0000000000000000000000000000000000000000..753ef5f9dbd02b20779c1ca516a5cfb1
 +  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
 +endfunction()
 diff --git a/docs/DETAILS.md b/docs/DETAILS.md
-index f037c65cbb46da1a99cf84dc86ef5183fc5cb3ab..a9e957646e72a0fe6835b6987c4fb89bf4ad3d94 100644
+index 43538ddca377f2a2d37a16ce5550e9ba31df37e8..8049a569b1b2a778550a3e4bfb7ee060448a5f1b 100644
 --- a/docs/DETAILS.md
 +++ b/docs/DETAILS.md
-@@ -1815,6 +1815,40 @@ test images.
- 
- **Stager threads for a GGUF read in place (0.1.41, #1353):** a native pack read from its GGUF shards in place (UD-Q4_K_XL, a Q8_0 pack) copies each expert with 32 threads and a 128-deep ring when the bytes are page faults on an SSD. If the shards' pages are already in the page cache (a big-RAM box, a warm start) those copies are memory copies and the same profile ran 4-7x slower than the 4-thread default (a 124K-token Q8 prompt: 57 -> 350-410 tok/s with the default). The engine now checks a sample of the experts with `mincore` at the first prompt (Linux) and takes the RAM profile when 90% or more of their pages are resident, saying so in its log; a cold or partly cached GGUF keeps the SSD profile. `STRATA_STAGER_SSD=1` / `0` forces either profile; `STRATA_STAGER_THREADS` still wins. The bytes copied are the same.
- 
+@@ -1332,3 +1332,37 @@ mean KL from the stock model 0.063 nats (max 4.1), perplexity +15% on code, +2.3
+   the original 2,682 in 46 s. Speed: 4K IQ2_XS 465 prompt / 78.7 output tokens/s against 467 / 78.3 for the original.
+ - UD-Q4_K_XL on a 64 GB PC with a 12 GB RTX 5070: 7-8.5 tok/s, picks the same tokens as llama.cpp on the same file at 97.5-99% of the
+   positions of short greedy answers and 90-91% after a 16K prompt ([UNSLOTH_Q4.md](UNSLOTH_Q4.md#quality-against-llamacpp-on-the-same-file)).
++
 +## A faster engine start on Windows (on by default with CUDA: `STRATA_ARENA_PREFAULT`, `STRATA_DENSE_UPLOAD_THREADS`, `STRATA_EARLY_ARENA`)
 +
 +On Windows with an NVIDIA card, three changes shorten the engine's load. Each has a switch that restores the old way.
@@ -294,10 +286,6 @@ index f037c65cbb46da1a99cf84dc86ef5183fc5cb3ab..a9e957646e72a0fe6835b6987c4fb89b
 +The answers do not change: the expert arena's checksum (`STRATA_VERIFY_ARENA=1`) is the same with these on and off, and
 +decode and prompt speed after loading were unchanged in the same runs. None of this is built for Linux, macOS, AMD
 +(HIP) or Intel Arc (SYCL): there the start is as before.
-+
- ## Short prompts: the CPU shares the experts (on by default on one NVIDIA GPU, `STRATA_PREFILL_CPU_SHARE`)
- 
- A prompt chunk of a few thousand tokens (an agent's tool result, a test's output, a short follow-up) streams every routed
 diff --git a/include/strata/core/conversation_cache.hpp b/include/strata/core/conversation_cache.hpp
 index b2e6a74f7785264a0882cc4105c65acace51bd00..f27064b7c1de9104e1e9bd8d7f748b7170efd40f 100644
 --- a/include/strata/core/conversation_cache.hpp
@@ -657,11 +645,165 @@ index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e
 +}
 +} // namespace strata::platform::win_numa
 +#endif
+diff --git a/serve/dsml.py b/serve/dsml.py
+index c885e9703251450a62cf5e52092068eb9d208183..8416b294476115086a896c229c9a93a4c880cbb4 100644
+--- a/serve/dsml.py
++++ b/serve/dsml.py
+@@ -187,6 +187,7 @@ class DsmlOutputParser(OutputParser):
+         """string="true": the value is a string whatever it looks like ("123", "true"), as the template wrote it."""
+         if not is_string:
+             return
++        tool = self.aliases.get(tool, tool)
+         spec = self.schemas.get(tool)
+         if spec is None:
+             return
+@@ -254,3 +255,8 @@ def to_dsml_force(force: str | None) -> str | None:
+     if name.endswith(">\n"):
+         return head + f'{_OPEN} invoke name="{name[:-2]}">\n'
+     return head + f'{_OPEN} invoke name="{name}'
++
++def to_ds4_force(force: str | None) -> str | None:
++    """V4's own no-space DSML spelling, without substituting the V4.1 template."""
++    text = to_dsml_force(force)
++    return text.replace('<｜DSML｜ calls>', '<｜DSML｜tool_calls>').replace('<｜DSML｜ invoke', '<｜DSML｜invoke') if text else text
 diff --git a/serve/frontend.py b/serve/frontend.py
-index 53f2b4599d08f1a2ca2b056b5d6380c708341810..e32b5d0bb6d3abe6966160b29603ea192552dd9c 100644
+index 53f2b4599d08f1a2ca2b056b5d6380c708341810..46853eb3c2c92649e6704fb44d5851c5281c809b 100644
 --- a/serve/frontend.py
 +++ b/serve/frontend.py
-@@ -916,14 +916,18 @@ class OutputParser:
+@@ -49,9 +49,13 @@ class ChatTemplate:
+ 
+         env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, extensions=["jinja2.ext.loopcontrols"])
+         env.filters["tojson"] = tojson
++        env.filters["from_json"] = json.loads
+         env.globals["raise_exception"] = raise_exception
+         self.source = Path(path).read_text(encoding="utf-8")
+         self.template = env.from_string(self.source)
++        self.tool_style = "flat"
++        self.model_family = None
++        self.model_tokens = {}
+         self.caps = self._detect_caps()
+ 
+     def render(self, messages: list[dict], tools: list[dict] | None = None, add_generation_prompt: bool = True,
+@@ -62,8 +66,25 @@ class ChatTemplate:
+                     if i == len(messages) - 1 or os.environ.get("STRATA_KEEP_EMPTY_TURNS") == "1" or not (isinstance(m, dict) and m.get("role") == "assistant"
+                                                       and not _text_of(m.get("content")).strip()
+                                                       and not _has_image(m.get("content")) and not m.get("tool_calls"))]
+-        return self.template.render(messages=messages, tools=tools, add_generation_prompt=add_generation_prompt,
+-                                    **kwargs)
++        if self.tool_style == "openai":
++            tools = [{"type": "function", "function": t} if "function" not in t else t for t in tools or []]
++            shaped = []
++            for m in messages:
++                if not m.get("tool_calls"):
++                    shaped.append(m); continue
++                calls = []
++                for call in m["tool_calls"]:
++                    function = dict(call.get("function") or {})
++                    if isinstance(function.get("arguments"), (dict, list)):
++                        function["arguments"] = json.dumps(function["arguments"], ensure_ascii=False)
++                    calls.append({**call, "function": function})
++                shaped.append({**m, "tool_calls": calls})
++            messages = shaped
++        text = self.template.render(messages=messages, tools=tools, add_generation_prompt=add_generation_prompt,
++                                    **{**kwargs, **self.model_tokens})
++        if self.model_family == "glm" and add_generation_prompt and kwargs.get("enable_thinking") is False and text.endswith("<think>"):
++            text += "</think>"
++        return text
+ 
+     def _detect_caps(self) -> dict[str, bool]:
+         """llama.cpp's capability names, checked at load time against this template and Strata's tool-call format.
+@@ -82,6 +103,7 @@ class ChatTemplate:
+                   "parameters": {"type": "object", "properties": {"arg": {"type": "string"}}}}
+                  for i in range(2)]
+         tool_prompt = render([user], tools)
++        glm_format = "<arg_key>" in self.source and "<arg_value>" in self.source
+ 
+         def calls_supported(count):
+             calls = [{"name": f"strata_caps_call_{i}", "arguments": {"arg": f"strata_caps_arg_{i}"}}
+@@ -93,20 +115,35 @@ class ChatTemplate:
+             prompt = render(messages, tools)
+             # Instructions include example XML and literal tag names, which are not model output. Parse only
+             # complete calls to our probe functions, using the same body parser as OutputParser.
+-            bodies = re.findall(r"<tool_call>\s*(<function=strata_caps_call_\d+>.*?</function>)\s*</tool_call>",
+-                                prompt, re.S)
+-            try:
+-                parsed = [parse_tool_call(body) for body in bodies]
+-            except ValueError:
+-                return False
+-            return [{"name": call.name, "arguments": call.arguments} for call in parsed] == calls \
+-                and all(reply in prompt for reply in replies)
++            bodies = re.findall(r"<tool_call>\s*(<function=strata_caps_call_\d+>.*?</function>)\s*</tool_call>",prompt,re.S)
++            candidates = [(bodies, parse_tool_call)]
++            if glm_format:
++                from serve.glm import parse_call
++                bodies = [s for s in re.findall(r"<tool_call>(.*?)</tool_call>", prompt, re.S)
++                          if s.strip().startswith("strata_caps_call_")]
++                candidates.append((bodies, parse_call))
++            if "｜DSML｜" in self.source:
++                from serve.dsml import DsmlTranslator
++                translator = DsmlTranslator();converted = translator.feed(prompt) + translator.flush()
++                bodies = re.findall(r"<tool_call>\s*(<function=strata_caps_call_\d+>.*?</function>)\s*</tool_call>",converted,re.S)
++                candidates.append((bodies,parse_tool_call))
++            for bodies,parse in candidates:
++                try:
++                    parsed = [parse(body) for body in bodies]
++                except ValueError:
++                    continue
++                if ([{"name": call.name, "arguments": call.arguments} for call in parsed] == calls
++                        and all(reply in prompt for reply in replies)):
++                    return True
++            return False
+ 
+         history = [user, {"role": "assistant", "content": "strata_caps_answer",
+                           "reasoning_content": "strata_caps_reasoning"}, user]
+-        return {"supports_tools": all(s in tool_prompt for s in
+-                                      ("strata_caps_call_0", "strata_caps_description", "<tool_call>", "<function=")),
+-                "supports_tool_calls": calls_supported(1),
++        one_call = calls_supported(1)
++        return {"supports_tools": all(s in tool_prompt for s in ("strata_caps_call_0", "strata_caps_description"))
++                                 and (("<tool_call>" in tool_prompt and "<function=" in tool_prompt)
++                                      or ((glm_format or "｜DSML｜" in self.source) and one_call)),
++                "supports_tool_calls": one_call,
+                 "supports_system_role": "strata_caps_system" in render(
+                     [{"role": "system", "content": "strata_caps_system"}, user]),
+                 "supports_parallel_tool_calls": calls_supported(2),
+@@ -141,14 +178,16 @@ EFFORT_DEEPSEEK = {"none": None, "off": None, "minimal": None, "disabled": None,
+                    "low": "low", "medium": "medium", "high": "high", "xhigh": "max", "max": "max", "maximum": "max"}
+ _EFFORT_QWEN = dict(EFFORT)
+ _NUMERIC_EFFORT = False
++_BINARY_THINKING = False
+ 
+ 
+ def use_family(family: str | None) -> None:
+     """The reasoning-effort words of the model family this server runs (module state, like ENV_TO_USER)."""
+-    global _NUMERIC_EFFORT
++    global _NUMERIC_EFFORT, _BINARY_THINKING
+     EFFORT.clear()
+     EFFORT.update(EFFORT_DEEPSEEK if family == "deepseek41" else _EFFORT_QWEN)
+     _NUMERIC_EFFORT = family == "deepseek41"
++    _BINARY_THINKING = family in ("glm", "deepseek4")
+ 
+ 
+ def effort_kwargs(value) -> dict:
+@@ -166,6 +205,8 @@ def effort_kwargs(value) -> dict:
+         raise ValueError(f"unknown reasoning effort {value!r}: use none, low, medium or high"
+                          + (", max or 1..100" if _NUMERIC_EFFORT else ""))
+     level = EFFORT[key]
++    if _BINARY_THINKING:
++        return {"enable_thinking": level is not None}
+     return {"enable_thinking": False} if level is None else {"reasoning_effort": level}
+ 
+ 
+@@ -175,6 +216,8 @@ def budget_effort(tokens) -> dict:
+         n = int(tokens)
+     except (TypeError, ValueError):
+         return {}
++    if _BINARY_THINKING:
++        return {"enable_thinking": n > 0}
+     return {"reasoning_effort": "low" if n < 2048 else "medium" if n < 8192 else EFFORT["high"]}
+ 
+ 
+@@ -916,14 +959,18 @@ class OutputParser:
          # the client has no tool to run).  The Responses route leaves it off: a Codex compaction request keeps its
          # conversation's tools in the prompt only, and its calls come back as before.
          self.declared_only = declared_only
@@ -683,7 +825,28 @@ index 53f2b4599d08f1a2ca2b056b5d6380c708341810..e32b5d0bb6d3abe6966160b29603ea19
          self.aliases = {alias: next(iter(names)) for alias, names in aliases.items()
                          if len(names) == 1 and alias not in self.schemas}
          self.unread = 0              # #3441: `<tool_call>` blocks that opened like a call and were returned as text
-@@ -1158,7 +1162,9 @@ class OutputParser:
+@@ -1139,7 +1186,19 @@ class OutputParser:
+                 self._call_end_checked = len(self.buf)
+                 return -1
+             self._call_end_checked = -1
+-        return call_end(self.buf)
++        return self._body_end(self.buf)
++
++    # Family hooks keep the canonical parser and its declared-name boundary intact.
++    native_call_format = False
++
++    def _body_end(self, body: str) -> int:
++        return call_end(body)
++
++    def _body_name(self, body: str) -> str:
++        return body.strip()[len(FUNC_START):].split(">", 1)[0]
++
++    def _parse_body(self, body: str, schema):
++        return parse_tool_call(body, schema)
+ 
+     def _scan(self) -> list[Event]:
+         """Advance the streaming view of the call body in self.buf (see stream_tools)."""
+@@ -1158,7 +1217,9 @@ class OutputParser:
                  raw_name = rest[a + 10:b]
                  name = raw_name.strip()
                  name = self.aliases.get(name, name)
@@ -694,7 +857,7 @@ index 53f2b4599d08f1a2ca2b056b5d6380c708341810..e32b5d0bb6d3abe6966160b29603ea19
                      return out
                  self.scall = ToolCall(name=name, arguments={})
                  props = ((self.schemas.get(name) or {}).get("parameters") or {}).get("properties") or {}
-@@ -1167,6 +1173,8 @@ class OutputParser:
+@@ -1167,6 +1228,8 @@ class OutputParser:
                  args("{")
                  self.sp += b + 1
                  self.ss = "between"
@@ -703,7 +866,36 @@ index 53f2b4599d08f1a2ca2b056b5d6380c708341810..e32b5d0bb6d3abe6966160b29603ea19
              elif self.ss == "between":
                  stripped = rest.lstrip()
                  self.sp += len(rest) - len(stripped)
-@@ -1533,7 +1541,7 @@ class OutputParser:
+@@ -1273,14 +1336,14 @@ class OutputParser:
+                 # #804: a `<tool_call>` inside the reasoning, with tools declared.  It is held whole (never streamed
+                 # as a call) until it ends: a declared name is then a tool call, anything else stays reasoning text.
+                 body = self.buf[len(CALL_START):]
+-                end, think = call_end(body), body.find(THINK_END)
++                end, think = self._body_end(body), body.find(THINK_END)
+                 if end >= 0 and (think < 0 or think >= end):
+                     call = None
+                     try:
+-                        name = body[:end].strip()[len("<function="):].split(">", 1)[0].strip()
++                        name = self._body_name(body[:end]).strip()
+                         name = self.aliases.get(name, name)
+                         if name in self.schemas:
+-                            call = parse_tool_call(body[:end], self.schemas.get(name))
++                            call = self._parse_body(body[:end], self.schemas.get(name))
+                             call.name = name
+                     except ValueError:
+                         pass
+@@ -1403,6 +1466,10 @@ class OutputParser:
+                     out.append(Event("content", self._track(self.buf[:i + len(CALL_START)])))
+                     self.buf = self.buf[i + len(CALL_START):]
+                     continue
++                if self.native_call_format:
++                    if self._native_open(i, out) == "wait":
++                        return out
++                    continue
+                 # A call is `<tool_call>` and then (after whitespace) `<function=`; the tag with anything else after
+                 # it is prose that names the format ("I'll use a <tool_call> block") - content, not a malformed call
+                 # that ends the request.  Until its follower has arrived it is held, like a partial tag.
+@@ -1533,7 +1600,7 @@ class OutputParser:
                  self.buf = self.buf[i + drop:]
                  batch, self.batch = self.batch, False
                  out += self._finish_call(body)
@@ -712,7 +904,7 @@ index 53f2b4599d08f1a2ca2b056b5d6380c708341810..e32b5d0bb6d3abe6966160b29603ea19
                      self.state, self.lead = "call", False
  
      def finish(self, reason: str | None = None) -> list[Event]:
-@@ -1565,6 +1573,14 @@ class OutputParser:
+@@ -1565,6 +1632,14 @@ class OutputParser:
              return out
          if self.state == "reasoning" and self.buf == THINK_END:   # the output ends on a held `</think>`: its end
              self.buf, self.state = "", "content"
@@ -727,7 +919,12 @@ index 53f2b4599d08f1a2ca2b056b5d6380c708341810..e32b5d0bb6d3abe6966160b29603ea19
          if self.buf:
              # an unfinished call inside the reasoning (#804) is reasoning text, never a call
              kind = {"reasoning": "reasoning", "rcall": "reasoning", "content": "content"}.get(self.state, "content")
-@@ -1580,6 +1596,10 @@ class OutputParser:
+@@ -1576,14 +1651,18 @@ class OutputParser:
+     def _finish_call(self, body: str) -> list[Event]:
+         """A whole call body in the template's form -> its tool_call event.  With recover, one that still does not
+         parse is the text it is instead of an error that ends the request."""
+-        raw_name = body.strip()[len(FUNC_START):].split(">", 1)[0]
++        raw_name = self._body_name(body)
          name = raw_name.strip()
          name = self.aliases.get(name, name)
          bare, self.bare = self.bare, False
@@ -738,8 +935,245 @@ index 53f2b4599d08f1a2ca2b056b5d6380c708341810..e32b5d0bb6d3abe6966160b29603ea19
          try:
              if raw_name != raw_name.strip() and name not in self.schemas:
                  raise ValueError("whitespace tool name is not declared")
+-            call = parse_tool_call(body, self.schemas.get(name))
++            call = self._parse_body(body, self.schemas.get(name))
+             call.name = name
+         except ValueError:
+             if not self.recover:
+diff --git a/serve/glm.py b/serve/glm.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1fc25263fce50b3b1d23800a2a3448dd94756372
+--- /dev/null
++++ b/serve/glm.py
+@@ -0,0 +1,167 @@
++"""GLM's native call syntax over the existing declared-tool authorization boundary.
++
++The model writes NAME<arg_key>K</arg_key><arg_value>V</arg_value>.
++No global function marker is weakened and no undeclared name becomes a tool event.
++Format reference: PolyStrata c174f35 (MIT); streaming integration is local.
++"""
++from __future__ import annotations
++import json
++import re
++from serve.frontend import CALL_START, CALL_END, Event, OutputParser, ToolCall
++
++KEY, KEY_END = "<arg_key>", "</arg_key>"
++VALUE, VALUE_END = "<arg_value>", "</arg_value>"
++NAME_LIMIT = 600
++
++def name_of(body: str, complete=False):
++    stops = [p for p in (body.find(KEY), body.find(CALL_END)) if p >= 0]
++    if stops:
++        return body[:min(stops)].strip()
++    return body.strip() if complete else None
++
++def value_end(text: str, complete=False) -> int:
++    at = text.find(VALUE_END)
++    while at >= 0:
++        tail = text[at + len(VALUE_END):].lstrip()
++        if tail.startswith(KEY) or tail.startswith(CALL_END) or (complete and not tail):
++            return at
++        if not tail or KEY.startswith(tail) or CALL_END.startswith(tail):
++            return -2
++        at = text.find(VALUE_END, at + len(VALUE_END))
++    return -1
++
++def call_end(body: str) -> int:
++    """Only a closer after the name or a value closes a call; literal tags stay values."""
++    pos = body.find(CALL_END)
++    while pos >= 0:
++        before = body[:pos].rstrip()
++        if before.endswith(VALUE_END) or KEY not in before:
++            return pos
++        pos = body.find(CALL_END, pos + len(CALL_END))
++    return -1
++
++def typed(value, declared):
++    if declared == "string":
++        return value
++    try:
++        return json.loads(value)
++    except ValueError:
++        return value
++
++def parse_call(body: str, schema=None):
++    name = name_of(body, complete=True)
++    at = body.find(KEY)
++    rest = body[at:] if at >= 0 else ""
++    properties = ((schema or {}).get("parameters") or {}).get("properties") or {}
++    args = {}
++    while rest.strip():
++        rest = rest.lstrip()
++        if not rest.startswith(KEY):raise ValueError("malformed GLM argument")
++        end = rest.find(KEY_END, len(KEY))
++        if end < 0:raise ValueError("incomplete GLM argument key")
++        key = rest[len(KEY):end].strip()
++        if not key or len(key) > NAME_LIMIT or any(x in key for x in "<>"):raise ValueError("invalid GLM argument key")
++        if key in args:raise ValueError("duplicate GLM argument")
++        rest = rest[end + len(KEY_END):].lstrip()
++        if not rest.startswith(VALUE):raise ValueError("missing GLM argument value")
++        rest = rest[len(VALUE):];end = value_end(rest, complete=True)
++        if end < 0:raise ValueError("incomplete GLM argument value")
++        args[key] = typed(rest[:end], (properties.get(key) or {}).get("type"))
++        rest = rest[end + len(VALUE_END):]
++    return ToolCall(name=name, arguments=args)
++
++class GlmOutputParser(OutputParser):
++    native_call_format = True
++
++    def _reset_scan(self):
++        super()._reset_scan();self._glm_complete = False;self._glm_keys = set()
++
++    def _body_name(self, body):
++        return name_of(body, complete=True)
++
++    def _body_end(self, body):
++        return call_end(body)
++
++    def _parse_body(self, body, schema):
++        return parse_call(body, schema)
++
++    def _quoted_think_end(self, i):
++        # The GLM template permits an answer immediately after </think>, including after a quote.
++        return False
++
++    def _native_open(self, i, out):
++        after = self.buf[i + len(CALL_START):].lstrip()
++        name = name_of(after)
++        prefix = after[:after.find("<")] if "<" in after else after
++        partial = after[after.find("<"):] if "<" in after else ""
++        if (name is None and len(after) <= NAME_LIMIT and re.fullmatch(r"\S*\s*", prefix)
++                and (not partial or KEY.startswith(partial) or CALL_END.startswith(partial))):
++            j = i
++            while j > 0 and self.buf[j - 1] == "\n":j -= 1
++            if j > 0:out.append(Event("content", self._track(self.buf[:j])));self.buf = self.buf[j:]
++            return "wait"
++        canonical = self.aliases.get(name, name) if name else None
++        if not name or len(name) > NAME_LIMIT or canonical not in self.schemas:
++            self.unread += 1
++            if name and len(self.unread_names) < 5:self.unread_names.append(name[:80])
++            out.append(Event("content", self._track(self.buf[:i + len(CALL_START)])))
++            self.buf = self.buf[i + len(CALL_START):]
++            return "text"
++        if i and self.buf[:i].strip():out.append(Event("content", self._track(self.buf[:i].rstrip("\n"))))
++        self.buf = self.buf[i + len(CALL_START):];self.state = "call"
++        return "call"
++
++    def _wrapped_call_end(self):
++        end = call_end(self.buf);self._glm_complete = end >= 0
++        return end
++
++    def _scan(self):
++        out = []
++        def args(s):
++            if s:out.append(Event("tool_args", s, call=self.scall))
++        while True:
++            rest = self.buf[self.sp:]
++            if self.ss == "name":
++                raw = name_of(rest, complete=self._glm_complete)
++                if raw is None:return out
++                name = self.aliases.get(raw, raw)
++                if name not in self.schemas:self.ss = "blocked";return out
++                self.scall = ToolCall(name=name, arguments={})
++                props = ((self.schemas[name].get("parameters") or {}).get("properties") or {})
++                self.sdeclared = {k:(v or {}).get("type") for k,v in props.items()}
++                out.append(Event("tool_start", call=self.scall));args("{")
++                at = rest.find(KEY);self.sp += at if at >= 0 else len(rest);self.ss = "between"
++            elif self.ss == "between":
++                stripped = rest.lstrip();self.sp += len(rest) - len(stripped)
++                if not stripped.startswith(KEY):return out
++                end = stripped.find(KEY_END, len(KEY))
++                if end < 0:return out
++                key = stripped[len(KEY):end].strip()
++                if not key or len(key) > NAME_LIMIT or any(x in key for x in "<>") or key in self._glm_keys:
++                    raise ValueError("invalid or duplicate GLM argument key")
++                tail = stripped[end + len(KEY_END):];padding = len(tail)-len(tail.lstrip());tail = tail.lstrip()
++                if not tail.startswith(VALUE):return out
++                self._glm_keys.add(key)
++                args(("" if self.sfirst else ",") + json.dumps(key) + ":");self.sfirst = False
++                self.sp += end + len(KEY_END) + padding + len(VALUE)
++                self.ss = "str" if self.sdeclared.get(key) == "string" else "raw"
++                if self.ss == "str":args('"')
++            elif self.ss in ("str", "raw"):
++                end = value_end(rest, complete=self._glm_complete)
++                if end >= 0:
++                    if self.ss == "str":args(json.dumps(rest[:end])[1:-1] + '"')
++                    else:args(json.dumps(typed(rest[:end], None), ensure_ascii=False))
++                    self.sp += end + len(VALUE_END);self.ss = "between"
++                elif self.ss == "raw":return out
++                else:
++                    safe = rest.find(VALUE_END) if end == -2 else len(rest) - self._hold(rest, (VALUE_END,))
++                    if safe > 0:args(json.dumps(rest[:safe])[1:-1]);self.sp += safe
++                    return out
++            else:return out
++
++def to_glm_force(force):
++    if not force:return force
++    marker = "<function=";at = force.find(marker)
++    name = force[at + len(marker):] if at >= 0 else ""
++    if name.endswith(">\n"):name = name[:-2] + "\n"
++    return CALL_START + name
+diff --git a/serve/model_backends.py b/serve/model_backends.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f7af76068a0488919a2c4c2cc890097544bc675b
+--- /dev/null
++++ b/serve/model_backends.py
+@@ -0,0 +1,53 @@
++"""Explicit optional-engine profiles; never feed Qwen-only switches to another CLI."""
++from __future__ import annotations
++import math
++
++def checked_bind(cfg, cli_port, argv):
++    """Honor profile ports; using the native API port requires an explicit CLI choice."""
++    explicit=any(x=='--port' or x.startswith('--port=') for x in argv)
++    port=cli_port if explicit else cfg.get('port',8094)
++    if type(port) is not int or not 1024<=port<=65535 or port==8080 or port==8093 and not explicit:
++        raise ValueError('8080 is reserved; 8093 requires an explicit --port after the previous server stops')
++    return port
++
++def checked_args(cfg):
++    kind=cfg.get('engine_kind');backend=cfg.get('backend');args=cfg.get('args')
++    if kind not in ('ggml','poly') or backend not in ('cpu','cuda','vulkan'):
++        raise ValueError('Unknown optional engine/backend profile')
++    if kind=='poly' and backend!='cuda':raise ValueError('The reviewed Poly build is CUDA-only')
++    if not isinstance(args,list) or not args or not all(isinstance(x,str) and x and '\0' not in x for x in args):
++        raise ValueError('Engine argv must contain separate nonempty string elements')
++    if cfg.get('user_args') or cfg.get('layer_split') or cfg.get('replicas'):
++        raise ValueError('Regenerate this optional-engine profile; native Qwen argument/split overrides do not apply')
++    if cfg.get('parallel') not in (None,1) or cfg.get('gpu_groups'):
++        raise ValueError('Parallel slots and GPU groups require separate optional-backend qualification')
++    policy=cfg.get('mtp_policy')
++    if policy not in ('require','off'):raise ValueError('An explicit MTP policy is required')
++    if ('--require-mtp' in args)!=(policy=='require'):raise ValueError('MTP policy and engine argv disagree')
++    if cfg.get('drafting') not in (None,'auto','mtp','off') or cfg.get('mtp') is False and policy=='require':
++        raise ValueError('This profile requires a compatible native NextN head; no silent drafter fallback')
++    if cfg.get('drafting')=='off' and policy=='require' or cfg.get('drafting')=='mtp' and policy=='off' or cfg.get('mtp') is True and policy=='off':
++        raise ValueError('Drafting override contradicts the prepared MTP policy; regenerate the profile')
++    if cfg.get('vision'):raise ValueError('A family-matched vision encoder is not qualified by this optional profile')
++    return list(args)
++
++def sampling_keys(sampling):
++    """GGML's sampler has no native Qwen top-k64 ceiling; explicit zero values matter."""
++    if sampling.get('strata_tune'):
++        raise ValueError('Native Qwen per-request tuning is not supported by this backend')
++    result=[]
++    fields={'temperature':'temperature','top_p':'top_p','min_p':'min_p','repetition_penalty':'penalty_repeat',
++            'frequency_penalty':'penalty_freq','presence_penalty':'penalty_present'}
++    for key,wire in fields.items():
++        value=sampling.get(key)
++        if value is None:continue
++        if type(value) not in (int,float) or not math.isfinite(value):raise ValueError('Invalid sampling value: '+key)
++        result.append(wire+'='+repr(float(value)))
++    for key,wire in (('top_k','top_k'),('seed','seed'),('penalty_last_n','penalty_last_n')):
++        value=sampling.get(key)
++        if value is None:continue
++        if type(value) is not int or value<0:raise ValueError('Invalid sampling integer: '+key)
++        result.append(wire+'='+str(value))
++    if any(k in sampling for k in ('repetition_penalty','frequency_penalty','presence_penalty')) and 'penalty_last_n' not in sampling:
++        result.append('penalty_last_n=64')
++    return (' '+' '.join(result)) if result else ''
 diff --git a/serve/server.py b/serve/server.py
-index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd2b4a8778 100644
+index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..b4c2b6668fc86cdb35fd72d573bb5a5839eadbb1 100644
 --- a/serve/server.py
 +++ b/serve/server.py
 @@ -92,7 +92,11 @@ IMAGE_PAD = "<|image_pad|>"
@@ -755,7 +1189,29 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
      try:
          return lifeline.popen(args, role, **kw)       # a child that cannot outlive this server (serve/lifeline.py)
      except OSError as e:
-@@ -2190,6 +2194,9 @@ class StrataEngine:
+@@ -1385,6 +1389,12 @@ class StrataEngine:
+             if time.time() > deadline:
+                 raise EngineDied("the engine did not answer the VRAM command")
+ 
++    def request_sampling(self, sampling: dict) -> str:
++        if (getattr(self, "info", None) or {}).get("engine_kind") in ("ggml", "poly"):
++            from serve.model_backends import sampling_keys
++            return sampling_keys(sampling)
++        return self.sampling_keys(sampling)
++
+     @staticmethod
+     def sampling_keys(sampling: dict) -> str:
+         keys = ""
+@@ -1778,7 +1788,7 @@ class StrataEngine:
+             raise EngineDied("the engine is unavailable; this request was not sent")
+         self.progress, self.progress_ms, self.reused = None, 0, 0
+         born = self.gen                                 # the engine process this request is sent to
+-        keys = self.sampling_keys(sampling or {})
++        keys = self.request_sampling(sampling or {})
+         out: list[int] = []
+         pending: list[int] = []
+         prompt, left = list(ids), int(max_new)
+@@ -2190,14 +2200,17 @@ class StrataEngine:
          if not self.alive():
              raise EngineDied("the engine is unavailable; this request was not sent")
          bias_api.validate_request(sampling or {}, self, None)
@@ -765,7 +1221,17 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
          if getattr(self, "batch", 0):
              yield from self.generate_batched(ids, max_new, sampling, cancel, embeddings)
              return
-@@ -2303,6 +2310,8 @@ class StrataEngine:
+         self.progress, self.progress_ms, self.reused = None, 0, 0
+         self.prefill_tok_s_mean = None
+         # an image request takes the same sampling keys as text (#75: it used to decode greedily whatever was asked)
+-        head = f"GENI {int(max_new)}{self.sampling_keys(sampling or {})} {embeddings}" if embeddings else \
+-            f"GEN {int(max_new)}{self.sampling_keys(sampling or {})}"
++        head = f"GENI {int(max_new)}{self.request_sampling(sampling or {})} {embeddings}" if embeddings else \
++            f"GEN {int(max_new)}{self.request_sampling(sampling or {})}"
+         try:
+             self.proc.stdin.write(f"{head} {','.join(str(int(t)) for t in ids)}\n")
+             self.proc.stdin.flush()
+@@ -2303,6 +2316,8 @@ class StrataEngine:
                      if line.startswith("DONE"):
                          self._parse_done(line)
                          break
@@ -774,7 +1240,71 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
                      if not self.can_stop:
                          heard = time.monotonic()
  
-@@ -5080,11 +5089,13 @@ class Service:
+@@ -3078,6 +3093,9 @@ def engine_args(cfg: dict) -> list[str]:
+     """The engine's arguments: the config's, and with several GPUs the layer split across them ("layer_split" in the
+     config: "auto" by default, or the first layer of each later GPU's share, e.g. "18" or "16,32"; see
+     layer_split_value)."""
++    if cfg.get("engine_kind") in ("ggml", "poly"):
++        from serve.model_backends import checked_args
++        return checked_args(cfg)
+     args = list(cfg["args"])
+     # "user_args" (strata_control/user_args.py): the options the person set by hand, over the generated ones at every start,
+     # so a setup run or the app rewriting "args" cannot undo them (#3216 #3215 #3270)
+@@ -3505,7 +3523,7 @@ def child_env(cfg: dict, *, offline: bool = False) -> dict:
+         env["HIP_VISIBLE_DEVICES"] = ""
+     elif hip_visible(cfg) and cfg.get("backend") == "hip":   # AMD: numbered as HIP numbers them (hip_visible)
+         env["HIP_VISIBLE_DEVICES"] = ",".join(str(i) for i in hip_visible(cfg))
+-    elif gpu_list(cfg):                              # issue #51: the GPU(s) to run on, numbered as nvidia-smi does; CUDA's
++    elif gpu_list(cfg) and cfg.get("engine_kind") != "ggml": # embedded GGML uses an explicit canonical device name
+         env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"      # own default order (fastest first) can number the cards otherwise
+         env["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in ordered_gpus(cfg))
+     for k, v in (cfg.get("env") or {}).items():      # engine settings the config carries (AMD: the GEMM tuning table)
+@@ -3940,6 +3958,10 @@ class Service:
+     def set_family(self, family: str | None) -> None:
+         """A family whose text differs from the Qwen form this server was written for (DeepSeek-V4.1: its own end
+         token, DSML tool calls, reasoning-effort words).  The others keep the defaults."""
++        if family is None:
++            pre = getattr(self.tok, "pre", "")
++            family = ("glm" if pre in ("glm4", "glm5") or self.model_arch in ("glm5-next", "glm-dsa") else
++                      "deepseek4" if pre == "joyai-llm" or self.model_arch == "deepseek4" else None)
+         self.family = family
+         if family == "deepseek41":
+             from serve import dsml
+@@ -3947,6 +3969,33 @@ class Service:
+             self.stop_ids = {int(eos)}
+             self.parser_cls = dsml.DsmlOutputParser
+             self._force_text = dsml.to_dsml_force
++        elif family in ("glm", "deepseek4"):
++            if family == "glm":
++                from serve import glm
++                self.parser_cls = glm.GlmOutputParser
++                self._force_text = glm.to_glm_force
++                endings = ("<|user|>", "<|observation|>", "<|developer|>")
++            else:
++                from serve import dsml
++                self.parser_cls = dsml.DsmlOutputParser
++                self._force_text = dsml.to_ds4_force
++                endings = ()
++            special = getattr(self.tok, "special_ids", None) or {}
++            stops = {int(special[k]) for k in ("eos", "eot", "eom", "tokenizer.ggml.eos_token_id",
++                                              "tokenizer.ggml.eot_token_id", "tokenizer.ggml.eom_token_id")
++                     if type(special.get(k)) is int and special[k] >= 0}
++            vocabulary = getattr(self.tok, "ids", {})
++            stops.update(vocabulary[s] for s in endings if s in vocabulary)
++            if stops:
++                self.stop_ids = stops
++            self.template.model_family = family
++            self.template.tool_style = "openai" if family == "deepseek4" else "flat"
++            self.template.model_tokens = {}
++            for name, key in (("bos_token", "tokenizer.ggml.bos_token_id"), ("eos_token", "tokenizer.ggml.eos_token_id")):
++                index = special.get(key)
++                if type(index) is int and index >= 0:
++                    self.template.model_tokens[name] = self.tok.decode([index])
++            self.template.caps = self.template._detect_caps()
+         import serve.frontend as _frontend
+         _frontend.use_family(family)
+ 
+@@ -5080,11 +5129,13 @@ class Service:
          """Yields ("event", Event) as text arrives, then ("done", {"finish": .., "completion_tokens": ..}).
          `force` (forced_call): the opening of the call the reply must make - see prepare()."""
          # the model card's sampling for this thinking state, then the config's block, then the Chat settings shared with
@@ -792,7 +1322,7 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
          # #123: read after the merge, so a budget shared through POST /settings is seen like the other keys
          budget = self.reasoning_budget(sampling) if thinking else None
          if thinking and not budget and self.answer_room and max_new and max_new >= ANSWER_ROOM_MIN_CAP:
-@@ -5455,12 +5466,24 @@ class Service:
+@@ -5455,12 +5506,24 @@ class Service:
                              text = "\n" * (2 - (len(tail) - len(tail.rstrip("\n")))) + force
                          force = None
                          extra = self.tok.encode(text, parse_special=True)
@@ -820,7 +1350,7 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
                              n += 1
                              raw_ids.append(t)
                              thinking_n += parser.state in ("reasoning", "rcall")
-@@ -6668,8 +6691,11 @@ def make_handler(svc: Service):
+@@ -6668,8 +6731,11 @@ def make_handler(svc: Service):
              elif path in ("/v1/models", "/models"):
                  if self._authorized():
                      loaded = svc.loaded()
@@ -833,7 +1363,7 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
                               "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
                                                "output_modalities": ["text"]}}
                      if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
-@@ -7173,10 +7199,20 @@ def make_handler(svc: Service):
+@@ -7173,10 +7239,20 @@ def make_handler(svc: Service):
              if not req.get("stream"):
                  return self._json(200, openai_collect(chunks))
              self._sse()
@@ -854,7 +1384,16 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
                      else:
                          self.wfile.write(b"data: " + json.dumps(c, ensure_ascii=False).encode() + b"\n\n")
                      self.wfile.flush()
-@@ -8069,6 +8105,49 @@ def model_card_sampling(arch, thinking) -> dict:
+@@ -7870,6 +7946,8 @@ def apply_saved_tuning(cfg: dict, *, say=None) -> dict:
+     Every start path runs this (the Terminal, `runtime start`, the app's load, a restart of the app, an unload and a load), so the
+     tuning is applied every time and never re-measured. A tune's own worker sets STRATA_NO_PRESET so that it measures the
+     configuration it was given. Never fails a start: a store that cannot be read means the configuration as it is."""
++    if cfg.get("engine_kind") in ("ggml", "poly"):
++        return cfg
+     if os.environ.get("STRATA_NO_PRESET"):
+         return cfg
+     say = say or (lambda line: print(line, flush=True))
+@@ -8069,6 +8147,49 @@ def model_card_sampling(arch, thinking) -> dict:
      return dict(sets["thinking" if thinking else "instruct"]) if sets else {}
  
  
@@ -904,6 +1443,39 @@ index 71a55e1f0f9c8c95239396c2dd18297dee08e6df..f3979ea5eeed5e4ab89eaa7461f7f9dd
  def default_model_name(cfg: dict) -> str:
      """The config's "model_name", else its family's name ("arch": qwen4exp, qwen35moe), else Flash-Next's."""
      return cfg.get("model_name") or FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next")
+@@ -8287,6 +8408,12 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+         cfg["gpu"] = int(a.gpu) if a.gpu.strip().isdigit() else a.gpu
+     a.host = a.host or cfg.get("host") or "127.0.0.1"   # issue #26: the run scripts pass no --host, the config can
+     supplied_args = argv if argv is not None else sys.argv[1:]
++    if a.engine == "strata" and cfg.get("engine_kind") in ("ggml", "poly"):
++        from serve.model_backends import checked_bind
++        try:
++            a.port = checked_bind(cfg, a.port, supplied_args)
++        except ValueError as exc:
++            ap.error(str(exc))
+     if ("STRATA_API_KEY" in os.environ and not os.environ["STRATA_API_KEY"].strip()) or \
+             any((x == "--api-key" and i + 1 < len(supplied_args) and not supplied_args[i + 1].strip()) or
+                 x.strip() == "--api-key=" for i, x in enumerate(supplied_args)):
+@@ -8314,18 +8441,7 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+         ap.error(f"the model's tokenizer is missing ({tpath / 'vocab.json'}); run setup again")
+     if (tpath / "vocab.json").exists():
+         import strata_tokenizer as ST
+-        vocab = json.loads((tpath / "vocab.json").read_text(encoding="utf-8"))
+-        tokens = [None] * len(vocab)
+-        for t, i in vocab.items():
+-            tokens[i] = t
+-        merges = (tpath / "merges.txt").read_text(encoding="utf-8").split("\n")
+-        types = json.loads((tpath / "token_type.json").read_text())
+-        tcfg = {}
+-        try:                                            # the pack's pre-tokenizer name and special ids (DeepSeek's differ)
+-            tcfg = json.loads((tpath / "tokenizer.json").read_text(encoding="utf-8"))
+-        except (OSError, ValueError):
+-            pass
+-        tok = ST.Tokenizer(tokens, merges, types, tcfg.get("pre") or "qwen35", tcfg.get("special_ids") or None)
++        tok = ST.Tokenizer.from_dir(tpath)
+     hub = hub_from_config(cfg, a.mcp_config)            # before the minutes of loading: a bad entry stops here
+     if a.offline and (hub is not None or cfg.get("before_load") or a.before_load):
+         ap.error("--offline requires MCP servers and before_load commands to be disabled in this profile")
 diff --git a/serve/test_declared_tool_boundary.py b/serve/test_declared_tool_boundary.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..8422f3ceca0820dd8aed4c97f31e725640675b58
@@ -983,6 +1555,185 @@ index 0000000000000000000000000000000000000000..8422f3ceca0820dd8aed4c97f31e7256
 +
 +if __name__ == "__main__":
 +    unittest.main()
+diff --git a/serve/test_legacy_models.py b/serve/test_legacy_models.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..73c81f16705248b05359f865b49ce140b49f9b38
+--- /dev/null
++++ b/serve/test_legacy_models.py
+@@ -0,0 +1,173 @@
++"""Offline GLM/DeepSeek family and OpenAI protocol checks, without learned weights or speed tests."""
++import json
++from pathlib import Path
++import sys
++import tempfile
++import unittest
++import urllib.error
++import urllib.request
++ROOT=Path(__file__).resolve().parents[1]
++sys.path[:0]=[str(ROOT),str(ROOT/'tools')]
++import strata_tokenizer as ST
++from serve.glm import GlmOutputParser, to_glm_force
++from serve.frontend import ChatTemplate, OutputParser, forced_call
++from serve import frontend as F
++from serve.server import ByteTokenizer, MockEngine, Service, serve
++from serve.server import StrataEngine
++from serve.server import apply_saved_tuning
++from serve.dsml import DsmlOutputParser,to_ds4_force
++from serve.model_backends import checked_bind
++
++TOOLS=[{'name':'files.write','parameters':{'type':'object','properties':{
++ 'path':{'type':'string'},'n':{'type':'integer'},'content':{'type':'string'}}}}]
++VALUE='a literal </tool_call> and </arg_value>\nend'
++BODY='files__write<arg_key>path</arg_key><arg_value>doc.md</arg_value><arg_key>n</arg_key><arg_value>3</arg_value><arg_key>content</arg_key><arg_value>'+VALUE+'</arg_value>'
++
++class Parser(unittest.TestCase):
++ def tearDown(self):F.use_family(None)
++ def events(self,text,step=1,thinking=False,tools=TOOLS,stream=True):
++  p=GlmOutputParser(thinking=thinking,tools=tools,stream_tools=stream,declared_only=True)
++  events=[]
++  for i in range(0,len(text),step):events+=p.feed(text[i:i+step])
++  return events+p.finish('stop')
++ def test_chunks_alias_and_literal_tags(self):
++  for step in (1,2,7,10000):
++   for stream in (False,True):
++    with self.subTest(step=step,stream=stream):
++     ev=self.events('analysis</think>Answer\n<tool_call>'+BODY+'</tool_call>',step,True,stream=stream)
++     calls=[x.call for x in ev if x.kind=='tool_call'];self.assertEqual(len(calls),1)
++     self.assertEqual(calls[0].name,'files.write');self.assertEqual(calls[0].arguments,{'path':'doc.md','n':3,'content':VALUE})
++     self.assertEqual(''.join(x.text for x in ev if x.kind=='reasoning'),'analysis')
++     self.assertEqual(''.join(x.text for x in ev if x.kind=='content'),'Answer')
++     if stream:
++      args=''.join(x.text for x in ev if x.kind=='tool_args');self.assertEqual(json.loads(args),calls[0].arguments)
++ def test_zero_arguments(self):
++  for step in (1,1000):
++   ev=self.events('<tool_call>files.write</tool_call>',step)
++   self.assertEqual([x.call.arguments for x in ev if x.kind=='tool_call'],[{}])
++ def test_no_undeclared_events(self):
++  for tools in ([],TOOLS):
++   ev=self.events('<tool_call>unregistered<arg_key>x</arg_key><arg_value>1</arg_value></tool_call>',tools=tools)
++   self.assertFalse(any(x.kind.startswith('tool_') for x in ev))
++ def test_ambiguous_alias_not_authorized(self):
++  tools=[{'name':'one.write'},{'name':'two.write'}]
++  ev=self.events('<tool_call>write</tool_call>',tools=tools)
++  self.assertFalse(any(x.kind.startswith('tool_') for x in ev))
++ def test_quoted_and_fenced_examples_are_text(self):
++  for text in ('Example `<tool_call>'+BODY+'</tool_call>`.', '```xml\n<tool_call>'+BODY+'</tool_call>\n```'):
++   ev=self.events(text);self.assertFalse(any(x.kind.startswith('tool_') for x in ev))
++ def test_reasoning_call_rescue_and_quote(self):
++  text='<tool_call>'+BODY+'</tool_call></think>'
++  self.assertEqual(len([x for x in self.events(text,thinking=True) if x.kind=='tool_call']),1)
++  text='An example is `<tool_call>'+BODY+'</tool_call>`.</think>Answer'
++  self.assertFalse(any(x.kind.startswith('tool_') for x in self.events(text,thinking=True)))
++ def test_duplicate_arguments_fail(self):
++  with self.assertRaises(ValueError):self.events('<tool_call>files.write<arg_key>n</arg_key><arg_value>1</arg_value><arg_key>n</arg_key><arg_value>2</arg_value></tool_call>')
++ def test_think_end_after_quote(self):
++  ev=self.events('I will say "Paris."</think>Paris',thinking=True)
++  self.assertEqual(''.join(x.text for x in ev if x.kind=='content'),'Paris')
++ def test_truncated_call_is_never_completed(self):
++  for stream in (False,True):
++   p=GlmOutputParser(thinking=False,tools=TOOLS,stream_tools=stream,declared_only=True)
++   ev=p.feed('<tool_call>files.write<arg_key>content</arg_key><arg_value>unfinished')+p.finish('length')
++   self.assertFalse(any(x.kind=='tool_call' for x in ev))
++ def test_force_uses_native_spelling(self):
++  f=forced_call({'type':'function','function':{'name':'files.write'}},TOOLS)
++  self.assertEqual(to_glm_force(f),'<tool_call>files.write\n')
++ def test_qwen_marker_unchanged(self):
++  p=OutputParser(thinking=False,tools=TOOLS,declared_only=True)
++  ev=p.feed('<tool_call><function=files__write><parameter=n>3</parameter></function></tool_call>')+p.finish()
++  self.assertEqual([x.call.name for x in ev if x.kind=='tool_call'],['files.write'])
++ def test_effort_words_do_not_leak_between_families(self):
++  F.use_family('glm');self.assertEqual(F.effort_kwargs('high'),{'enable_thinking':True})
++  self.assertEqual(F.effort_kwargs('none'),{'enable_thinking':False})
++  F.use_family(None);self.assertEqual(F.effort_kwargs('high'),{'reasoning_effort':'xhigh'})
++ def test_optional_sampler_preserves_explicit_zero(self):
++  obj=object.__new__(StrataEngine);obj.info={'engine_kind':'ggml'}
++  values={'temperature':0,'top_p':1,'min_p':0,'top_k':0,'seed':0}
++  keys=obj.request_sampling(values)
++  for value in ('temperature=0.0','top_p=1.0','min_p=0.0','top_k=0','seed=0'):self.assertIn(value,keys)
++  obj.info={};self.assertEqual(obj.request_sampling(values),StrataEngine.sampling_keys(values))
++  del obj.info;self.assertEqual(obj.request_sampling(values),StrataEngine.sampling_keys(values))
++ def test_profile_port_does_not_fall_back_to_OWUI(self):
++  self.assertEqual(checked_bind({'port':8094},8080,[]),8094)
++  self.assertEqual(checked_bind({'port':8094},8095,['--port','8095']),8095)
++  with self.assertRaises(ValueError):checked_bind({'port':8094},8080,['--port=8080'])
++  with self.assertRaises(ValueError):checked_bind({'port':8093},8080,[])
++  self.assertEqual(checked_bind({'port':8094},8093,['--port','8093']),8093)
++ def test_native_presets_do_not_rewrite_optional_cli(self):
++  cfg={'engine_kind':'ggml','args':['--model','local.gguf'],'env':{}}
++  self.assertIs(apply_saved_tuning(cfg),cfg)
++
++class Tokenizer(unittest.TestCase):
++ def test_glm_three_digits_and_whole_piece(self):
++  vocab=['1','2','3','4','5','12','123','45','a','b','ab'];merges=['1 2','12 3','4 5']
++  glm=ST.Tokenizer(vocab,merges,pre='glm5');qwen=ST.Tokenizer(vocab,merges,pre='qwen35')
++  self.assertEqual([vocab[i] for i in glm.encode('12345ab')],['123','45','ab'])
++  self.assertEqual([vocab[i] for i in qwen.encode('12345ab')],['1','2','3','4','5','a','b'])
++ def test_joyai_matches_deepseek_sequence(self):
++  vocab=list(ST.bytes_to_unicode().values());a=ST.Tokenizer(vocab,[],pre='joyai-llm');b=ST.Tokenizer(vocab,[],pre='deepseek-v3')
++  for text in ('12345 中文','Привет\n世界','x!=foo 1.5'):
++   self.assertEqual(a.encode(text),b.encode(text));self.assertEqual(a.decode(a.encode(text)),text)
++
++class DeepSeek(unittest.TestCase):
++ def test_native_no_space_calls_alias_and_string_type(self):
++  text='<｜DSML｜tool_calls><｜DSML｜invoke name="files__write"><｜DSML｜parameter name="n" string="true">123</｜DSML｜parameter></｜DSML｜invoke></｜DSML｜tool_calls>'
++  for step in (1,7,10000):
++   p=DsmlOutputParser(thinking=False,tools=TOOLS,stream_tools=True,declared_only=True);ev=[]
++   for i in range(0,len(text),step):ev+=p.feed(text[i:i+step])
++   ev+=p.finish();calls=[x.call for x in ev if x.kind=='tool_call']
++   self.assertEqual([(x.name,x.arguments) for x in calls],[('files.write',{'n':'123'})])
++   self.assertEqual(json.loads(''.join(x.text for x in ev if x.kind=='tool_args')),{'n':'123'})
++ def test_forced_prefix_preserves_v4_spelling(self):
++  f=forced_call({'type':'function','function':{'name':'files.write'}},TOOLS)
++  self.assertEqual(to_ds4_force(f),'<｜DSML｜tool_calls>\n<｜DSML｜invoke name="files.write">\n')
++ def test_family_stop_ids_use_model_metadata(self):
++  tok=ByteTokenizer();tok.pre='joyai-llm';tok.special_ids={'tokenizer.ggml.eos_token_id':2,'tokenizer.ggml.eom_token_id':1000}
++  s=Service(MockEngine(tok,'x'),tok,ChatTemplate(ROOT/'serve/chat_template.jinja'));s.set_family(None)
++  self.assertEqual(s.family,'deepseek4');self.assertEqual(s.stop_ids,{2,1000});F.use_family(None)
++
++class API(unittest.TestCase):
++ def setUp(self):
++  self.tok=ByteTokenizer();self.tok.pre='glm5'
++  script='analysis</think>\n<tool_call>'+BODY+'</tool_call>'
++  self.svc=Service(MockEngine(self.tok,script),self.tok,ChatTemplate(ROOT/'serve/chat_template.jinja'),model_name='synthetic-glm')
++  self.svc.set_family(None);self.svc.api_key='unit-fixture-only'
++  self.http=serve(self.svc,port=0);self.url='http://127.0.0.1:'+str(self.http.server_address[1])
++ def tearDown(self):self.http.shutdown();self.http.server_close();F.use_family(None)
++ def request(self,path,body=None,auth=True):
++  headers={'Content-Type':'application/json'}
++  if auth:headers['Authorization']='Bearer unit-fixture-only'
++  req=urllib.request.Request(self.url+path,data=json.dumps(body).encode() if body is not None else None,headers=headers)
++  return urllib.request.urlopen(req,timeout=10)
++ def body(self,stream=False):return {'model':'synthetic-glm','messages':[{'role':'user','content':'test'}],
++  'tools':[{'type':'function','function':TOOLS[0]}],'max_tokens':500,'stream':stream}
++ def test_chat_completions(self):
++  with self.request('/v1/chat/completions',self.body()) as r:data=json.load(r)
++  msg=data['choices'][0]['message'];call=msg['tool_calls'][0]['function']
++  self.assertEqual(call['name'],'files.write');self.assertEqual(json.loads(call['arguments'])['content'],VALUE)
++  self.assertEqual(msg.get('reasoning_content'),'analysis')
++ def test_streamed_calls(self):
++  with self.request('/v1/chat/completions',self.body(True)) as r:lines=r.read().decode().splitlines()
++  events=[json.loads(x[6:]) for x in lines if x.startswith('data: ') and x[6:]!='[DONE]']
++  calls=[c for x in events for choice in x.get('choices',[]) for c in choice.get('delta',{}).get('tool_calls',[])]
++  self.assertTrue(calls);self.assertEqual(json.loads(''.join(c.get('function',{}).get('arguments','') for c in calls))['n'],3)
++ def test_auth_remains_required(self):
++  with self.assertRaises(urllib.error.HTTPError) as e:self.request('/v1/chat/completions',self.body(),False)
++  self.assertEqual(e.exception.code,401)
++ def test_models_route(self):
++  with self.request('/v1/models') as r:data=json.load(r)
++  self.assertEqual(data['data'][0]['id'],'synthetic-glm')
++ def test_responses_tool_calls(self):
++  body={'model':'synthetic-glm','input':'test','tools':[{'type':'function',**TOOLS[0]}],'max_output_tokens':500}
++  with self.request('/v1/responses',body) as r:data=json.load(r)
++  calls=[x for x in data['output'] if x['type']=='function_call']
++  self.assertEqual(calls[0]['name'],'files.write');self.assertEqual(json.loads(calls[0]['arguments'])['content'],VALUE)
++ def test_named_choice_seeds_native_prefix(self):
++  tail=BODY[BODY.index('<arg_key>'):]+'</tool_call>'
++  self.svc.engine=MockEngine(self.tok,tail)
++  body=self.body();body['reasoning_effort']='none';body['tool_choice']={'type':'function','function':{'name':'files.write'}}
++  with self.request('/v1/chat/completions',body) as r:data=json.load(r)
++  self.assertEqual(data['choices'][0]['message']['tool_calls'][0]['function']['name'],'files.write')
++
++if __name__=='__main__':unittest.main()
 diff --git a/serve/test_responses.py b/serve/test_responses.py
 index 3e6188a1175fa5dbc9d2f92c73c0628b824b6b47..de93128b7f18747f36528ff3f70991c7d7ad3026 100644
 --- a/serve/test_responses.py
@@ -2707,10 +3458,10 @@ index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85
      if (cpu_index < 0 || cpu_index >= 64) return false;
      return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;
 diff --git a/src/kernels/cpu/iq_avx512.cpp b/src/kernels/cpu/iq_avx512.cpp
-index 14330f6ecb7c0264ddd41ac4a3f13f3f7d1f9810..5f94d77a69d62aada9a90d6dbe09785d925424bf 100644
+index 444c64d28e8c8c53c40f54671f303f9a8a9e6304..6e7240f4aba7e89b830eba48f710d34901e19baf 100644
 --- a/src/kernels/cpu/iq_avx512.cpp
 +++ b/src/kernels/cpu/iq_avx512.cpp
-@@ -568,11 +568,11 @@ static bool has_vpopcnt() {
+@@ -588,11 +588,11 @@ static bool has_vpopcnt() {
  #if defined(_MSC_VER)
          int r[4];
          __cpuidex(r, 7, 0);
@@ -3417,10 +4168,10 @@ index 6cb888e50a4ed516a1bb90566d7140d1315dc372..f70ad4f50793b0c8d70c07630547e8b6
                          out[(size_t) i] = (uint16_t) (u >> 16);
                      }
 diff --git a/src/program/generate.cpp b/src/program/generate.cpp
-index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc2504e295 100644
+index d381227de4c1175bca54e2e3c92f141813c1ffa8..cf57f34bd01826c530aa01c93087f2aa021bcb44 100644
 --- a/src/program/generate.cpp
 +++ b/src/program/generate.cpp
-@@ -45,6 +45,7 @@
+@@ -46,6 +46,7 @@
  #include "strata/kernels/cpu/expert.hpp"
  #include "strata/kernels/cpu/pool.hpp"
  #include "strata/platform/aux_cpus.hpp"
@@ -3428,7 +4179,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
  #include "strata/kernels/cpu/expert_layout.hpp"
  #include "strata/kernels/cpu/hadamard.hpp"
  #include "strata/kernels/ngram.hpp"
-@@ -2624,7 +2625,13 @@ int main(int argc, char** argv) {
+@@ -2629,7 +2630,13 @@ int main(int argc, char** argv) {
          else if (a == "--mtp-window") o.mtp_window = std::atoll(next("--mtp-window"));
          else if (a == "--pcie-frac") o.pcie_frac = std::atof(next("--pcie-frac"));
          else if (a == "--adapt-every") { o.adapt_every = std::atoi(next("--adapt-every")); o.adapt_every_given = true; }
@@ -3441,9 +4192,9 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
 +            }
 +        }
          else if (a == "--adapt-min-gain") o.adapt_min_gain = (float) std::atof(next("--adapt-min-gain"));
-         else if (a == "--adapt-async") o.adapt_async = std::atoi(next("--adapt-async")) != 0 ? 1 : 0;
+         else if (a == "--adapt-async") { o.adapt_async = std::atoi(next("--adapt-async")) != 0 ? 1 : 0; o.adapt_async_given = o.adapt_async; }
          else if (a == "--spec-min-p") o.spec_min_p = std::atof(next("--spec-min-p"));
-@@ -3508,6 +3515,36 @@ int main(int argc, char** argv) {
+@@ -3513,6 +3520,36 @@ int main(int argc, char** argv) {
          }
      }
      const bool native_pack = strata::kernels::cpu::expert_layout().native;
@@ -3480,7 +4231,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
      // STRATA_MMQ_DIRECT: the room each sized expert slot keeps after its blob (0 unless it is on: the slot costs and
      // the arena are then today's, byte for byte)
      const int64_t slot_guard = native_pack ? (int64_t) strata::prefill::Prefill::slot_guard_bytes() : 0;
-@@ -5704,7 +5741,11 @@ int main(int argc, char** argv) {
+@@ -5709,7 +5746,11 @@ int main(int argc, char** argv) {
              return 1;
          }
      }
@@ -3492,7 +4243,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
      strata::core::ExpertSource* srcp = nullptr;
      if (o.mmap_experts) {
          // FileExpertSource maps the pack's experts.bin: a canonical pack has it; a native (IQ) pack has it when
-@@ -5968,6 +6009,8 @@ int main(int argc, char** argv) {
+@@ -5973,6 +6014,8 @@ int main(int argc, char** argv) {
          }
      }
  #endif
@@ -3501,7 +4252,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
      if (o.pool_measure)
          o.pool_affinity = measure_pool_affinity(srcp, o.pool_workers, !o.no_host_worker, o.pool_tasks);
      strata::kernels::cpu::ExpertPool pool(o.pool_workers, /*pin=*/true, /*host_works=*/!o.no_host_worker,
-@@ -9465,10 +9508,44 @@ int main(int argc, char** argv) {
+@@ -9491,10 +9534,44 @@ int main(int argc, char** argv) {
              id.config = *config_fp;
              return true;
          };
@@ -3547,7 +4298,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              // #2049: parking copies the outgoing conversation's running checkpoints and K/V into host memory, which
              // is a silent stretch of the "request" stage; when the OS has paged that memory out it takes minutes.
              // Named, so a stall report says "parking"; its copies beat (conversation_copy.hpp), so the watchdog
-@@ -9489,9 +9566,15 @@ int main(int argc, char** argv) {
+@@ -9515,9 +9592,15 @@ int main(int argc, char** argv) {
              }
              // #342: before make_room evicts oldest-first, the copies of this conversation a turn back go (they hold
              // nothing the outgoing chain does not, apart from the tail this conversation rewrote)
@@ -3564,7 +4315,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              // A layer split parks one image per stage: the first stage's (with the draft layer's K/V) and one per
              // later stage (without it - the draft ring is saved once).  The checkpoints are MOVED apart into their
              // stage parts for the capture and put back together whichever way this ends (no running state copied).
-@@ -9504,10 +9587,63 @@ int main(int argc, char** argv) {
+@@ -9530,10 +9613,63 @@ int main(int argc, char** argv) {
              if (n_st > 0) cs = strata::core::conversation_checkpoints_split(std::move(checks), n_st);   // #752: two-phase; a bad_alloc leaves `checks` whole
              struct MergeBack {
                  strata::core::ConversationCheckpointSplit& cs; std::vector<ConvCheckpoint>& checks; bool on;
@@ -3631,7 +4382,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              std::vector<strata::core::ConversationKvReuse> stage_reuse = std::move(reuse.stages);
              stage_reuse.resize(n_st);
              reuse.stages.clear();
-@@ -9565,7 +9701,7 @@ int main(int argc, char** argv) {
+@@ -9591,7 +9727,7 @@ int main(int argc, char** argv) {
              const auto t0 = Clock::now();
              try {
                  const uint64_t floor = (uint64_t) o.conversation_cache_min_free_mib * 1024 * 1024;
@@ -3640,7 +4391,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                  const size_t additional = estimate > retained ? estimate - retained : 0;
                  // The physical-RAM gate: the incoming snapshot has to fit beside the floor.  make_room()
                  // above only balanced the cache's own budget, so a full cache leaves this one short even
-@@ -9599,8 +9735,9 @@ int main(int argc, char** argv) {
+@@ -9625,8 +9761,9 @@ int main(int argc, char** argv) {
                                   (long long) o.conversation_cache_min_free_mib);
                  strata::core::SavedConversation image;
                  size_t reused_bytes = 0;
@@ -3651,7 +4402,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                  for (size_t k = 0; k < n_st; ++k) {   // the later stages (the last one with the draft layer's K/V)
                      auto& st = stages[k];
                      const strata::core::OnDevice on(st->dev);
-@@ -9608,10 +9745,16 @@ int main(int argc, char** argv) {
+@@ -9634,10 +9771,16 @@ int main(int argc, char** argv) {
                      const strata::core::ConversationView view_k{live, live_imgs, cs.parts[k], cvec_cached};
                      strata::core::SavedConversation part;
                      if (!strata::core::conversation_snapshot_save(part, view_k, st->ss, g, draft_of(k), err,
@@ -3669,7 +4420,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                  const auto mem_after = strata::core::sample_host_memory();
                  if (!strata::core::conversation_memory_admit(
                          mem_after ? std::optional<uint64_t>(mem_after->available) : std::nullopt, 0, floor)) {
-@@ -9634,8 +9777,8 @@ int main(int argc, char** argv) {
+@@ -9660,8 +9803,8 @@ int main(int argc, char** argv) {
          };
          // #752: the whole park (the checkpoint split included) is under one try, so a host OOM skips parking instead of
          // ending the server
@@ -3680,7 +4431,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              catch (const std::bad_alloc&) {
                  std::fprintf(stderr, "strata serve: conversation cache: allocation failed; skip parking\n");
                  return true;
-@@ -9701,6 +9844,10 @@ int main(int argc, char** argv) {
+@@ -9727,6 +9870,10 @@ int main(int argc, char** argv) {
          auto checkpoint_at = [&](int64_t L, std::vector<ConvCheckpoint>* parts = nullptr, bool as_tail = false) -> bool {
              ckpt_why.clear();
              if (o.prompt_cache <= 0 || L < 1) return true;
@@ -3691,7 +4442,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              for (ConvCheckpoint& c : checks)
                  if ((int64_t) c.ids.size() == L) {
                      c.used = ++check_clock;
-@@ -9712,6 +9859,7 @@ int main(int argc, char** argv) {
+@@ -9738,6 +9885,7 @@ int main(int argc, char** argv) {
              c.imgs = imgs_below(req_imgs, L);
              if (parts != nullptr) {
                  if (parts->size() != stages.size() + 1) return false;
@@ -3699,7 +4450,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                  c.gdn = std::move((*parts)[0].gdn);
                  c.ple = std::move((*parts)[0].ple);
                  c.tails = std::move((*parts)[0].tails);
-@@ -9855,6 +10003,11 @@ int main(int argc, char** argv) {
+@@ -9881,6 +10029,11 @@ int main(int argc, char** argv) {
                  ckpt_pool.give(std::move(checks[victim]));   // (STRATA_CKPT_POOL; else nothing)
                  checks.erase(checks.begin() + (std::ptrdiff_t) victim);
              }
@@ -3711,7 +4462,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              if (ckpt_trace && checks.size() < before_evict) {
                  const double ms = std::chrono::duration<double, std::milli>(Clock::now() - te0).count();
                  req_times.evict_ms += ms;
-@@ -11469,6 +11622,7 @@ int main(int argc, char** argv) {
+@@ -11505,6 +11658,7 @@ int main(int argc, char** argv) {
          // conversation an idle slot holds reads on from there.  Every stage, the same calls.
          // `at`: one of the slot's checkpoints - only the K/V up to it is copied and its state restored instead
          auto copy_from_slot = [&](int b, const ConvCheckpoint* at, std::string& e) -> bool {
@@ -3719,7 +4470,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              const int64_t upto = at != nullptr ? (int64_t) at->ids.size() : (int64_t) bs[(size_t) b].ids.size();
              if (at != nullptr && at->stage_parts.size() != stages.size()) { e = "a checkpoint without its stage parts"; return false; }
              if (slot_copy_direct && at == nullptr) {
-@@ -12507,6 +12661,7 @@ int main(int argc, char** argv) {
+@@ -12543,6 +12697,7 @@ int main(int argc, char** argv) {
              }
              cur = ids;
              const Clock::time_point r0 = Clock::now();
@@ -3727,7 +4478,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
              const int64_t streamed0 = sp.chain_experts_streamed();   // the DONE line's experts_streamed= is the difference
              // ---- where this request starts reading: the live session, or a checkpoint, whose tokens AND pictures are
              // exactly the start of this prompt - at most n - 1 of them, the last token is always the first window
-@@ -12748,7 +12903,7 @@ int main(int argc, char** argv) {
+@@ -12784,7 +12939,7 @@ int main(int argc, char** argv) {
                                      (int64_t) live.size() >= (int64_t) park_held + o.conversation_cache_park_gain;
              if (borrow && !pin_sibling && park_worth) {
                  conversations.guard(parked.serial);   // parking the outgoing conversation must not evict the donor
@@ -3736,7 +4487,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                  const bool blocked = conversations.guard_blocked();
                  conversations.unguard();
                  if (!parked_ok) {
-@@ -12763,13 +12918,13 @@ int main(int argc, char** argv) {
+@@ -12799,13 +12954,13 @@ int main(int argc, char** argv) {
                      borrow = false;
                      if (const size_t at = conversations.index_of(parked.serial); at != SIZE_MAX)
                          incoming.emplace(conversations.take(at));
@@ -3752,7 +4503,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                  std::printf("ERR %s\n", err.c_str());
                  return 1;
              }
-@@ -12910,7 +13065,7 @@ int main(int argc, char** argv) {
+@@ -12946,7 +13101,7 @@ int main(int argc, char** argv) {
                  if (std::getenv("STRATA_SNAPSHOT_FULL_CAPTURE") == nullptr) {
                      std::vector<std::vector<strata::core::ConversationKv>> stage_kv;   // every stage's, for its next park
                      for (auto& si : incoming->stage_images) stage_kv.push_back(std::move(si.kv));
@@ -3761,7 +4512,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                  }
                  incoming.reset(); // Running-state/checkpoint copies are no longer needed.
                  lent_slot = -1;   // (the main session holds the parked conversation now)
-@@ -13588,7 +13743,8 @@ int main(int argc, char** argv) {
+@@ -13624,7 +13779,8 @@ int main(int argc, char** argv) {
                          return v == nullptr || std::atoi(v) != 0;
                      }();
  #if defined(_WIN32)
@@ -3771,7 +4522,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                      std::vector<ULONG> host_cpu_sets;
                      if (conc_on_host) {
                          const HANDLE self = GetCurrentThread();
-@@ -13616,6 +13772,7 @@ int main(int argc, char** argv) {
+@@ -13652,6 +13808,7 @@ int main(int argc, char** argv) {
                              std::fprintf(stderr, "strata batch: %d threads that ran on the host thread's core moved off "
                                                   "it, for reads beside the slots\n", moved);
                      auto conc_thread_cpus = [&] {
@@ -3779,7 +4530,7 @@ index 7bafd685073a102d2ad099d623643615b6cffc1f..b37eb507cb688ce79446ed70105450fc
                          strata::aux_cpus::pin_current_thread();
  #if defined(_WIN32)
                          const HANDLE self = GetCurrentThread();
-@@ -15499,6 +15656,17 @@ int main(int argc, char** argv) {
+@@ -15562,6 +15719,17 @@ int main(int argc, char** argv) {
                           prompt_ms > 0 ? 1000.0 * read_n / prompt_ms : 0.0, (long long) produced_n, decode_ms,
                           decode_ms > 0 ? 1000.0 * produced_n / decode_ms : 0.0, (long long) draft_accepted,
                           (long long) draft_offered, checks.size(), cancelled ? " (cancelled)" : "");
@@ -4977,10 +5728,10 @@ index 0000000000000000000000000000000000000000..8f24a8d815cbc1ed5e172fba23b1561c
 +    return 0;
 +}
 diff --git a/tests/terminal/test_launch_engine_first.py b/tests/terminal/test_launch_engine_first.py
-index 62ba4baaa6fa1d8cfd89a4c04cc6e771f8be0af8..f31febccfd5be2fdf811cca7e406632c9cb9dea6 100644
+index 397249c55029519586e58ef3cea0f6eaf64f8c98..b2ce2cb2e5b46786e01a2e6c9567e4d119b722c6 100644
 --- a/tests/terminal/test_launch_engine_first.py
 +++ b/tests/terminal/test_launch_engine_first.py
-@@ -41,8 +41,14 @@ def update_events(status: str, note: str = "", code: int = 0) -> list[dict]:
+@@ -49,6 +49,12 @@ def update_events(status: str, note: str = "", code: int = 0) -> list[dict]:
              {"event": "result", "results": [res], "exit_code": code}]
  
  
@@ -4991,44 +5742,8 @@ index 62ba4baaa6fa1d8cfd89a4c04cc6e771f8be0af8..f31febccfd5be2fdf811cca7e406632c
 +
 +
  def runner(spawned: list) -> Runner:
--    r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=mock.Mock(), emit=lambda e: None)
-+    r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=qwen_catalog(), emit=lambda e: None)
+     r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=qwen_catalog(), emit=lambda e: None)
      r.check_cancel = lambda: None
-     return r
- 
-@@ -58,7 +64,7 @@ class EngineBeforeModel(unittest.TestCase):
-         """ensure_engine() like run_ensure, returning (spawns, error or None, the runner with .events)."""
-         spawns: list = []
-         seen: list = []
--        r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=mock.Mock(), emit=seen.append,
-+        r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=qwen_catalog(), emit=seen.append,
-                    confirm=confirm, assume_yes=assume_yes)
-         r.events = seen
-         r.check_cancel = lambda: None
-diff --git a/tests/terminal/test_tui2_023_versions.py b/tests/terminal/test_tui2_023_versions.py
-index 4fd17be89e49ffdff1034230ba7df4af8ea37702..1cbbcce6372f16832b5055b2f784928c80d82cc2 100644
---- a/tests/terminal/test_tui2_023_versions.py
-+++ b/tests/terminal/test_tui2_023_versions.py
-@@ -24,8 +24,8 @@ class VersionBump(unittest.TestCase):
-         # 0.2.4 is a Terminal / Control and engine release (DeepSeek V4.1-Flash): the app stays 0.2.3, the three DeepSeek engine packages are 0.1.49,
-         # the other engine packages stay 0.1.48 (metal/CMakeLists.txt keeps 0.1.48)
-         self.assertEqual(strata_cli.PRODUCT_VERSION, "0.2.4.2")
--        self.assertEqual(strata_cli.version(), "0.1.49.2")                # the CMake project version: Control
--        self.assertEqual(first("CMakeLists.txt", r"^project\(strata VERSION ([0-9.]+) "), "0.1.49.2")
-+        self.assertEqual(strata_cli.version(), "0.1.49.3")                # the CMake project version: Control
-+        self.assertEqual(first("CMakeLists.txt", r"^project\(strata VERSION ([0-9.]+) "), "0.1.49.3")
-         self.assertIn('STRATA_VERSION="0.1.48-metal"', (ROOT / "metal" / "CMakeLists.txt").read_text(encoding="utf-8"))
- 
-     def test_every_place_the_app_version_lives_says_0_2_3(self):
-@@ -48,7 +48,7 @@ class VersionBump(unittest.TestCase):
-     def test_version_prints_the_product_and_the_build(self):
-         done = subprocess.run([sys.executable, str(ROOT / "strata.py"), "--version"], capture_output=True, text=True, cwd=str(ROOT),
-                               env={**os.environ, "STRATA_NO_HANDOVER": "1"})
--        self.assertTrue(done.stdout.startswith("strata 0.2.4.2 (build 0.1.49.2;"), done.stdout)
-+        self.assertTrue(done.stdout.startswith("strata 0.2.4.2 (build 0.1.49.3;"), done.stdout)
- 
- 
- class UpdateFromTheLastRelease(test_updater.UpdaterCase):
 diff --git a/tools/strata_bench.py b/tools/strata_bench.py
 index 93d92ee1d18c8d1fa3d3f0bbaabd6e9347b21fc2..19de31e8040e415c82e077ef30ab0623d3810572 100644
 --- a/tools/strata_bench.py
@@ -5043,6 +5758,110 @@ index 93d92ee1d18c8d1fa3d3f0bbaabd6e9347b21fc2..19de31e8040e415c82e077ef30ab0623
          return m.group(1) if m else None
      except OSError:
          return None
+diff --git a/tools/strata_tokenizer.py b/tools/strata_tokenizer.py
+index 33452af86ef072766a105655872e0235562db97c..b5fe5fe3558c17fb65546f9a99400dc80b10eb95 100644
+--- a/tools/strata_tokenizer.py
++++ b/tools/strata_tokenizer.py
+@@ -77,6 +77,9 @@ DEEPSEEK3_PATTERNS = (
+     r"| ?[\p{P}\p{S}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+",
+ )
+ 
++# llama.cpp assigns these pre labels the same sequential DeepSeek3 splitter.
++DEEPSEEK3_PRES = ("deepseek", "joyai", "hunyuan-dense", "hy_v4")
++
+ 
+ def _sequence_findall(patterns, text: str) -> list[str]:
+     """llama.cpp's unicode_regex_split: the pieces of `text` after each pattern in turn splits every piece into its
+@@ -97,11 +100,21 @@ def _sequence_findall(patterns, text: str) -> list[str]:
+     return pieces
+ 
+ 
++# GLM's native pre-tokenizer: three-digit runs and whole-piece matches before BPE.
++# Reference: pinned PolyStrata c174f35 and llama.cpp CHATGLM4 tokenizer (MIT).
++GLM4_PATTERN = (
++    r"(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])"
++    r"|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*"
++    r"|\s*[\r\n]+|\s+(?!\S)|\s+"
++)
++
++
+ class Tokenizer:
+     def __init__(self, tokens: list[str], merges: list[str], token_types: list[int] | None = None,
+                  pre: str = "qwen35", special_ids: dict[str, int] | None = None):
+         self.tokens = tokens
+         self.pre = pre
++        self.ignore_merges = pre in ("glm4", "glm5")
+         self.token_types = token_types
+         self.special_ids = special_ids or {}
+         self.ids = {t: i for i, t in enumerate(tokens)}
+@@ -119,11 +132,11 @@ class Tokenizer:
+             if parts[0] not in self.ids or parts[1] not in self.ids:
+                 raise ValueError("merge %d names a token outside the vocabulary: %r" % (i, m))
+             self.ranks[(parts[0], parts[1])] = i
+-        if str(pre).startswith("deepseek"):
++        if str(pre).startswith(DEEPSEEK3_PRES):
+             seq = [regex.compile(x) for x in DEEPSEEK3_PATTERNS]
+             self._split = lambda text: _sequence_findall(seq, text)
+         else:
+-            self._re = regex.compile(QWEN35_PATTERN)
++            self._re = regex.compile(GLM4_PATTERN if self.ignore_merges else QWEN35_PATTERN)
+             self._split = self._re.findall
+ 
+         # The literals matched directly instead of being run through BPE.  GGUF token types: 3 = CONTROL,
+@@ -181,6 +194,31 @@ class Tokenizer:
+                    list(md.get("tokenizer.ggml.token_type") or []) or None,
+                    md.get("tokenizer.ggml.pre", "qwen35"), special)
+ 
++    @classmethod
++    def from_dir(cls, path) -> "Tokenizer":
++        """Read a local tokenizer export, including empty or newline-bearing merge lists."""
++        path = pathlib.Path(path)
++        vocab = json.loads((path / "vocab.json").read_text(encoding="utf8"))
++        if (not isinstance(vocab, dict) or not vocab or not all(isinstance(k, str) for k in vocab)
++                or not all(type(i) is int for i in vocab.values()) or set(vocab.values()) != set(range(len(vocab)))):
++            raise ValueError("tokenizer vocabulary IDs must be unique and contiguous")
++        tokens = [None] * len(vocab)
++        for token, index in vocab.items():tokens[index] = token
++        if (path / "merges.json").exists():
++            merges = json.loads((path / "merges.json").read_text(encoding="utf8"))
++        else:
++            text = (path / "merges.txt").read_text(encoding="utf8")
++            merges = text.split("\n") if text else []
++        if not isinstance(merges, list) or not all(isinstance(m, str) for m in merges):
++            raise ValueError("tokenizer merges must be a list of strings")
++        types = json.loads((path / "token_type.json").read_text(encoding="utf8"))
++        if not isinstance(types, list) or len(types) != len(tokens) or not all(type(t) is int for t in types):
++            raise ValueError("tokenizer token types must match the vocabulary")
++        meta = json.loads((path / "tokenizer.json").read_text(encoding="utf8")) if (path / "tokenizer.json").exists() else {}
++        if not isinstance(meta, dict) or not isinstance(meta.get("special_ids") or {}, dict):
++            raise ValueError("invalid tokenizer metadata")
++        return cls(tokens, merges, types, meta.get("pre") or "qwen35", meta.get("special_ids") or None)
++
+     # -------------------------------------------------------------- the algorithm
+     def _bpe(self, word: str) -> list[str]:
+         """Merge `word` (already byte-mapped) by LOWEST RANK first, repeatedly - not left to right.
+@@ -263,12 +301,15 @@ class Tokenizer:
+             got = cache.get(piece)
+             if got is None:
+                 mapped = "".join(BYTE_TO_UNICODE[b] for b in piece.encode("utf-8"))
+-                got = []
+-                for tok in self._bpe(mapped):
+-                    i = self.ids.get(tok)
+-                    if i is None:
+-                        raise KeyError("BPE produced a token outside the vocabulary: %r" % tok)
+-                    got.append(i)
++                if self.ignore_merges and mapped in self.ids:
++                    got = [self.ids[mapped]]
++                else:
++                    got = []
++                    for tok in self._bpe(mapped):
++                        i = self.ids.get(tok)
++                        if i is None:
++                            raise KeyError("BPE produced a token outside the vocabulary: %r" % tok)
++                        got.append(i)
+                 if len(cache) < self.PIECE_CACHE_MAX:
+                     cache[piece] = got
+             out.extend(got)
 diff --git a/tools/test_strata_bench.py b/tools/test_strata_bench.py
 index 30d3978b010cce1c7af3e5278680bc258945d99b..2291285e4647c2f7099643e948372f8ed03e62e1 100644
 --- a/tools/test_strata_bench.py
@@ -5070,3 +5889,52 @@ index 30d3978b010cce1c7af3e5278680bc258945d99b..2291285e4647c2f7099643e948372f8e
  
  if __name__ == "__main__":
      unittest.main()
+diff --git a/tools/test_strata_tokenizer.py b/tools/test_strata_tokenizer.py
+index e3cb498c2ffe75aa4b77133f8594912bc2ad5fcd..797a8f7fa3171326dc215e5226680a074707f474 100644
+--- a/tools/test_strata_tokenizer.py
++++ b/tools/test_strata_tokenizer.py
+@@ -1,6 +1,6 @@
+-"""Tests for tools/strata_tokenizer.py: llama.cpp's reference vectors, the piece cache (0.1.41: the ids are the ones the
+-merge loop gives, cache cold, warm or switched off), and the incremental prompt encoder, which must give exactly the
+-ids of a plain encode.
++"""Tests for tools/strata_tokenizer.py: the splitter the `pre` label selects, llama.cpp's reference vectors, the piece
++cache (0.1.41: the ids are the ones the merge loop gives, cache cold, warm or switched off), and the incremental prompt
++encoder, which must give exactly the ids of a plain encode.
+ 
+     python -m unittest tools.test_strata_tokenizer -v
+ 
+@@ -139,6 +139,34 @@ def conversation_prompts(template, rnd: random.Random) -> list[tuple[str, str]]:
+     return out
+ 
+ 
++class PreTokenizer(unittest.TestCase):
++    """The `pre` label picks the splitter, and llama.cpp gives JOYAI_LLM, HUNYUAN_DENSE and HY_V4 the DEEPSEEK3_LLM
++    regex sequence (src/llama-vocab.cpp). A vocabulary stating "joyai-llm", as DeepSeek-V4-Flash-0731's does, that
++    falls back to the Qwen pattern splits every digit on its own, where the DeepSeek3 list keeps runs of 1-3 digits
++    together. No vocabulary file is needed: the splitters are pure functions of the text."""
++
++    TEXT = "Grüße aus München am 25.10.2026"        # an umlaut and a date: the date is where the two disagree
++
++    def deepseek3(self, text: str) -> list[str]:
++        return ST._sequence_findall([ST.regex.compile(p) for p in ST.DEEPSEEK3_PATTERNS], text)
++
++    def qwen(self, text: str) -> list[str]:
++        return ST.regex.compile(ST.QWEN35_PATTERN).findall(text)
++
++    def test_the_two_splitters_disagree_on_this_text(self):
++        # the two tests below only mean something while this holds
++        self.assertNotEqual(self.deepseek3(self.TEXT), self.qwen(self.TEXT))
++
++    def test_the_labels_that_share_llama_cpps_deepseek3_list_use_it(self):
++        for pre in ("deepseek-v3", "joyai-llm", "hunyuan-dense", "hy_v4"):
++            tk = ST.Tokenizer(["a"], [], pre=pre)
++            self.assertEqual(tk._split(self.TEXT), self.deepseek3(self.TEXT), pre)
++
++    def test_other_labels_still_use_the_qwen_pattern(self):
++        tk = ST.Tokenizer(["a"], [], pre="qwen35")
++        self.assertEqual(tk._split(self.TEXT), self.qwen(self.TEXT))
++
++
+ class Oracle(unittest.TestCase):
+     """llama.cpp's own tokenizer test vectors for qwen35."""
+ 

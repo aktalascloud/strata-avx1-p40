@@ -1,33 +1,10 @@
 {
-  "schema": 1,
-  "status": "experimental_source_and_CPU_checked",
-  "regression": {
-    "tests": 400,
-    "failures": 0,
-    "errors": 0,
-    "skipped": 6
-  },
-  "family_tests": {
-    "tests": 26,
-    "failures": 0,
-    "errors": 0,
-    "skipped": 0
-  },
-  "profile_tests": 9,
-  "protocol_cases_per_ggml_backend": 15,
-  "native_MTP_cases": [
-    "rejection",
-    "partial",
-    "full",
-    "seeded_sampling"
-  ],
-  "real_CPU_worker_OpenAI_normal_and_SSE": true,
-  "existing_Qwen_tokenizer_and_author_templates_equal": true,
-  "author_DS4_templates_checked": 2,
-  "unchanged_server_functions": 321,
+  "schema": 2,
+  "status": "component_checked",
+  "native_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
   "binaries": {
-    "ggml-cpu": {
-      "sha256": "1511c2e3340cb01dbaabc99269cc5f74dcdd50f07dc2018a98d7dbb979379491",
+    "cpu": {
+      "sha256": "4b96b711855391a67b277839cc0de5cdf8257631c8d52b39e3be69a947daa538",
       "imports": [
         "ADVAPI32.dll",
         "KERNEL32.dll",
@@ -49,36 +26,30 @@
         "api-ms-win-crt-utility-l1-1-0.dll",
         "libomp.dll"
       ],
-      "GLM5Next_compiled": true
+      "capabilities": {
+        "backend": "cpu",
+        "trained_mtp": true,
+        "universal_mtp": false,
+        "model_downloads": false,
+        "images": false,
+        "cache_reuse": false,
+        "native_mtp_architectures": [
+          "deepseek2",
+          "deepseek4",
+          "glm-dsa",
+          "qwen35",
+          "qwen35moe",
+          "qwen3next",
+          "qwen4exp",
+          "glm5-next"
+        ],
+        "glm5_next": true,
+        "library_pin": "b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea"
+      },
+      "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending"
     },
-    "ggml-vulkan": {
-      "sha256": "9293e1dd8163c7650e2cc7681e6b6e5466e7a5233ab20c5d66d9e62bb9c92a75",
-      "imports": [
-        "ADVAPI32.dll",
-        "KERNEL32.dll",
-        "MSVCP140.dll",
-        "SHELL32.dll",
-        "VCRUNTIME140.dll",
-        "VCRUNTIME140_1.dll",
-        "WS2_32.dll",
-        "api-ms-win-crt-convert-l1-1-0.dll",
-        "api-ms-win-crt-environment-l1-1-0.dll",
-        "api-ms-win-crt-filesystem-l1-1-0.dll",
-        "api-ms-win-crt-heap-l1-1-0.dll",
-        "api-ms-win-crt-locale-l1-1-0.dll",
-        "api-ms-win-crt-math-l1-1-0.dll",
-        "api-ms-win-crt-runtime-l1-1-0.dll",
-        "api-ms-win-crt-stdio-l1-1-0.dll",
-        "api-ms-win-crt-string-l1-1-0.dll",
-        "api-ms-win-crt-time-l1-1-0.dll",
-        "api-ms-win-crt-utility-l1-1-0.dll",
-        "libomp.dll",
-        "vulkan-1.dll"
-      ],
-      "GLM5Next_compiled": true
-    },
-    "ggml-cuda": {
-      "sha256": "ee8adb1150cdc6ab0e07aee8b37c21e6a1a9548c2b91013e2aec718e657c555a",
+    "cuda": {
+      "sha256": "ccc9f2708065e83fba7e66ba1058515d4647fea804d1138654b5a1e12e28c417",
       "imports": [
         "ADVAPI32.dll",
         "KERNEL32.dll",
@@ -103,47 +74,180 @@
         "libomp.dll",
         "nvcuda.dll"
       ],
-      "GLM5Next_compiled": true
-    },
-    "poly-cuda": {
-      "sha256": "803726ba8ed1fda83fbb0474d20d182e9c6d2374b61dddf77aedb1d56524f20b"
-    },
-    "dsv41-cuda": {
-      "sha256": "ad13d51dfffa7043d9125cdab442277b561291ce529879c5961498064a8b162d",
-      "prediction": "DSpark, not native NextN",
-      "compile_startup_only": true
-    }
-  },
-  "compile_audit": {
-    "cpu": {
-      "cpu_commands": 130,
-      "cuda_commands": 0,
-      "IVY_O3": true,
-      "no_AVX2_FMA_F16C_baseline": true
+      "capabilities": {
+        "backend": "cuda",
+        "trained_mtp": true,
+        "universal_mtp": false,
+        "model_downloads": false,
+        "images": false,
+        "cache_reuse": false,
+        "native_mtp_architectures": [
+          "deepseek2",
+          "deepseek4",
+          "glm-dsa",
+          "qwen35",
+          "qwen35moe",
+          "qwen3next",
+          "qwen4exp",
+          "glm5-next"
+        ],
+        "glm5_next": true,
+        "library_pin": "b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea"
+      },
+      "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending"
     },
     "vulkan": {
-      "cpu_commands": 288,
-      "cuda_commands": 0,
-      "IVY_O3": true,
-      "no_AVX2_FMA_F16C_baseline": true
+      "sha256": "eb12ee13656bc6bb002587fb29a194cd7a3ceb7ae5483543359d52e13215480e",
+      "imports": [
+        "ADVAPI32.dll",
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "SHELL32.dll",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "WS2_32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "libomp.dll",
+        "vulkan-1.dll"
+      ],
+      "capabilities": {
+        "backend": "vulkan",
+        "trained_mtp": true,
+        "universal_mtp": false,
+        "model_downloads": false,
+        "images": false,
+        "cache_reuse": false,
+        "native_mtp_architectures": [
+          "deepseek2",
+          "deepseek4",
+          "glm-dsa",
+          "qwen35",
+          "qwen35moe",
+          "qwen3next",
+          "qwen4exp",
+          "glm5-next"
+        ],
+        "glm5_next": true,
+        "library_pin": "b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea"
+      },
+      "qualification": "protocol/security/CPU fixtures; Vulkan hardware pending"
     },
-    "cuda": {
-      "cpu_commands": 130,
-      "cuda_commands": 144,
-      "IVY_O3": true,
-      "no_AVX2_FMA_F16C_baseline": true
+    "poly": {
+      "sha256": "a0512e20205eacc1babfb1b4bda024ad272e095b11564f7d1dc7f49879335a7f",
+      "capabilities": {
+        "backend": "cuda",
+        "native_mtp_architectures": [
+          "glm5-next",
+          "qwen35moe"
+        ],
+        "universal_mtp": false,
+        "model_downloads": false
+      },
+      "qualification": "compiled, capability/version and worker/guesses/conversation tests; trained model/GPU math pending"
     }
   },
-  "poly_CPU_checks": {
+  "CPU_CUDA_tensor_cases_each": 18,
+  "protocol_cases_per_backend": 15,
+  "head_contract_cases": 9,
+  "profile_cases": 12,
+  "parser_boundary_cases_per_backend": 10,
+  "native_MTP_CPU_fixture": {
+    "passed": true,
+    "architecture": "qwen35",
+    "backend": "cpu",
+    "trained_weights": false,
+    "model_downloads": false,
+    "speed_benchmark": false,
+    "native_mtp_enabled": true,
+    "greedy_sequence_equals_plain": true,
+    "repeated_request_state_reset": true,
+    "cases": [
+      {
+        "case": "rejection",
+        "greedy_equals_plain": true,
+        "repeated_reset": true,
+        "stats": [
+          {
+            "produced": 12,
+            "accepted": 0,
+            "offered": 23
+          },
+          {
+            "produced": 12,
+            "accepted": 0,
+            "offered": 23
+          }
+        ]
+      },
+      {
+        "case": "partial",
+        "greedy_equals_plain": true,
+        "repeated_reset": true,
+        "stats": [
+          {
+            "produced": 12,
+            "accepted": 2,
+            "offered": 19
+          },
+          {
+            "produced": 12,
+            "accepted": 2,
+            "offered": 19
+          }
+        ]
+      },
+      {
+        "case": "full",
+        "greedy_equals_plain": true,
+        "repeated_reset": true,
+        "stats": [
+          {
+            "produced": 12,
+            "accepted": 8,
+            "offered": 8
+          },
+          {
+            "produced": 12,
+            "accepted": 8,
+            "offered": 8
+          }
+        ]
+      }
+    ],
+    "seeded_stochastic_equals_plain": true,
+    "limits": "Synthetic recurrent + attention + NextN fixture, rejection/partial/full acceptance and seeded sampling; not GLM/DeepSeek trained-model or RX580/GPU qualification"
+  },
+  "OpenAI_CPU_fixture": {
+    "passed": true,
+    "frontend_family": "glm",
+    "decoder_architecture": "qwen35",
+    "backend": "cpu",
+    "native_MTP": true,
+    "nonstream_and_SSE": true,
+    "model_downloads": false,
+    "learned_weights": false,
+    "speed_benchmark": false,
+    "limits": "Synthetic GLM-style API with a Qwen35 NextN graph; not trained GLM/DeepSeek or RX580 qualification"
+  },
+  "poly_unit_tests": {
     "poly_workers_test": "workers_test: 4000 checks passed",
     "poly_guesses_test": "guesses_test: 7 checks passed",
     "poly_conversations_test": "conversations_test: 54950 checks passed"
   },
-  "production_changed": false,
   "trained_model_qualified": false,
-  "gpu_numerical_qualified": false,
   "rx580_hardware_qualified": false,
-  "model_downloads": false,
+  "vulkan_GPU_available": false,
+  "models_downloaded": false,
   "speed_benchmark": false,
-  "limits": "Untrained CPU fixtures are not GLM/DeepSeek quality or speed measurements. RX580 absent. DSV41 stays OFF; new owner/model/GPU qualification required before deployment."
+  "limits": "Component evidence only; RX580 and trained new-model checks remain pending. Native Qwen has a separate25-run/loaded owner qualification."
 }

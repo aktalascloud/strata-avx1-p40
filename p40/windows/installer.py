@@ -127,6 +127,9 @@ def make_config(root, models, manifest, workers, numa, port=8093):
 
 def install(args):
     root = ROOT; bundle = check_bundle(root)
+    if (root/'strata-davidau.json').exists():
+        print('Existing profile retained. No weights downloaded. Run START.cmd, or extract another folder for another model/backend.')
+        return
     if getattr(args,'backend','native')!='native':
         return install_local(args,root,bundle)
     manifest = json.loads((root/'p40/model-downloads.json').read_text(encoding='utf8'))
@@ -176,7 +179,23 @@ def install(args):
     print(f'Ready. Run START.cmd. API: http://127.0.0.1:{port}/v1. No API key is shipped or required for this localhost preset.')
     print('NUMA preference:',args.numa_node,'; choose node0 only after confirming your GPU is local to it.')
 
+@contextlib.contextmanager
+def private_runtime_path(root):
+    """Only this installer process and its children; never changes the user's Windows environment."""
+    runtime=(root/'runtime').resolve(strict=True);folders=[runtime/'engine',runtime/'vision']
+    if (runtime/'backends').is_dir():folders.extend(p for p in sorted((runtime/'backends').iterdir()) if p.is_dir())
+    for folder in folders:
+        if folder.is_symlink() or not folder.resolve().is_relative_to(runtime):raise ValueError('Unsafe bundled runtime directory')
+    before=os.environ.get('PATH','')
+    try:
+        os.environ['PATH']=os.pathsep.join(map(str,folders))+os.pathsep+before
+        yield
+    finally:os.environ['PATH']=before
+
 def install_local(args,root,bundle):
+    with private_runtime_path(root):return _install_local(args,root,bundle)
+
+def _install_local(args,root,bundle):
     """One local-model setup for CPU/CUDA/Vulkan/Poly; no HF request or implicit MTP fallback."""
     if not args.model:raise ValueError('Choose a local GGUF with --model; only the native Qwen preset downloads weights')
     config=root/'strata-davidau.json'

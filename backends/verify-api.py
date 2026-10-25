@@ -4,6 +4,17 @@ def sha(data):return hashlib.sha256(data).hexdigest()
 def verify(root):
     root=pathlib.Path(root).resolve(strict=True);here=pathlib.Path(__file__).resolve().parent
     review=json.loads((here/'api-compat-review.json').read_text(encoding='utf8'))
+    integrated=review.get('integrated_native_aggregate')
+    if integrated:
+        values={}
+        for rel in integrated['lf_sha256']:
+            path=root/rel
+            if pathlib.PurePosixPath(rel).is_absolute() or '..' in pathlib.PurePosixPath(rel).parts or path.is_symlink() or not path.resolve().is_relative_to(root):
+                raise ValueError('Integrated API path escapes the selected source')
+            if path.is_file():values[rel]=sha(path.read_bytes().replace(b'\r\n',b'\n'))
+        if values==integrated['lf_sha256']:
+            return dict(source_state='integrated_native_aggregate',can_apply_patch=False,API_source_checked=True,
+                production_qualified=False,model_family_qualification='See exact native/component manifests',writes=False,model_downloads=False)
     if not review.get('semantic_reviewed_for_optional_source') or sha((here/'api-compat.patch').read_bytes())!=review['patch_sha256']:
         raise ValueError('API patch semantic review does not match its bytes')
     base=review['base_lf_sha256'];candidate=review['candidate_lf_sha256']

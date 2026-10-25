@@ -86,12 +86,12 @@ function(_dsv_tensor_core_copy RELATIVE EXPECTED KERNEL END_MARKER HOST_GUARD)
 endfunction()
 
 _dsv_tensor_core_copy("src/dsv41/ds4_iq.cu"
-  "515bbf415f5765c6288e33322fdedaf2af46a11c6a7eca5ac1566b64f0c48416"
+  "15efd9c3895152819a7235566bc3fb08b7c6551e994261a22012a01e424a6501"
   "__global__ void __launch_bounds__(kThreads) set_tc_kernel(const SetArgs a) {\n"
   "\n}\n#endif\n\n// ---------------------------------------------------------------- GEMVs"
   "v = major >= 7 && !(e != nullptr && e[0] == '1') ? 1 : 2;")
 _dsv_tensor_core_copy("src/dsv41/ds4_gguf.cu"
-  "d0d368e04d19f1f5b8107432f5438e233f609e7d3fcb370dd21388c202f6639f"
+  "f184a5b157492a090353bc1b4247f9d9159f4b3f2f6a6c45e545d461ff367bcf"
   "__global__ void __launch_bounds__(kThreads) mx_set_tc_kernel(const SetK a) {\n"
   "\n}\n#endif\n#if defined(STRATA_USE_HIP)"
   "return major >= 7 && !(v != nullptr && v[0] == '1');")

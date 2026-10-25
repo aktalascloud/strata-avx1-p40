@@ -36,3 +36,12 @@ CPU fused scheduling follows the StrataFast/txiki739 work, itself based on Franc
 - Older staged-prefill gathering patches require a port to the newer dynamic ring/direct-MMQ layout and dedicated parity; an old fixed-slot mask is not applied to it.
 
 [Current patches](PATCHES.md) · [Source review scope](RESEARCH.md) · [Original/latest performance](BENCHMARKS.md). Correctness tests do not establish an isolated speed gain for every fix.
+
+## Universal package additions
+
+- [Strata#4079](https://github.com/Niko1221/Strata/pull/4079), head `c93cf5139207`: additional DeepSeek tokenizer pre labels, retaining GLM and Qwen splitters.
+- [llama.cpp#31114](https://github.com/ggml-org/llama.cpp/pull/31114), head `b765816acf99`: non-compute Vulkan views no longer fail a shader-addressing pre-check; allocation and compute limits remain.
+- [llama.cpp#29755](https://github.com/ggml-org/llama.cpp/pull/29755), head `ac00ed5d2a9f`: grammar depth bound, adapted without changing the pinned parser ABI. JSON conversion is separately bounded at128; the submitted#31099 patch is not applied verbatim. Real boundary/recovery tests are included.
+- [PolyStrata#87](https://github.com/VecSzn/PolyStrata/pull/87): retained Pascal DP4A/cuBLAS compatibility; native trained heads remain distinct from assistant/lookup methods.
+
+GLM/DeepSeek formatting, template and MTP work draws on the linked MIT-licensed [Xolotl](https://github.com/Indras-Mirror/Xolotl), [PolyStrata](https://github.com/VecSzn/PolyStrata), [Maya](https://github.com/mw00/project-maya) and official model library. Other reviewed branches are not wholesale replacements for the native Qwen engine.

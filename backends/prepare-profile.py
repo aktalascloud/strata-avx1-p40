@@ -1,19 +1,19 @@
 """Prepare an isolated local-model profile. Never downloads weights, changes tasks or starts an API."""
 from __future__ import annotations
 import argparse,hashlib,json,os,pathlib,re,secrets,subprocess
-from gguf_meta import Header,compatible_head
+from gguf_meta import Header,ModelHeader,compatible_head
 
-ARCHITECTURES={'glm5-next','glm-dsa','deepseek4','qwen35','qwen35moe'}
-def prepare(model,engine,output,*,backend='cpu',draft=None,context=131072,port=8094,mtp='require',workers=14,device=None):
+ARCHITECTURES={'glm5-next','glm-dsa','deepseek4','qwen35','qwen35moe','qwen3next','qwen4exp'}
+def prepare(model,engine,output,*,backend='cpu',draft=None,context=131072,port=8094,mtp='require',workers=14,device=None,allow_native_api_port=False):
     model=pathlib.Path(model).resolve(strict=True);engine=pathlib.Path(engine).resolve(strict=True);output=pathlib.Path(output).absolute()
     if backend not in ('cpu','cuda','vulkan') or mtp not in ('require','off'):raise ValueError('Unknown backend or MTP policy')
     if draft and mtp=='off':raise ValueError('A draft model cannot be supplied with MTP off')
     if backend!='cpu' and (not isinstance(device,str) or not re.fullmatch(('Vulkan' if backend=='vulkan' else 'CUDA')+r'[0-9]+',device)):
         raise ValueError('Select the intended GPU explicitly with --device VulkanN or CUDA<N>; no automatic fallback onto the working P40')
-    if type(port) is not int or not 1024<=port<=65535 or port in (8080,8093):raise ValueError('Choose a separate API port; 8080 and 8093 are reserved')
+    if type(port) is not int or not 1024<=port<=65535 or port==8080 or port==8093 and not allow_native_api_port:raise ValueError('8080 is reserved; 8093 requires an explicit installation selection')
     if type(workers) is not int or not 1<=workers<=256:raise ValueError('Invalid CPU worker count')
     if output.exists():raise ValueError('Output directory already exists; existing profiles are never overwritten')
-    header=Header(model);md=header.metadata;arch=header.architecture
+    header=ModelHeader(model);md=header.metadata;arch=header.architecture
     if arch not in ARCHITECTURES:raise ValueError('This model family is not reviewed by the optional backend profile builder')
     trained=md.get(arch+'.context_length')
     if type(context) is not int or context<64 or type(trained) is not int or context>trained:raise ValueError('Requested context exceeds the model metadata; RoPE is not changed automatically')
@@ -26,9 +26,10 @@ def prepare(model,engine,output,*,backend='cpu',draft=None,context=131072,port=8
     if kind=='poly' and (backend!='cuda' or arch not in ('glm5-next','qwen35moe','deepseek4')):raise ValueError('This Poly architecture/backend combination is not reviewed')
     candidate=header
     if draft:
-        draft=pathlib.Path(draft).resolve(strict=True);candidate=Header(draft);compatible_head(header,candidate)
+        draft=pathlib.Path(draft).resolve(strict=True);candidate=ModelHeader(draft);compatible_head(header,candidate)
         if draft==model:draft=None
     if mtp=='require':
+        if kind=='ggml' and isinstance(caps.get('native_mtp_architectures'),list) and arch not in caps['native_mtp_architectures']:raise ValueError('Engine has no reviewed native MTP graph for this architecture')
         if caps.get('trained_mtp') is not True and arch not in caps.get('native_mtp_architectures',[]):raise ValueError('Engine has no native MTP graph for this family')
         if not candidate.nextn():raise ValueError('MTP_REQUIRED: compatible NextN tensors are absent; provide a matching local draft GGUF or explicitly use --mtp off')
     vocab=md.get('tokenizer.ggml.tokens');merges=md.get('tokenizer.ggml.merges');types=md.get('tokenizer.ggml.token_type')

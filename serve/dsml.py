@@ -187,6 +187,7 @@ class DsmlOutputParser(OutputParser):
         """string="true": the value is a string whatever it looks like ("123", "true"), as the template wrote it."""
         if not is_string:
             return
+        tool = self.aliases.get(tool, tool)
         spec = self.schemas.get(tool)
         if spec is None:
             return
@@ -254,3 +255,8 @@ def to_dsml_force(force: str | None) -> str | None:
     if name.endswith(">\n"):
         return head + f'{_OPEN} invoke name="{name[:-2]}">\n'
     return head + f'{_OPEN} invoke name="{name}'
+
+def to_ds4_force(force: str | None) -> str | None:
+    """V4's own no-space DSML spelling, without substituting the V4.1 template."""
+    text = to_dsml_force(force)
+    return text.replace('<｜DSML｜ calls>', '<｜DSML｜tool_calls>').replace('<｜DSML｜ invoke', '<｜DSML｜invoke') if text else text

@@ -7,12 +7,15 @@ This is an independent community build, not endorsed by NVIDIA, Microsoft or ups
 |---|---|
 | Strata and local source modifications | MIT; upstream copyright preserved. |
 | GGML/llama.cpp and Pascal source overlay | MIT; upstream notices preserved. |
+| PolyStrata source and optional CUDA worker | MIT; original license, origin and compatibility review retained in backends/poly and p40/licenses. Component qualification is distinct from trained-model qualification. |
+| Embedded model library and API adapters | MIT; the separate official model-library pin, original license and build-copy compatibility guards are preserved. CPU/CUDA/Vulkan workers are included; no separate llama-server is distributed. LLVM runtime code retains Apache2.0/LLVM exceptions. |
 | Vendored Project Maya source and contributions | MIT; original LICENSE and attribution NOTICE included when these sources are present. The optional DeepSeek engine is not enabled or qualified by this P40 preset. |
 | Python interpreter | PSF license and its included third-party/Microsoft conditions. |
 | NumPy, Jinja2, MarkupSafe, psutil, regex, Pillow | Their included package licenses/notices; preserved with dependencies. |
 | certifi2026.10.19 | MPL2.0; unmodified certificate bundle, source and license retained in its package/dist-info. |
 | truststore0.10.5 | MIT; source and license retained in its package/dist-info. |
 | LLVM OpenMP (`libomp.dll`) | Apache2.0 with LLVM exceptions; full license included. |
+| Khronos Vulkan-Headers/Vulkan-Hpp, nlohmann JSON, cpp-httplib and hash helpers | Original SPDX declarations and full MIT/other vendor notices retained in p40/licenses; no Vulkan driver or SDK is distributed. |
 | CUDA Runtime, cuBLAS, cuBLASLt | NVIDIA CUDA agreement and redistributable attachment; included only as unmodified application dependencies. |
 | Microsoft Visual C++ Runtime | Not bundled separately; installer downloads the official Microsoft installer and validates its signature if needed. |
 | NVIDIA driver, CUDA compiler, MSVC, Windows SDK, Clang compiler | Not bundled. |
@@ -30,7 +33,3 @@ Official terms:
 - LLVM:https://github.com/llvm/llvm-project/blob/main/LICENSE.TXT
 
 This package contains no model license grant. Review each pinned Hugging Face repository before downloading.
-
-## Optional experimental source
-
-PolyStrata source retains its MIT license and origin in `backends/poly/`. The GGML adapter links the existing MIT library. These experimental engines are excluded from the current binary release and have not received trained-model, GPU numerical or RX580 hardware qualification. Research attribution: Xolotl, Project Maya and polaris-local-ai; see `backends/README.md`.

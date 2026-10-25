@@ -1389,6 +1389,12 @@ class StrataEngine:
             if time.time() > deadline:
                 raise EngineDied("the engine did not answer the VRAM command")
 
+    def request_sampling(self, sampling: dict) -> str:
+        if (getattr(self, "info", None) or {}).get("engine_kind") in ("ggml", "poly"):
+            from serve.model_backends import sampling_keys
+            return sampling_keys(sampling)
+        return self.sampling_keys(sampling)
+
     @staticmethod
     def sampling_keys(sampling: dict) -> str:
         keys = ""
@@ -1782,7 +1788,7 @@ class StrataEngine:
             raise EngineDied("the engine is unavailable; this request was not sent")
         self.progress, self.progress_ms, self.reused = None, 0, 0
         born = self.gen                                 # the engine process this request is sent to
-        keys = self.sampling_keys(sampling or {})
+        keys = self.request_sampling(sampling or {})
         out: list[int] = []
         pending: list[int] = []
         prompt, left = list(ids), int(max_new)
@@ -2203,8 +2209,8 @@ class StrataEngine:
         self.progress, self.progress_ms, self.reused = None, 0, 0
         self.prefill_tok_s_mean = None
         # an image request takes the same sampling keys as text (#75: it used to decode greedily whatever was asked)
-        head = f"GENI {int(max_new)}{self.sampling_keys(sampling or {})} {embeddings}" if embeddings else \
-            f"GEN {int(max_new)}{self.sampling_keys(sampling or {})}"
+        head = f"GENI {int(max_new)}{self.request_sampling(sampling or {})} {embeddings}" if embeddings else \
+            f"GEN {int(max_new)}{self.request_sampling(sampling or {})}"
         try:
             self.proc.stdin.write(f"{head} {','.join(str(int(t)) for t in ids)}\n")
             self.proc.stdin.flush()
@@ -3087,6 +3093,9 @@ def engine_args(cfg: dict) -> list[str]:
     """The engine's arguments: the config's, and with several GPUs the layer split across them ("layer_split" in the
     config: "auto" by default, or the first layer of each later GPU's share, e.g. "18" or "16,32"; see
     layer_split_value)."""
+    if cfg.get("engine_kind") in ("ggml", "poly"):
+        from serve.model_backends import checked_args
+        return checked_args(cfg)
     args = list(cfg["args"])
     # "user_args" (strata_control/user_args.py): the options the person set by hand, over the generated ones at every start,
     # so a setup run or the app rewriting "args" cannot undo them (#3216 #3215 #3270)
@@ -3514,7 +3523,7 @@ def child_env(cfg: dict, *, offline: bool = False) -> dict:
         env["HIP_VISIBLE_DEVICES"] = ""
     elif hip_visible(cfg) and cfg.get("backend") == "hip":   # AMD: numbered as HIP numbers them (hip_visible)
         env["HIP_VISIBLE_DEVICES"] = ",".join(str(i) for i in hip_visible(cfg))
-    elif gpu_list(cfg):                              # issue #51: the GPU(s) to run on, numbered as nvidia-smi does; CUDA's
+    elif gpu_list(cfg) and cfg.get("engine_kind") != "ggml": # embedded GGML uses an explicit canonical device name
         env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"      # own default order (fastest first) can number the cards otherwise
         env["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in ordered_gpus(cfg))
     for k, v in (cfg.get("env") or {}).items():      # engine settings the config carries (AMD: the GEMM tuning table)
@@ -3949,6 +3958,10 @@ class Service:
     def set_family(self, family: str | None) -> None:
         """A family whose text differs from the Qwen form this server was written for (DeepSeek-V4.1: its own end
         token, DSML tool calls, reasoning-effort words).  The others keep the defaults."""
+        if family is None:
+            pre = getattr(self.tok, "pre", "")
+            family = ("glm" if pre in ("glm4", "glm5") or self.model_arch in ("glm5-next", "glm-dsa") else
+                      "deepseek4" if pre == "joyai-llm" or self.model_arch == "deepseek4" else None)
         self.family = family
         if family == "deepseek41":
             from serve import dsml
@@ -3956,6 +3969,33 @@ class Service:
             self.stop_ids = {int(eos)}
             self.parser_cls = dsml.DsmlOutputParser
             self._force_text = dsml.to_dsml_force
+        elif family in ("glm", "deepseek4"):
+            if family == "glm":
+                from serve import glm
+                self.parser_cls = glm.GlmOutputParser
+                self._force_text = glm.to_glm_force
+                endings = ("<|user|>", "<|observation|>", "<|developer|>")
+            else:
+                from serve import dsml
+                self.parser_cls = dsml.DsmlOutputParser
+                self._force_text = dsml.to_ds4_force
+                endings = ()
+            special = getattr(self.tok, "special_ids", None) or {}
+            stops = {int(special[k]) for k in ("eos", "eot", "eom", "tokenizer.ggml.eos_token_id",
+                                              "tokenizer.ggml.eot_token_id", "tokenizer.ggml.eom_token_id")
+                     if type(special.get(k)) is int and special[k] >= 0}
+            vocabulary = getattr(self.tok, "ids", {})
+            stops.update(vocabulary[s] for s in endings if s in vocabulary)
+            if stops:
+                self.stop_ids = stops
+            self.template.model_family = family
+            self.template.tool_style = "openai" if family == "deepseek4" else "flat"
+            self.template.model_tokens = {}
+            for name, key in (("bos_token", "tokenizer.ggml.bos_token_id"), ("eos_token", "tokenizer.ggml.eos_token_id")):
+                index = special.get(key)
+                if type(index) is int and index >= 0:
+                    self.template.model_tokens[name] = self.tok.decode([index])
+            self.template.caps = self.template._detect_caps()
         import serve.frontend as _frontend
         _frontend.use_family(family)
 
@@ -7906,6 +7946,8 @@ def apply_saved_tuning(cfg: dict, *, say=None) -> dict:
     Every start path runs this (the Terminal, `runtime start`, the app's load, a restart of the app, an unload and a load), so the
     tuning is applied every time and never re-measured. A tune's own worker sets STRATA_NO_PRESET so that it measures the
     configuration it was given. Never fails a start: a store that cannot be read means the configuration as it is."""
+    if cfg.get("engine_kind") in ("ggml", "poly"):
+        return cfg
     if os.environ.get("STRATA_NO_PRESET"):
         return cfg
     say = say or (lambda line: print(line, flush=True))
@@ -8366,6 +8408,12 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
         cfg["gpu"] = int(a.gpu) if a.gpu.strip().isdigit() else a.gpu
     a.host = a.host or cfg.get("host") or "127.0.0.1"   # issue #26: the run scripts pass no --host, the config can
     supplied_args = argv if argv is not None else sys.argv[1:]
+    if a.engine == "strata" and cfg.get("engine_kind") in ("ggml", "poly"):
+        from serve.model_backends import checked_bind
+        try:
+            a.port = checked_bind(cfg, a.port, supplied_args)
+        except ValueError as exc:
+            ap.error(str(exc))
     if ("STRATA_API_KEY" in os.environ and not os.environ["STRATA_API_KEY"].strip()) or \
             any((x == "--api-key" and i + 1 < len(supplied_args) and not supplied_args[i + 1].strip()) or
                 x.strip() == "--api-key=" for i, x in enumerate(supplied_args)):
@@ -8393,18 +8441,7 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
         ap.error(f"the model's tokenizer is missing ({tpath / 'vocab.json'}); run setup again")
     if (tpath / "vocab.json").exists():
         import strata_tokenizer as ST
-        vocab = json.loads((tpath / "vocab.json").read_text(encoding="utf-8"))
-        tokens = [None] * len(vocab)
-        for t, i in vocab.items():
-            tokens[i] = t
-        merges = (tpath / "merges.txt").read_text(encoding="utf-8").split("\n")
-        types = json.loads((tpath / "token_type.json").read_text())
-        tcfg = {}
-        try:                                            # the pack's pre-tokenizer name and special ids (DeepSeek's differ)
-            tcfg = json.loads((tpath / "tokenizer.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            pass
-        tok = ST.Tokenizer(tokens, merges, types, tcfg.get("pre") or "qwen35", tcfg.get("special_ids") or None)
+        tok = ST.Tokenizer.from_dir(tpath)
     hub = hub_from_config(cfg, a.mcp_config)            # before the minutes of loading: a bad entry stops here
     if a.offline and (hub is not None or cfg.get("before_load") or a.before_load):
         ap.error("--offline requires MCP servers and before_load commands to be disabled in this profile")

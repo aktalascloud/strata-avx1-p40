@@ -3,7 +3,7 @@ import importlib.util,json,pathlib,struct,sys,tempfile,unittest
 from unittest.mock import patch
 from types import SimpleNamespace
 B=pathlib.Path(__file__).resolve().parents[1];sys.path[:0]=[str(B),str(B/'tests')]
-from gguf_meta import Header
+from gguf_meta import Header,ModelHeader,compatible_head
 from tiny_gguf import qwen35_mtp
 spec=importlib.util.spec_from_file_location('profiles',B/'prepare-profile.py');profiles=importlib.util.module_from_spec(spec);spec.loader.exec_module(profiles)
 
@@ -65,5 +65,36 @@ class Profiles(unittest.TestCase):
         def guarded(path,*args,**kwargs):return Guard(original(path,*args,**kwargs))
         with patch.object(pathlib.Path,'open',guarded):Header(self.model)
         self.assertGreater(sum(read_bytes),0);self.assertLessEqual(sum(read_bytes),limit)
+
+    def test_nextn_in_second_shard(self):
+        from tiny_gguf import TinyGGUF
+        first=self.root/'model-00001-of-00002.gguf';second=self.root/'model-00002-of-00002.gguf'
+        w=qwen35_mtp(first);all_tensors=w.tensors[:];head=[t for t in all_tensors if '.nextn.' in t[0]]
+        w.tensors=[t for t in all_tensors if '.nextn.' not in t[0]];w.meta.update({'split.count':2,'split.no':0,'split.tensors.count':len(all_tensors)});w.write()
+        other=TinyGGUF(second);other.meta=dict(w.meta,**{'split.no':1});other.tensors=head;other.write()
+        self.assertFalse(Header(first).nextn());combined=ModelHeader(first)
+        self.assertTrue(combined.nextn());self.assertEqual(len(combined.shards),2)
+        second.unlink()
+        with self.assertRaises(OSError):ModelHeader(first)
+
+    def test_split_identity_and_duplicates_rejected(self):
+        from tiny_gguf import TinyGGUF
+        first=self.root/'model-00001-of-00002.gguf';second=self.root/'model-00002-of-00002.gguf'
+        w=qwen35_mtp(first);w.meta.update({'split.count':2,'split.no':0});w.write()
+        other=TinyGGUF(second);other.meta=dict(w.meta,**{'split.no':1});other.tensors=w.tensors[:1];other.write()
+        with self.assertRaisesRegex(ValueError,'Duplicate'):ModelHeader(first)
+        with self.assertRaisesRegex(ValueError,'first canonical'):ModelHeader(second)
+
+    def test_qwen4_hyper_connection_head_shapes(self):
+        import numpy as np
+        w=qwen35_mtp(self.model);w.meta={k.replace('qwen35.','qwen4exp.'):v for k,v in w.meta.items()};w.meta['general.architecture']='qwen4exp'
+        w.meta.update({'qwen4exp.hyper_connection.count':4,'qwen4exp.hyper_connection.low_rank':8})
+        w.tensors=[(name,np.ones((4,32),dtype=np.float32) if name.endswith('nextn.hnorm.weight') else data) for name,data in w.tensors]
+        for name,shape in [('hc_head_norm.weight',(4,32)),('hc_head_down.weight',(8,128)),('hc_head_up.weight',(128,8))]:
+            w.add_tensor('blk.2.nextn.'+name,np.ones(shape,dtype=np.float32))
+        w.write();self.assertTrue(ModelHeader(self.model).nextn())
+        w.tensors=[(n,x.reshape(-1) if n.endswith(('nextn.hnorm.weight','nextn.hc_head_norm.weight')) else x) for n,x in w.tensors];w.write()
+        self.assertTrue(ModelHeader(self.model).nextn())
+        w.tensors=[t for t in w.tensors if not t[0].endswith('nextn.hc_head_up.weight')];w.write();self.assertFalse(ModelHeader(self.model).nextn())
 
 if __name__=='__main__':unittest.main()

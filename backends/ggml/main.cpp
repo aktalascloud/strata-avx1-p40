@@ -7,6 +7,7 @@
 #include "speculative.h"
 #include "llama.h"
 #include "gguf.h"
+#include "ggml-backend.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -16,6 +17,9 @@
 #include <iostream>
 #include <limits>
 #include <mutex>
+#include <memory>
+#include <regex>
+#include <unordered_set>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -66,7 +70,7 @@ void check_mtp_architecture(const std::string & path, const std::string & draft_
     auto key=gguf_find_key(meta,"general.architecture");
     if(key<0||gguf_get_kv_type(meta,key)!=GGUF_TYPE_STRING)throw std::runtime_error("missing GGUF architecture");
     std::string arch=gguf_get_val_str(meta,key);
-    const std::vector<std::string> supported={"deepseek2","deepseek4","glm-dsa","qwen35","qwen35moe"
+    const std::vector<std::string> supported={"deepseek2","deepseek4","glm-dsa","qwen35","qwen35moe","qwen3next","qwen4exp"
 #ifdef STRATA_GLM5_NEXT
         ,"glm5-next"
 #endif
@@ -76,6 +80,10 @@ void check_mtp_architecture(const std::string & path, const std::string & draft_
     auto integer=[](gguf_context * m,const std::string & key)->int64_t{
         auto k=gguf_find_key(m,key.c_str());if(k<0)return 0;
         switch(gguf_get_kv_type(m,k)){
+            case GGUF_TYPE_UINT16:return gguf_get_val_u16(m,k);
+            case GGUF_TYPE_INT16:return gguf_get_val_i16(m,k);
+            case GGUF_TYPE_UINT8:return gguf_get_val_u8(m,k);
+            case GGUF_TYPE_INT8:return gguf_get_val_i8(m,k);
             case GGUF_TYPE_UINT32:return gguf_get_val_u32(m,k);
             case GGUF_TYPE_INT32:return gguf_get_val_i32(m,k);
             case GGUF_TYPE_UINT64:{auto v=gguf_get_val_u64(m,k);return v<=INT64_MAX?int64_t(v):0;}
@@ -83,24 +91,62 @@ void check_mtp_architecture(const std::string & path, const std::string & draft_
             default:return 0;
         }
     };
-    auto has_head=[&](gguf_context * m){
+    auto has_head=[&](gguf_context * m,const std::string & path){
+        std::vector<gguf_context *> parts{m};
+        std::vector<std::unique_ptr<gguf_context,decltype(&gguf_free)>> owned;
+        auto count=integer(m,"split.count");if(count==0&&gguf_find_key(m,"split.count")<0)count=1;
+        if(count<1||count>256)throw std::runtime_error("MTP_REQUIRED: invalid local GGUF split count");
+        if(count>1){
+            std::filesystem::path first(path);std::smatch match;std::string name=first.filename().string();
+            if(!std::regex_match(name,match,std::regex("(.+)-([0-9]{5})-of-([0-9]{5})\\.gguf"))||
+               std::stoi(match[2])!=1||std::stoi(match[3])!=count||integer(m,"split.no")!=0)
+                throw std::runtime_error("MTP_REQUIRED: select the first canonical GGUF shard");
+            for(int64_t i=1;i<count;++i){char tail[40];std::snprintf(tail,sizeof(tail),"-%05lld-of-%05lld.gguf",(long long)i+1,(long long)count);
+                auto file=first.parent_path()/(match[1].str()+tail);
+                if(!std::filesystem::is_regular_file(file)||std::filesystem::is_symlink(file))throw std::runtime_error("MTP_REQUIRED: missing or unsafe local GGUF shard");
+                auto * part=gguf_init_from_file(file.string().c_str(),p);
+                if(!part)throw std::runtime_error("MTP_REQUIRED: invalid local GGUF shard");
+                owned.emplace_back(part,gguf_free);
+                if(integer(part,"split.count")!=count||integer(part,"split.no")!=i)throw std::runtime_error("MTP_REQUIRED: GGUF shard identity mismatch");
+                auto ak=gguf_find_key(part,"general.architecture");
+                if(ak>=0&&(gguf_get_kv_type(part,ak)!=GGUF_TYPE_STRING||arch!=gguf_get_val_str(part,ak)))throw std::runtime_error("MTP_REQUIRED: shard architecture mismatch");
+                parts.push_back(part);
+            }
+        }
+        std::unordered_set<std::string> names;
+        for(auto * part:parts)for(int64_t i=0;i<gguf_get_n_tensors(part);++i)
+            if(!names.insert(gguf_get_tensor_name(part,i)).second)throw std::runtime_error("MTP_REQUIRED: duplicate tensor across shards");
+        auto find=[&](const std::string & name)->std::pair<gguf_context*,int64_t>{
+            for(auto * part:parts){auto i=gguf_find_tensor(part,name.c_str());if(i>=0)return {part,i};}return {nullptr,-1};};
         auto heads=integer(m,arch+".nextn_predict_layers");
         auto layers=integer(m,arch+".block_count"),embd=integer(m,arch+".embedding_length");
         if(heads!=1||layers<heads||embd<1)return false;
         std::string prefix="blk."+std::to_string(layers-heads)+".nextn.";
-        auto idx=gguf_find_tensor(m,(prefix+"eh_proj.weight").c_str());
-        if(idx<0||gguf_find_tensor(m,(prefix+"enorm.weight").c_str())<0||gguf_find_tensor(m,(prefix+"hnorm.weight").c_str())<0)return false;
-        auto ne=gguf_get_tensor_ne(m,idx);
-        return ne[0]==2*embd&&ne[1]==embd&&ne[2]==1&&ne[3]==1;
+        auto tensor=find(prefix+"eh_proj.weight");
+        if(!tensor.first||!find(prefix+"enorm.weight").first||!find(prefix+"hnorm.weight").first)return false;
+        auto ne=gguf_get_tensor_ne(tensor.first,tensor.second);
+        if(!(ne[0]==2*embd&&ne[1]==embd&&ne[2]==1&&ne[3]==1))return false;
+        if(arch=="qwen4exp"){
+            auto hc=integer(m,arch+".hyper_connection.count"),rank=integer(m,arch+".hyper_connection.low_rank");
+            if(hc<2||hc>64||rank<1||embd>1048576||rank>hc*embd)return false;
+            auto shape=[&](const char * name,int64_t elements){auto found=find(prefix+name);if(!found.first)return false;
+                auto n=gguf_get_tensor_ne(found.first,found.second);int64_t total=1;for(int j=0;j<4;++j){if(n[j]<1||n[j]>elements/total)return false;total*=n[j];}return total==elements;};
+            if(!shape("hnorm.weight",embd*hc)||!shape("hc_head_norm.weight",embd*hc)||
+               !shape("hc_head_down.weight",embd*hc*rank)||!shape("hc_head_up.weight",embd*hc*rank))return false;
+        }
+        return true;
     };
     if(draft_path.empty()){
-        if(!has_head(meta))throw std::runtime_error("MTP_REQUIRED: a complete supported NextN head is absent from this GGUF; supply a compatible local draft GGUF or explicitly disable MTP");
+        if(!has_head(meta,path))throw std::runtime_error("MTP_REQUIRED: a complete supported NextN head is absent from this GGUF; supply a compatible local draft GGUF or explicitly disable MTP");
     }else{
         auto * draft=gguf_init_from_file(draft_path.c_str(),p);
         if(!draft)throw std::runtime_error("cannot read draft GGUF metadata");
         Close close_draft{draft};auto ak=gguf_find_key(draft,"general.architecture");
-        if(ak<0||gguf_get_kv_type(draft,ak)!=GGUF_TYPE_STRING||arch!=gguf_get_val_str(draft,ak)||!has_head(draft)||integer(draft,arch+".embedding_length")!=integer(meta,arch+".embedding_length"))
+        if(ak<0||gguf_get_kv_type(draft,ak)!=GGUF_TYPE_STRING||arch!=gguf_get_val_str(draft,ak)||!has_head(draft,draft_path)||integer(draft,arch+".embedding_length")!=integer(meta,arch+".embedding_length"))
             throw std::runtime_error("MTP_REQUIRED: draft architecture, dimensions or NextN tensors are incompatible");
+        if(arch=="qwen4exp"&&(integer(draft,arch+".hyper_connection.count")!=integer(meta,arch+".hyper_connection.count")||
+            integer(draft,arch+".hyper_connection.low_rank")!=integer(meta,arch+".hyper_connection.low_rank")))
+            throw std::runtime_error("MTP_REQUIRED: draft hyper-connection dimensions do not match");
         auto a=gguf_find_key(meta,"tokenizer.ggml.tokens"),b=gguf_find_key(draft,"tokenizer.ggml.tokens");
         if(a<0||b<0||gguf_get_kv_type(meta,a)!=GGUF_TYPE_ARRAY||gguf_get_kv_type(draft,b)!=GGUF_TYPE_ARRAY||gguf_get_arr_type(meta,a)!=GGUF_TYPE_STRING||gguf_get_arr_type(draft,b)!=GGUF_TYPE_STRING||gguf_get_arr_n(meta,a)!=gguf_get_arr_n(draft,b))
             throw std::runtime_error("MTP_REQUIRED: draft token vocabulary is incompatible");
@@ -234,9 +280,30 @@ void generate(Request & r, common_params & p, llama_context * ctx, llama_model *
 }
 int main(int argc,char ** argv){
     std::setlocale(LC_NUMERIC,"C");
+    if((argc==3||argc==4)&&std::string(argv[1])=="--check-mtp-only"){
+        try{check_mtp_architecture(argv[2],argc==4?argv[3]:"");line("{\"valid_head_contract\":true,\"trained_model_qualified\":false,\"model_loaded\":false}");return 0;}
+        catch(const std::exception & e){std::cerr<<e.what()<<std::endl;return 2;}
+    }
+    if(argc==2&&std::string(argv[1])=="--devices-json"){
+        auto quote=[](const char * text){std::string s="\"";for(const unsigned char c:std::string(text?text:"")){
+            if(c=='"'||c=='\\'){s+='\\';s+=char(c);}else if(c<32){const char h[]="0123456789abcdef";s+="\\u00";s+=h[c>>4];s+=h[c&15];}else s+=char(c);
+        }return s+'"';};
+        ggml_backend_load_all();std::string rows="[";
+        for(size_t i=0;i<ggml_backend_dev_count();++i){auto dev=ggml_backend_dev_get(i);size_t free=0,total=0;ggml_backend_dev_memory(dev,&free,&total);
+            if(i)rows+=',';
+            rows+="{\"name\":"+quote(ggml_backend_dev_name(dev))+",\"description\":"+quote(ggml_backend_dev_description(dev))+
+                ",\"type\":"+std::to_string(int(ggml_backend_dev_type(dev)))+",\"total_bytes\":"+std::to_string(total)+"}";
+        }
+        line(rows+"]");return 0;
+    }
     if(argc==2&&std::string(argv[1])=="--version"){line("strata-ggml adapter 0.1 (" STRATA_DEVICE_NAME ")");return 0;}
     if(argc==2&&std::string(argv[1])=="--capabilities"){
         std::string cap="{\"backend\":\"" STRATA_DEVICE_NAME "\",\"trained_mtp\":true,\"universal_mtp\":false,\"model_downloads\":false,\"images\":false,\"cache_reuse\":false";
+        cap+=",\"native_mtp_architectures\":[\"deepseek2\",\"deepseek4\",\"glm-dsa\",\"qwen35\",\"qwen35moe\",\"qwen3next\",\"qwen4exp\"";
+#ifdef STRATA_GLM5_NEXT
+        cap+=",\"glm5-next\"";
+#endif
+        cap+="]";
 #ifdef STRATA_GLM5_NEXT
         cap+=",\"glm5_next\":true";
 #else

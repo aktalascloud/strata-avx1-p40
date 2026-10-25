@@ -77,6 +77,9 @@ DEEPSEEK3_PATTERNS = (
     r"| ?[\p{P}\p{S}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+",
 )
 
+# llama.cpp assigns these pre labels the same sequential DeepSeek3 splitter.
+DEEPSEEK3_PRES = ("deepseek", "joyai", "hunyuan-dense", "hy_v4")
+
 
 def _sequence_findall(patterns, text: str) -> list[str]:
     """llama.cpp's unicode_regex_split: the pieces of `text` after each pattern in turn splits every piece into its
@@ -97,11 +100,21 @@ def _sequence_findall(patterns, text: str) -> list[str]:
     return pieces
 
 
+# GLM's native pre-tokenizer: three-digit runs and whole-piece matches before BPE.
+# Reference: pinned PolyStrata c174f35 and llama.cpp CHATGLM4 tokenizer (MIT).
+GLM4_PATTERN = (
+    r"(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])"
+    r"|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*"
+    r"|\s*[\r\n]+|\s+(?!\S)|\s+"
+)
+
+
 class Tokenizer:
     def __init__(self, tokens: list[str], merges: list[str], token_types: list[int] | None = None,
                  pre: str = "qwen35", special_ids: dict[str, int] | None = None):
         self.tokens = tokens
         self.pre = pre
+        self.ignore_merges = pre in ("glm4", "glm5")
         self.token_types = token_types
         self.special_ids = special_ids or {}
         self.ids = {t: i for i, t in enumerate(tokens)}
@@ -119,11 +132,11 @@ class Tokenizer:
             if parts[0] not in self.ids or parts[1] not in self.ids:
                 raise ValueError("merge %d names a token outside the vocabulary: %r" % (i, m))
             self.ranks[(parts[0], parts[1])] = i
-        if str(pre).startswith("deepseek"):
+        if str(pre).startswith(DEEPSEEK3_PRES):
             seq = [regex.compile(x) for x in DEEPSEEK3_PATTERNS]
             self._split = lambda text: _sequence_findall(seq, text)
         else:
-            self._re = regex.compile(QWEN35_PATTERN)
+            self._re = regex.compile(GLM4_PATTERN if self.ignore_merges else QWEN35_PATTERN)
             self._split = self._re.findall
 
         # The literals matched directly instead of being run through BPE.  GGUF token types: 3 = CONTROL,
@@ -180,6 +193,31 @@ class Tokenizer:
         return cls(list(md["tokenizer.ggml.tokens"]), list(md["tokenizer.ggml.merges"]),
                    list(md.get("tokenizer.ggml.token_type") or []) or None,
                    md.get("tokenizer.ggml.pre", "qwen35"), special)
+
+    @classmethod
+    def from_dir(cls, path) -> "Tokenizer":
+        """Read a local tokenizer export, including empty or newline-bearing merge lists."""
+        path = pathlib.Path(path)
+        vocab = json.loads((path / "vocab.json").read_text(encoding="utf8"))
+        if (not isinstance(vocab, dict) or not vocab or not all(isinstance(k, str) for k in vocab)
+                or not all(type(i) is int for i in vocab.values()) or set(vocab.values()) != set(range(len(vocab)))):
+            raise ValueError("tokenizer vocabulary IDs must be unique and contiguous")
+        tokens = [None] * len(vocab)
+        for token, index in vocab.items():tokens[index] = token
+        if (path / "merges.json").exists():
+            merges = json.loads((path / "merges.json").read_text(encoding="utf8"))
+        else:
+            text = (path / "merges.txt").read_text(encoding="utf8")
+            merges = text.split("\n") if text else []
+        if not isinstance(merges, list) or not all(isinstance(m, str) for m in merges):
+            raise ValueError("tokenizer merges must be a list of strings")
+        types = json.loads((path / "token_type.json").read_text(encoding="utf8"))
+        if not isinstance(types, list) or len(types) != len(tokens) or not all(type(t) is int for t in types):
+            raise ValueError("tokenizer token types must match the vocabulary")
+        meta = json.loads((path / "tokenizer.json").read_text(encoding="utf8")) if (path / "tokenizer.json").exists() else {}
+        if not isinstance(meta, dict) or not isinstance(meta.get("special_ids") or {}, dict):
+            raise ValueError("invalid tokenizer metadata")
+        return cls(tokens, merges, types, meta.get("pre") or "qwen35", meta.get("special_ids") or None)
 
     # -------------------------------------------------------------- the algorithm
     def _bpe(self, word: str) -> list[str]:
@@ -263,12 +301,15 @@ class Tokenizer:
             got = cache.get(piece)
             if got is None:
                 mapped = "".join(BYTE_TO_UNICODE[b] for b in piece.encode("utf-8"))
-                got = []
-                for tok in self._bpe(mapped):
-                    i = self.ids.get(tok)
-                    if i is None:
-                        raise KeyError("BPE produced a token outside the vocabulary: %r" % tok)
-                    got.append(i)
+                if self.ignore_merges and mapped in self.ids:
+                    got = [self.ids[mapped]]
+                else:
+                    got = []
+                    for tok in self._bpe(mapped):
+                        i = self.ids.get(tok)
+                        if i is None:
+                            raise KeyError("BPE produced a token outside the vocabulary: %r" % tok)
+                        got.append(i)
                 if len(cache) < self.PIECE_CACHE_MAX:
                     cache[piece] = got
             out.extend(got)

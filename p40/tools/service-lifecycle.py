@@ -46,6 +46,7 @@ def portable_paths(state, cfg):
     if state.get('version') != active['id']:
         raise RuntimeError('Saved runtime version differs from active runtime')
     keys=('source','engine','vision') if active.get('vision') else ('source','engine')
+    if not active.get('vision') and state.get('vision') is not None:raise RuntimeError('Unexpected saved vision owner for a text-only profile')
     expected = {key: local_path(active.get(key), 'active.' + key) for key in keys}
     if bool(cfg.get('vision'))!=bool(active.get('vision')):raise RuntimeError('Config vision capability differs from active runtime')
     if not expected['source'].is_dir() or any(not expected[key].is_file() for key in keys if key!='source'):

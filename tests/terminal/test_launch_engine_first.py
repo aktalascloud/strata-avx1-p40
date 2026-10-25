@@ -24,6 +24,14 @@ UNUSABLE = {"usable": False, "engine": None, "notice": "No engine for this PC wa
                                                        "The app never downloads an engine while it starts or serves."}
 
 
+def qwen_catalog():
+    """A catalog stand-in for a Qwen model: since 0.2.4 the runner asks it whether the family is DeepSeek (which has its own engine and skips this step);
+    a bare Mock answers yes to everything."""
+    cat = mock.Mock()
+    cat.strata.multi_family.return_value = False
+    return cat
+
+
 class FakeProc:
     def __init__(self, events: list[dict], code: int = 0):
         self.stdout = iter(json.dumps(e) + "\n" for e in events)

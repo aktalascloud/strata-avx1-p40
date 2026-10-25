@@ -14,6 +14,9 @@
 | Compact prefill scratch | PR4039 reduces MMQ scratch to one expert group. Whole/compact outputs are compared bitwise in direct/CUDA Graphs at the model's matrix sizes. HC-region reuse remains off. |
 | Thinking and tool names | PR3971 preserves safe in-flight thinking tokens at a budget cut; PR3972 recognizes unambiguous declared namespace aliases. No OWUI changes. |
 
+| Model-library portability | Separate pinned library, explicit BMI2/AVX2/FMA/F16C off, CPU/CUDA/Vulkan workers and native NextN/head/shard checks. Native Qwen keeps its own dependency and fast path. |
+| Parser and Vulkan fixes | Bounded grammar/JSON recursion and non-compute Vulkan view handling. Build copies are source-pinned; allocation, shader addressing and device-feature guards are preserved. |
+
 The preset keeps 131,072 tokens, KV q4_0, author xhigh, MTP Q2/two drafts (`--spec 3`, `--spec-min-p 0.25`), prefill 512, PLE RAM, PCIe auto and CPU vision. Expert dropping is off. Affinity, system NUMA policy, clocks and power are unchanged.
 
 [Original installation versus latest result](BENCHMARKS.md) · [Measured record](results/benchmarks.json) · [Authors and pinned PRs](COMMUNITY-FIXES.md). Component effects come from separate controlled whole-model experiments; never add them. Numerical correctness and throughput are separate evidence.
