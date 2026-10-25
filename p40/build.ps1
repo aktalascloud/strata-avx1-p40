@@ -34,7 +34,7 @@ $args=@('-S',$root,'-B',$build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release',
     '-DSTRATA_ISA_FLOOR=avx','-DSTRATA_PORTABLE=OFF','-DSTRATA_NATIVE_EXPERTS=ON','-DSTRATA_Q6K_EXPERTS=ON',
     '-DSTRATA_MMQ_KQUANTS=ON','-DSTRATA_IVYBRIDGE_O3=ON','-DSTRATA_PASCALLAMA=ON',
     ('-DSTRATA_PASCALLAMA_PATCH='+(Join-Path $PSScriptRoot 'patches\pascallama-sm61.patch')),
-    "-DSTRATA_PRIVATE_GIT=$git","-DSTRATA_GGML_DIR=$deps",'-DSTRATA_BUILD_TESTS=ON','-DGGML_CCACHE=OFF')
+    "-DSTRATA_PRIVATE_GIT=$git","-DSTRATA_GGML_DIR=$deps",'-DSTRATA_BUILD_TESTS=ON','-DSTRATA_BUILD_CONVERSATION_TESTS=ON','-DGGML_CCACHE=OFF')
 & cmake @args
 if($LASTEXITCODE -ne 0){throw 'Configure failed'}
 & cmake --build $build --target strata strata_kq --parallel $Jobs

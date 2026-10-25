@@ -71,6 +71,9 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(any(k in cfg for k in ('api_key','token','password')))
         for flag,value in [('--max-context','131072'),('--kv','q4_0'),('--pool-workers','14'),('--spec','3'),('--spec-min-p','0.25'),('--ple-io','ram')]:self.assertEqual(cfg['args'][cfg['args'].index(flag)+1],value)
         self.assertFalse(cfg['vision']['gpu']);self.assertEqual(cfg['host'],'127.0.0.1');self.assertEqual(cfg['env']['STRATA_ROUTE_TAIL_SKIP'],'0')
+        self.assertEqual({k:cfg['env'][k] for k in ('STRATA_CKPT_PARK_REUSE','STRATA_PF_GROUP_SCRATCH','STRATA_POOL_FUSED')},
+                         {'STRATA_CKPT_PARK_REUSE':'1','STRATA_PF_GROUP_SCRATCH':'1','STRATA_POOL_FUSED':'0'})
+        self.assertNotIn('STRATA_PF_HC_REGION',cfg['env'])
     def test_separate_installation_port_and_paths_are_local(self):
         manifest=dict(files=[dict(kind='model',name='one.gguf'),dict(kind='model',name='two.gguf'),dict(kind='vision',name='vision.gguf')])
         cfg=kit.make_config(self.root,self.root/'models',manifest,14,'0',8094)

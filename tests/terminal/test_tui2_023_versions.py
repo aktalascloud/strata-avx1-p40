@@ -24,8 +24,8 @@ class VersionBump(unittest.TestCase):
         # 0.2.4 is a Terminal / Control and engine release (DeepSeek V4.1-Flash): the app stays 0.2.3, the three DeepSeek engine packages are 0.1.49,
         # the other engine packages stay 0.1.48 (metal/CMakeLists.txt keeps 0.1.48)
         self.assertEqual(strata_cli.PRODUCT_VERSION, "0.2.4.2")
-        self.assertEqual(strata_cli.version(), "0.1.49.2")                # the CMake project version: Control
-        self.assertEqual(first("CMakeLists.txt", r"^project\(strata VERSION ([0-9.]+) "), "0.1.49.2")
+        self.assertEqual(strata_cli.version(), "0.1.49.3")                # the CMake project version: Control
+        self.assertEqual(first("CMakeLists.txt", r"^project\(strata VERSION ([0-9.]+) "), "0.1.49.3")
         self.assertIn('STRATA_VERSION="0.1.48-metal"', (ROOT / "metal" / "CMakeLists.txt").read_text(encoding="utf-8"))
 
     def test_every_place_the_app_version_lives_says_0_2_3(self):
@@ -48,7 +48,7 @@ class VersionBump(unittest.TestCase):
     def test_version_prints_the_product_and_the_build(self):
         done = subprocess.run([sys.executable, str(ROOT / "strata.py"), "--version"], capture_output=True, text=True, cwd=str(ROOT),
                               env={**os.environ, "STRATA_NO_HANDOVER": "1"})
-        self.assertTrue(done.stdout.startswith("strata 0.2.4.2 (build 0.1.49.2;"), done.stdout)
+        self.assertTrue(done.stdout.startswith("strata 0.2.4.2 (build 0.1.49.3;"), done.stdout)
 
 
 class UpdateFromTheLastRelease(test_updater.UpdaterCase):

@@ -2,7 +2,7 @@
 
 [English](README.md) · [Русский](README.ru.md) · [Скачать](https://github.com/aktalascloud/strata-avx1-p40/releases/latest)
 
-Windows-сборка [Strata](https://github.com/Niko1221/Strata) для **Xeon Ivy Bridge и Tesla P40 (sm_61)**. Движок **0.1.49.2**, официальные исходники [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5). Проверенные патчи, воспроизводимые замеры, переносимая среда запуска.
+Windows-сборка [Strata](https://github.com/Niko1221/Strata) для **Xeon Ivy Bridge и Tesla P40 (sm_61)**. Движок **0.1.49.3**, официальные исходники [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5). Проверенные патчи, воспроизводимые замеры, переносимая среда запуска.
 
 Тестовая модель: **DavidAU Qwen3.8-Flash-Next IQ3_S**, MTP Q2, изображения на CPU. В архиве нет весов, ключей, личных настроек, логов, кэшей, SDK и компиляторов.
 

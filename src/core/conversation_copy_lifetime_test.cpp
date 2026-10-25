@@ -79,6 +79,51 @@ using strata::core::conversation_detail::copy_nonblocking;
 
 int main() {
     using namespace fixture;
+    using namespace strata::core;
+    using namespace strata::core::conversation_detail;
+    auto same = [](const ConversationCheckpoint& a, const ConversationCheckpoint& b) {
+        return a.ids == b.ids && a.imgs == b.imgs && a.gdn == b.gdn && a.ple == b.ple &&
+               a.tails == b.tails && a.dead == b.dead && a.block_pos == b.block_pos &&
+               a.capture == b.capture && a.used == b.used && a.pinned == b.pinned;
+    };
+    int park_cases = 0;
+    for (uint64_t seed = 1; seed <= 64; ++seed) {
+        ConversationCheckpoint c;
+        c.ids = {1, 2, 3}; c.capture = seed; c.used = seed + 5; c.pinned = seed % 2;
+        c.gdn.assign(31, uint8_t(seed)); c.ple.assign(7, 2); c.tails.assign(13, 3);
+        c.dead.assign(19, 4); c.block_pos.assign(5, 5);
+        const std::vector<ConversationCheckpoint> view{c};
+        ConversationParkSource plain;
+        auto copied = park_checkpoints(view, plain);
+        check(same(copied[0], c) && plain.copied == 1 && plain.moved == 0, "ordinary copy remains identical"); ++park_cases;
+        std::vector<ConversationCheckpoint> harvest{c};
+        harvest[0].used = 0; harvest[0].pinned = !c.pinned;
+        auto* storage = harvest[0].gdn.data();
+        ConversationParkSource src; src.harvest = &harvest;
+        auto moved = park_checkpoints(view, src);
+        check(same(moved[0], c) && moved[0].gdn.data() == storage && harvest[0].gdn.empty() &&
+              src.moved == 1 && src.copied == 0, "harvest moves state but preserves current metadata"); ++park_cases;
+        auto again = park_checkpoints(view, src);
+        check(same(again[0], c) && src.copied == 1, "spent harvest is never reused"); ++park_cases;
+        for (int fault = 0; fault < 4; ++fault) {
+            harvest = {c};
+            if (fault == 0) harvest[0].capture = 0;
+            if (fault == 1) harvest[0].capture += 1000;
+            if (fault == 2) harvest[0].gdn.push_back(0);
+            if (fault == 3) harvest[0].ids[0] = 8;
+            ConversationParkSource miss; miss.harvest = &harvest;
+            auto fallback = park_checkpoints(view, miss);
+            check(same(fallback[0], c) && miss.moved == 0 && miss.copied == 1, "identity/shape/token mismatch copies"); ++park_cases;
+        }
+        std::vector<ConversationCheckpoint> outgoing{c}; storage = outgoing[0].gdn.data();
+        ConversationParkSource consume; consume.consume = &outgoing;
+        auto consumed = park_checkpoints(outgoing, consume);
+        check(same(consumed[0], c) && consumed[0].gdn.data() == storage && outgoing[0].gdn.empty(), "consume moves the exact outgoing chain"); ++park_cases;
+        outgoing = {c}; consume = {}; consume.consume = &outgoing;
+        auto unrelated = park_checkpoints(view, consume);
+        check(same(unrelated[0], c) && !outgoing[0].gdn.empty() && consume.moved == 0, "equal tokens in another vector do not authorize consumption"); ++park_cases;
+    }
+    std::printf("PASS: %d checkpoint ownership/identity/copy cases\n", park_cases);
     // Models one fresh async stage thread per chunk: retained streams used to
     // increase by one each time, even after every worker had been joined.
     for (int i = 0; i < 32; ++i) {

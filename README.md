@@ -2,7 +2,7 @@
 
 [English](README.md) · [Русский](README.ru.md) · [Download](https://github.com/aktalascloud/strata-avx1-p40/releases/latest)
 
-A Windows build of [Strata](https://github.com/Niko1221/Strata) for **Ivy Bridge Xeons and Tesla P40 (sm_61)**. Engine **0.1.49.2**, upstream [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5). Reviewed patches, reproducible measurements, portable runtime.
+A Windows build of [Strata](https://github.com/Niko1221/Strata) for **Ivy Bridge Xeons and Tesla P40 (sm_61)**. Engine **0.1.49.3**, upstream [`7dd5cf18e68c`](https://github.com/Niko1221/Strata/commit/7dd5cf18e68c639a8773e096c5c79f971ea2a9f5). Reviewed patches, reproducible measurements, portable runtime.
 
 Reference model: **DavidAU Qwen3.8-Flash-Next IQ3_S**, MTP Q2, CPU vision. No weights, keys, private settings, logs, caches, SDKs or compilers are included.
 

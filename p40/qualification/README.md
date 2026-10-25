@@ -9,9 +9,12 @@ remain enforced. Run it with --root <this-repo> --build <repo/work/build-dir>
 Private Windows CRLF versus public Git LF is reviewed by comparing every source
 body after EOL normalization; public SHA pins match the actual LF source bytes.
 
-The selected deployment ran23 cases: the previous22 (including the full standard
-5201 DenseF32 GEMM sweep), plus BF16 NaN parity (327680 exact bit cases in each
-direct/graph mode). Actual-IQ MMQ, three B6 modes and two EXPDEC grid/graph cases
-are preserved. Timing loops are disabled in the generated extra drivers.
+The selected deployment ran25 cases: the previous23 (including the full standard
+5201 DenseF32 GEMM sweep and BF16 NaN parity), plus conversation_reuse_identity_test
+and prefill_group_scratch_parity. The latter compares whole/compact MMQ outputs
+bitwise in direct/CUDA Graphs at the model's matrix sizes. Actual-IQ MMQ, three B6
+modes and two EXPDEC grid/graph cases are preserved. Configure conversation tests
+with STRATA_BUILD_CONVERSATION_TESTS=ON; build the two additional CMake targets
+before qualification. Timing loops are disabled in the generated extra drivers.
 The PowerShell policy gives exact runtime cases and argv. These files are source,
 not raw logs or prebuilt test binaries. Building an engine alone is not qualification.

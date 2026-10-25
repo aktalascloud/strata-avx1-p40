@@ -41,8 +41,14 @@ def update_events(status: str, note: str = "", code: int = 0) -> list[dict]:
             {"event": "result", "results": [res], "exit_code": code}]
 
 
+def qwen_catalog():
+    catalog = mock.Mock()
+    catalog.strata.multi_family.return_value = False
+    return catalog
+
+
 def runner(spawned: list) -> Runner:
-    r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=mock.Mock(), emit=lambda e: None)
+    r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=qwen_catalog(), emit=lambda e: None)
     r.check_cancel = lambda: None
     return r
 
@@ -58,7 +64,7 @@ class EngineBeforeModel(unittest.TestCase):
         """ensure_engine() like run_ensure, returning (spawns, error or None, the runner with .events)."""
         spawns: list = []
         seen: list = []
-        r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=mock.Mock(), emit=seen.append,
+        r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=qwen_catalog(), emit=seen.append,
                    confirm=confirm, assume_yes=assume_yes)
         r.events = seen
         r.check_cancel = lambda: None

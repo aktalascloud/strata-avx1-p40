@@ -8,7 +8,7 @@
 # below refuses anything older: silently building for a pre-Ampere arch would produce a binary that runs
 # and is wrong about its own performance, which is the worst of both outcomes.
 cmake_minimum_required(VERSION 3.24)
-project(strata VERSION 0.1.49.2 LANGUAGES CXX)
+project(strata VERSION 0.1.49.3 LANGUAGES CXX)
 # EXPERIMENTAL: the Intel Arc engine, the SYCL port in sycl/ (PR #423; icpx + oneMKL, docs/INTEL_ARC.md). It is its
 # own project that takes the unported sources from src/; with this on, nothing below is configured.
 option(STRATA_ENABLE_SYCL "EXPERIMENTAL: build the Intel Arc (SYCL) engine from sycl/ - docs/INTEL_ARC.md" OFF)
@@ -701,6 +701,10 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
     target_link_libraries(conversation_validation_test PRIVATE strata_engine)
     add_test(NAME conversation_validation_test COMMAND conversation_validation_test)
     set_tests_properties(conversation_validation_test PROPERTIES ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" TIMEOUT 120)
+    add_executable(conversation_reuse_identity_test src/core/conversation_reuse_identity_test.cpp)
+    target_link_libraries(conversation_reuse_identity_test PRIVATE strata_engine)
+    add_test(NAME conversation_reuse_identity_test COMMAND conversation_reuse_identity_test)
+    set_tests_properties(conversation_reuse_identity_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 120)
     if(NOT STRATA_ENABLE_HIP AND UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
       add_executable(conversation_transfer_test src/core/conversation_validation_test.cpp)
       target_compile_definitions(conversation_transfer_test PRIVATE CONVERSATION_TEST_TRANSFERS)
@@ -2455,6 +2459,8 @@ if(STRATA_PASCALLAMA AND STRATA_BUILD_TESTS)
   target_link_libraries(sm61_graph_parity PRIVATE ${_strata_gpu_runtime_target})
   add_executable(pascallama_mmq_screen tests/cuda/pascallama_mmq_screen.cpp)
   target_link_libraries(pascallama_mmq_screen PRIVATE strata_mmq ggml-cpu ggml-base)
+  add_executable(prefill_group_scratch_parity tests/cuda/prefill_group_scratch_parity.cpp)
+  target_link_libraries(prefill_group_scratch_parity PRIVATE strata_mmq ggml-cpu ggml-base)
   add_test(NAME sm61_graph_parity COMMAND sm61_graph_parity)
   add_test(NAME pascallama_mmq_screen COMMAND pascallama_mmq_screen)
 endif()

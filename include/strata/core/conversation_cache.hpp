@@ -42,6 +42,11 @@ struct ConversationCheckpoint {
     // Ordinary layer-split checkpoints retain each device's running state.
     // Whole-session parking is currently single-GPU and rejects these parts.
     std::vector<ConversationCheckpoint> stage_parts;
+    // The identity of the running-state bytes (gdn .. block_pos): conversation_checkpoint_save gives every capture a
+    // new process-unique number, a copy keeps it, 0 = unknown (a session file).  Two checkpoints with the same nonzero
+    // `capture` hold the same bytes, so STRATA_CKPT_PARK_REUSE can move one's buffers in place of copying the other's.
+    // Run-time only, like `pinned`.
+    uint64_t capture = 0;
 
     size_t bytes() const {
         size_t n = ids.capacity() * sizeof(int32_t) + imgs.capacity() * sizeof(ConversationImageKey) +
@@ -126,6 +131,7 @@ inline ConversationCheckpointSplit conversation_checkpoints_split(std::vector<Co
             dst.gdn = std::move(src.gdn); dst.ple = std::move(src.ple);
             dst.tails = std::move(src.tails); dst.dead = std::move(src.dead);
             dst.block_pos = std::move(src.block_pos);
+            dst.capture = src.capture;   // the part's own bytes (merge moves it back with them)
         }
         c.stage_parts.clear();
         out.stage0.push_back(std::move(c));
@@ -238,7 +244,7 @@ public:
         reuse_ = {};
         ConversationKvReuse candidate{std::move(kv), tokens, tokens, std::move(ids), {}};
         for (auto& k : stage_kv) candidate.stages.push_back(ConversationKvReuse{std::move(k), tokens, tokens, {}, {}});
-        if (enabled() && candidate.bytes() <= budget_ - bytes_) reuse_ = std::move(candidate);
+        if (enabled() && bytes_ <= budget_ && candidate.bytes() <= budget_ - bytes_) reuse_ = std::move(candidate);
     }
     void limit_reuse(int64_t first_dirty) {
         reuse_.unchanged_tokens = std::min(reuse_.unchanged_tokens, first_dirty);
@@ -347,7 +353,8 @@ public:
         while (!entries_.empty() && (entries_.size() >= slots_ || bytes_ > budget_ - held - incoming)) {
             // the oldest entry that does not hold a pinned shared prefix leaves; with only pinned ones left the new
             // image does not fit (the caller skips parking it - the pinned prefix is what the queries come back to)
-            if (!evict_oldest()) return false;
+            const bool byte_bound = bytes_ > budget_ - held - incoming;
+            if (!(byte_bound ? evict_oldest() : evict_smallest())) return false;
         }
         return true;
     }
@@ -391,8 +398,24 @@ public:
     // oldest-first eviction then pushed the parent conversation out after `slots` turns.  An entry without
     // checkpoints, or whose deepest checkpoint the outgoing chain does not hold (another conversation that only
     // shares the system prompt's root with it), is kept.  Returns how many were dropped.
+    /// `harvest` (STRATA_CKPT_PARK_REUSE; null = as before): the dropped entries' checkpoints, every stage image's,
+    /// are moved there instead of freed with the entry, for the park that supersedes them (ConversationParkSource).
+    bool evict_smallest() {
+        size_t pick = SIZE_MAX;
+        for (size_t i = 0; i < entries_.size(); ++i) {
+            if (entries_[i].pinned() || (guarded_ != 0 && serials_[i] == guarded_)) continue;
+            if (pick == SIZE_MAX || entries_[i].bytes() < entries_[pick].bytes()) pick = i;
+        }
+        if (pick == SIZE_MAX) return false;
+        bytes_ -= entries_[pick].bytes();
+        erase(pick);
+        ++evictions_;
+        return true;
+    }
+
     size_t drop_superseded(const std::vector<int32_t>& ids, const std::vector<ConversationImageKey>& images,
-                           const std::vector<ConversationCheckpoint>& checkpoints, bool cvec) {
+                           const std::vector<ConversationCheckpoint>& checkpoints, bool cvec,
+                           std::vector<ConversationCheckpoint>* harvest = nullptr) {
         auto held = [&](const ConversationCheckpoint& c) {
             if (c.ids == ids && c.imgs == images) return true;
             for (const auto& k : checkpoints)
@@ -407,7 +430,18 @@ public:
                 if (!deepest || c.ids.size() > deepest->ids.size()) deepest = &c;
             if (e.cvec == cvec && deepest && !deepest->ids.empty() && held(*deepest) &&
                 !(guarded_ != 0 && serials_[i] == guarded_)) {
+                if (harvest != nullptr) {
+                    size_t count = e.checkpoints.size();
+                    for (const auto& si : e.stage_images) count += si.checkpoints.size();
+                    harvest->reserve(harvest->size() + count);   // may throw before the ledger or entry changes
+                }
                 bytes_ -= e.bytes();
+                if (harvest != nullptr) {
+                    auto& m = entries_[i];
+                    for (auto& c : m.checkpoints) harvest->push_back(std::move(c));
+                    for (auto& si : m.stage_images)
+                        for (auto& c : si.checkpoints) harvest->push_back(std::move(c));
+                }
                 erase(i);
                 ++dropped;
                 continue;

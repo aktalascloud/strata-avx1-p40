@@ -10,6 +10,9 @@ function Get-StrataRuntimeGpuChecks {
     if($r -and $r -notin @('1','2')){throw 'EXPDEC row count lacks reviewed parity coverage.'}
     if($b -and $b -ne '0'){$required+='b6_runtime_parity'}
     if($e -eq '1'){$required+='expdec_runtime_parity'}
+    if($Environment.STRATA_CKPT_PARK_REUSE -eq '1'){$required+='conversation_reuse_identity_test'}
+    if($Environment.STRATA_PF_GROUP_SCRATCH -eq '1'){$required+='prefill_group_scratch_parity'}
+    if($Environment.STRATA_PF_HC_REGION -and $Environment.STRATA_PF_HC_REGION -ne '0'){throw 'HC region reuse needs a separate prefill lifetime qualification; not selected.'}
     return $required
 }
 function Get-StrataRuntimeGpuCases {
