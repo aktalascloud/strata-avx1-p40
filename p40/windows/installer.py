@@ -1,7 +1,7 @@
 """Install this public, weights-free distribution. No credentials, global environment edits or server start."""
 from __future__ import annotations
 import argparse, contextlib, datetime, hashlib, json, os, pathlib, shutil, subprocess, sys, time
-import http.client, urllib.error, urllib.request
+import http.client, importlib.util, urllib.error, urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -127,6 +127,8 @@ def make_config(root, models, manifest, workers, numa, port=8093):
 
 def install(args):
     root = ROOT; bundle = check_bundle(root)
+    if getattr(args,'backend','native')!='native':
+        return install_local(args,root,bundle)
     manifest = json.loads((root/'p40/model-downloads.json').read_text(encoding='utf8'))
     models = pathlib.Path(args.models_dir).expanduser().absolute() if args.models_dir else root/'models/DavidAU-Qwen3.8-IQ3_S'
     if (root/'strata-davidau.json').exists():
@@ -174,6 +176,58 @@ def install(args):
     print(f'Ready. Run START.cmd. API: http://127.0.0.1:{port}/v1. No API key is shipped or required for this localhost preset.')
     print('NUMA preference:',args.numa_node,'; choose node0 only after confirming your GPU is local to it.')
 
+def install_local(args,root,bundle):
+    """One local-model setup for CPU/CUDA/Vulkan/Poly; no HF request or implicit MTP fallback."""
+    if not args.model:raise ValueError('Choose a local GGUF with --model; only the native Qwen preset downloads weights')
+    config=root/'strata-davidau.json'
+    if config.exists():raise ValueError('This installation already has a profile. Use another extracted folder; the existing profile is preserved')
+    backend=args.backend;device_backend='cuda' if backend=='poly' else backend
+    registry=json.loads((root/'p40/backends.json').read_text(encoding='utf8'))
+    row=registry['engines'].get(backend)
+    if not row:raise ValueError('Backend is absent from this package')
+    engine=(root/row['path']).resolve(strict=True)
+    if not engine.is_relative_to(root.resolve()) or sha(engine)!=row['sha256']:raise ValueError('Backend fingerprint mismatch')
+    device=args.device
+    if device_backend!='cpu' and not device:
+        enumerator=engine if backend!='poly' else root/registry['engines']['cuda']['path']
+        p=subprocess.run([str(enumerator),'--devices-json'],capture_output=True,text=True,encoding='utf8',timeout=60)
+        if p.returncode:raise ValueError('Device detection failed; inspect driver installation, no driver or GPU setting was changed')
+        devices=json.loads(p.stdout);prefix='Vulkan' if backend=='vulkan' else 'CUDA'
+        choices=[x for x in devices if x['name'].startswith(prefix)]
+        if len(choices)!=1:raise ValueError('Select --device explicitly from: '+', '.join(x['name']+' '+x['description'] for x in choices))
+        device=choices[0]['name'];print('Selected device:',device,choices[0]['description'])
+    module=root/'backends/prepare-profile.py'
+    sys.path.insert(0,str(module.parent))
+    spec=importlib.util.spec_from_file_location('strata_local_profile',module);prepared=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepared)
+    from gguf_meta import Header
+    header=Header(args.model);limit=header.metadata.get(header.architecture+'.context_length')
+    context=args.context or min(131072,limit if type(limit) is int else 131072)
+    output=root/'profiles/local'
+    with install_lock(root):
+        # All validation precedes profile/config writes. The launcher proves exclusive port ownership before starting.
+        report=prepared.prepare(args.model,engine,output,backend=device_backend,draft=args.draft_model,
+            context=context,port=args.port,mtp=args.mtp,workers=args.workers,device=device,allow_native_api_port=True)
+        value=json.loads((output/'profile.json').read_text(encoding='utf8'));value['cwd']=str(root/'app')
+        value['log']=str(root/'logs/engine.log');value['open_browser']=False
+        atomic(config,value)
+        atomic(root/'runtime/active.json',dict(id=bundle['release_tag'],source='app',engine=row['path'],vision=None,
+            source_sha=bundle['source_sha'],backend=backend,engine_sha256=row['sha256']))
+        (root/'logs').mkdir(exist_ok=True)
+    print(f'Ready: {backend}, {report["architecture"]}, MTP {args.mtp}. Run START.cmd; API http://127.0.0.1:{args.port}/v1')
+    print('Local API key is generated in strata-davidau.json. No model downloaded. AUTOSTART.cmd enables independent startup.')
+
+def interactive_choices(args):
+    if args.backend is not None:return
+    if not sys.stdin.isatty():args.backend='native';return
+    print('Choose engine / Выберите движок:')
+    print('1. Qwen3.8 DavidAU — native CUDA/P40, resumable download / загрузка с докачкой')
+    print('2. Local GGUF — CUDA NVIDIA; 3. Vulkan AMD Polaris/RX580; 4. CPU AVX1; 5. Poly CUDA')
+    choice=input('[1-5, default1]: ').strip() or '1'
+    modes={'1':'native','2':'cuda','3':'vulkan','4':'cpu','5':'poly'}
+    if choice not in modes:raise ValueError('Choose1..5')
+    args.backend=modes[choice]
+    if args.backend!='native' and not args.model:args.model=input('Local GGUF path / Путь к GGUF: ').strip().strip('"')
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--check-bundle',action='store_true',help='Verify package hashes only; no downloads, config edits or server')
@@ -181,11 +235,19 @@ def main():
     p.add_argument('--workers',type=int,default=max(1,min(14,(os.cpu_count() or 2)-2)))
     p.add_argument('--port',type=int,default=8093,help='Local API port; choose a free port for a separate installation')
     p.add_argument('--numa-node',choices=['off','0','1'],default='off',help='Reference machine used node0; generic default leaves NUMA allocation unchanged')
+    p.add_argument('--backend',choices=('native','cpu','cuda','vulkan','poly'),help='Native optimized Qwen or an embedded local-GGUF engine')
+    p.add_argument('--model',help='Existing local GGUF; never downloaded by a generic backend')
+    p.add_argument('--draft-model',help='Existing matching NextN-head GGUF, when not embedded in the target')
+    p.add_argument('--device',help='Explicit CUDA0 or Vulkan0; one available GPU may be detected automatically')
+    p.add_argument('--context',type=int,help='Context up to the model metadata limit; generic KV starts at F16')
+    p.add_argument('--mtp',choices=('require','off'),default='require',help='Require a trained compatible head; never silently disable MTP')
     args=p.parse_args()
     if args.check_bundle: check_bundle(); return 0
+    interactive_choices(args)
     if os.name!='nt' or sys.maxsize<=2**32: p.error('Windows x64 required')
     if not 1<=args.workers<=256: p.error('workers must be1..256')
-    if not 1024<=args.port<=65535: p.error('port must be1024..65535')
+    if not 1024<=args.port<=65535 or args.port==8080: p.error('port must be1024..65535;8080 is reserved')
+    if args.backend=='native' and any((args.model,args.draft_model,args.device,args.context,args.mtp=='off')):p.error('Native preset uses its pinned model/MTP/settings; use a local-GGUF backend for these options')
     install(args); return 0
 
 if __name__=='__main__':

@@ -122,6 +122,13 @@ def main():
     mutable=(root/'upstream').resolve()
     sys.path=[str(source)]+[value for value in sys.path if Path(value).resolve()!=mutable]
     os.chdir(source);os.environ['PYTHONNOUSERSITE']='1';os.environ['OMP_PROC_BIND']='FALSE'
+    # Private bundle runtime directories only; no global PATH or driver changes.
+    runtime=(root/'runtime').resolve(strict=True)
+    binaries=[runtime/'engine',runtime/'vision']
+    for folder in sorted((runtime/'backends').glob('*')) if (runtime/'backends').is_dir() else []:
+        if folder.is_symlink() or not folder.resolve().is_relative_to(runtime):raise SystemExit('Unsafe backend runtime directory')
+        if folder.is_dir():binaries.append(folder)
+    os.environ['PATH']=os.pathsep.join(map(str,binaries))+os.pathsep+os.environ.get('PATH','')
     server=importlib.import_module('serve.server')
     if Path(server.__file__).resolve()!=server_file:raise SystemExit('Unexpected serving module path')
     original=server.Service

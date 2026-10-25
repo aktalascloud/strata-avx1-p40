@@ -45,8 +45,10 @@ def portable_paths(state, cfg):
         raise RuntimeError('Invalid active runtime identity')
     if state.get('version') != active['id']:
         raise RuntimeError('Saved runtime version differs from active runtime')
-    expected = {key: local_path(active.get(key), 'active.' + key) for key in ('source', 'engine', 'vision')}
-    if not expected['source'].is_dir() or any(not expected[key].is_file() for key in ('engine', 'vision')):
+    keys=('source','engine','vision') if active.get('vision') else ('source','engine')
+    expected = {key: local_path(active.get(key), 'active.' + key) for key in keys}
+    if bool(cfg.get('vision'))!=bool(active.get('vision')):raise RuntimeError('Config vision capability differs from active runtime')
+    if not expected['source'].is_dir() or any(not expected[key].is_file() for key in keys if key!='source'):
         raise RuntimeError('Active runtime source/engine/vision has an unexpected file type')
     for key, path in expected.items():
         saved = local_path(state.get(key), 'state.' + key)
@@ -54,7 +56,7 @@ def portable_paths(state, cfg):
             raise RuntimeError('Saved path differs from active runtime: ' + key)
         state[key] = str(saved)
     if (norm(cfg['cwd']) != norm(expected['source']) or norm(cfg['exe']) != norm(expected['engine']) or
-            norm(cfg['vision']['exe']) != norm(expected['vision'])):
+            (cfg.get('vision') and norm(cfg['vision']['exe']) != norm(expected['vision']))):
         raise RuntimeError('Config source/engine/vision differs from active runtime')
 
 
@@ -136,11 +138,12 @@ def verify(cfg):
         raise RuntimeError('Saved PID creation time differs; possible PID reuse')
     if owner.pid != wrapper.pid and wrapper.pid not in [p.pid for p in owner.parents()]:
         raise RuntimeError('Port owner is not in the saved wrapper parent tree')
-    expected_native = {Path(cfg['exe']).name.casefold(), Path(cfg['vision']['exe']).name.casefold()}
-    allowed_exe = {norm(cfg['exe']), norm(cfg['vision']['exe']), norm(state['python'])}
+    native_paths=[cfg['exe']]+([cfg['vision']['exe']] if cfg.get('vision') else [])
+    expected_native = {Path(p).name.casefold() for p in native_paths}
+    allowed_exe = {norm(p) for p in native_paths}|{norm(state['python'])}
     rows = [wr] + [identity(p, expected_native) for p in wrapper.children(recursive=True)]
     ids = {r['pid'] for r in rows}
-    native_exes={norm(cfg['exe']),norm(cfg['vision']['exe'])}
+    native_exes={norm(p) for p in native_paths}
     for row in rows:
         if row['pid'] != wrapper.pid and row['ppid'] not in ids:
             raise RuntimeError('Child parent is outside the captured tree')
@@ -189,7 +192,7 @@ def controlled_stop(tree,cfg,timeout=600):
     temporary.write_text(json.dumps({'action':'drain_stop','nonce':nonce,'pid':tree['wrapper']['pid']}),encoding='utf-8')
     os.replace(temporary,path)
     captured={(r['pid'],r['created']):r for r in fresh['rows']}
-    expected={Path(cfg['exe']).name.casefold(),Path(cfg['vision']['exe']).name.casefold()}
+    expected={Path(cfg['exe']).name.casefold()}|({Path(cfg['vision']['exe']).name.casefold()} if cfg.get('vision') else set())
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         if same_process(tree['wrapper']):
@@ -266,7 +269,8 @@ def main():
                     return broker['dispatch']('--stop' if args.stop else '--verify')
         cfg = json.loads(CONFIG.read_text(encoding='utf-8-sig'))
         # Canonical portable config may keep paths relative to its project root.
-        for container, key in ((cfg, 'exe'), (cfg, 'cwd'), (cfg['vision'], 'exe')):
+        paths=[(cfg,'exe'),(cfg,'cwd')]+([(cfg['vision'],'exe')] if cfg.get('vision') else [])
+        for container, key in paths:
             container[key] = str(local_path(container.get(key), 'config.' + key))
         if cfg.get('host') != '127.0.0.1' or type(cfg.get('port')) is not int or not 1024 <= cfg['port'] <= 65535:
             raise RuntimeError('Only a valid localhost profile is allowed')
