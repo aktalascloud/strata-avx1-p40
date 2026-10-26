@@ -32,12 +32,12 @@
     "comparison_label": "Historical first-installation receipt, not a fresh stock run"
   },
   "latest_measured": {
-    "date": "2026-10-25",
-    "source_sha": "7dd5cf18e68c639a8773e096c5c79f971ea2a9f5",
-    "engine_version": "0.1.49.3",
-    "engine_sha256": "45B99DC2F8D5CD4EB1563EDBAA694CBBCBB29F1B637CA288B6CF445D572973F9",
-    "vision_sha256": "9669C3A2EEDAA3D53C482B46E76FD98D5C2076F0CAE1D58E91A313CC66A0450F",
-    "patch_sha256": "2568998CD2217AD3435CC2E71E1C899D8D152094FC1CA5215BBDE9990140C392",
+    "date": "2026-10-26",
+    "source_sha": "4b9e05a2a806a3fe24f7b2560d98626c37dade35",
+    "engine_version": "0.1.51",
+    "engine_sha256": "02E0F926EBAF88D6C577ED3CE7BA77F25AD47FEB4B60242997FA8EF2A1A3EB07",
+    "vision_sha256": "7C4F2BC8C45684AEBDD7575E69B2C8928BC7D47DE0EDFDA87C93AA19368AE060",
+    "patch_sha256": "ABC789D370E6CA98A0A6F4E111D1662ECF87F16ECCA4C727673D31399FC675B8",
     "profile": "Ivy Bridge O3 / CUDA12.9 sm61 / I64-J96 /14workers /NUMA0 /fused0 /checkpoint-reuse1 /group-scratch1",
     "context_capacity": 131072,
     "kv": "q4_0",
@@ -59,41 +59,41 @@
     "qualification_only_is_not_throughput": true,
     "benchmark_kind": "Quick warmed benchmark; no engine restart or profile changes",
     "stock_remeasured": false,
-    "native_tok_s": 48.774911404946074,
-    "api_tok_s": 44.64759254075923,
+    "native_tok_s": 50.48114844612715,
+    "api_tok_s": 45.953168336368975,
     "native_samples_tok_s": [
-      45.704491894594014,
-      48.774911404946074,
-      50.68503999366437
+      50.32237773234785,
+      51.16520765879203,
+      50.48114844612715
     ],
     "api_samples_tok_s": [
-      41.99913107734941,
-      44.64759254075923,
-      46.02510309801651
+      45.71227437429256,
+      46.182975288347684,
+      45.953168336368975
     ],
     "payload_sha256": "028ce7584a616d92038ccfaa20dc66dfa235306a27d2078acad32588552eedb6",
-    "first_reasoning_token_median_s": 0.2772721999999703,
+    "first_reasoning_token_median_s": 0.2864380999963032,
     "native_range_tok_s": [
-      45.704491894594014,
-      50.68503999366437
+      50.32237773234785,
+      51.16520765879203
     ],
-    "cached4k_native_tok_s": 50.148879485973985,
-    "cached4k_api_tok_s": 45.47514976690395,
+    "cached4k_native_tok_s": 43.128137740489905,
+    "cached4k_api_tok_s": 39.47570466216563,
     "cached4k_native_samples_tok_s": [
-      50.148879485973985,
-      49.428483163422925,
-      53.729589052596225
+      43.128137740489905,
+      41.35034727830722,
+      47.78258921905331
     ],
     "cached4k_api_samples_tok_s": [
-      45.47514976690395,
-      44.67972352466835,
-      48.10625227940322
+      39.47570466216563,
+      38.06297066506896,
+      42.88522693708068
     ],
     "cached4k_payload_sha256": "ed6f5bb036716c030f52bd6536d4c6b6949d16cb5f18dfbde2fa39b4271cd590",
-    "cached4k_first_reasoning_token_median_s": 0.30522540000038134,
+    "cached4k_first_reasoning_token_median_s": 0.3381831000006059,
     "cached4k_native_range_tok_s": [
-      49.428483163422925,
-      53.729589052596225
+      41.35034727830722,
+      47.78258921905331
     ],
     "observed_gpu_clock_mhz_range": [
       1531.0,

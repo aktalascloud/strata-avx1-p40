@@ -22,7 +22,7 @@
 
 ## Measured Qwen progress
 
-**16.45 → 48.77 tokens/s** in the engine; whole API: 11.65 → 44.65. Measured 2026-10-25, engine 0.1.49.3, `45B99DC2`. Historical cold response without MTP versus warmed MTP/xhigh: different settings, not a simultaneous A/B. Full 128K and the new models were not benchmarked. [Method and CPU/GPU evidence](p40/BENCHMARKS.md).
+**16.45 → 50.48 tokens/s** in the engine; whole API: 11.65 → 45.95. Measured 2026-10-26, engine 0.1.51, `02E0F926`. Historical cold response without MTP versus warmed MTP/xhigh: different settings, not a simultaneous A/B. Full 128K and the new models were not benchmarked. [Method and CPU/GPU evidence](p40/BENCHMARKS.md).
 
 Native preset: **128K · KV Q4 · MTP Q2/two drafts · xhigh · CPU vision**. Build: **Ivy Bridge O3/AVX1**, CUDA **O3/sm_61**, MSVC host **O2/Ob3**. Generic profiles start with F16 KV and model-specific limits.
 
