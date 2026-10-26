@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "native_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
+  "native_source_sha": "4b9e05a2a806a3fe24f7b2560d98626c37dade35",
   "engines": {
     "cpu": {
       "path": "runtime/backends/cpu/strata-ggml.exe",
@@ -8,7 +8,9 @@
       "backend": "cpu",
       "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending",
       "trained_model_qualified": false,
-      "rx580_hardware_qualified": false
+      "rx580_hardware_qualified": false,
+      "component_build_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
+      "reused_exact_checked_bytes": true
     },
     "cuda": {
       "path": "runtime/backends/cuda/strata-ggml.exe",
@@ -16,7 +18,9 @@
       "backend": "cuda",
       "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending",
       "trained_model_qualified": false,
-      "rx580_hardware_qualified": false
+      "rx580_hardware_qualified": false,
+      "component_build_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
+      "reused_exact_checked_bytes": true
     },
     "vulkan": {
       "path": "runtime/backends/vulkan/strata-ggml.exe",
@@ -24,7 +28,9 @@
       "backend": "vulkan",
       "qualification": "protocol/security/CPU fixtures; Vulkan hardware pending",
       "trained_model_qualified": false,
-      "rx580_hardware_qualified": false
+      "rx580_hardware_qualified": false,
+      "component_build_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
+      "reused_exact_checked_bytes": true
     },
     "poly": {
       "path": "runtime/backends/poly/strata-poly.exe",
@@ -32,7 +38,9 @@
       "backend": "cuda",
       "qualification": "compiled, capability/version and worker/guesses/conversation tests; trained model/GPU math pending",
       "trained_model_qualified": false,
-      "rx580_hardware_qualified": false
+      "rx580_hardware_qualified": false,
+      "component_build_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
+      "reused_exact_checked_bytes": true
     }
   }
 }

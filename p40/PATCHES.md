@@ -17,6 +17,8 @@
 | Model-library portability | Separate pinned library, explicit BMI2/AVX2/FMA/F16C off, CPU/CUDA/Vulkan workers and native NextN/head/shard checks. Native Qwen keeps its own dependency and fast path. |
 | Parser and Vulkan fixes | Bounded grammar/JSON recursion and non-compute Vulkan view handling. Build copies are source-pinned; allocation, shader addressing and device-feature guards are preserved. |
 
+| Ivy Bridge CPU2638 | IQ4_NL down dispatch uses the existing AVX GGML dot; Q2_0 keeps its native kernel. Two-row NT1, exact FP16 bit conversion without F16C and shared Q2_0 activation sums; odd-tail upper lanes explicitly zeroed. CPU numerical checks passed, no fresh whole-model speed measurement. |
+
 The preset keeps 131,072 tokens, KV q4_0, author xhigh, MTP Q2/two drafts (`--spec 3`, `--spec-min-p 0.25`), prefill 512, PLE RAM, PCIe auto and CPU vision. Expert dropping is off. Affinity, system NUMA policy, clocks and power are unchanged.
 
 [Original installation versus latest result](BENCHMARKS.md) · [Measured record](results/benchmarks.json) · [Authors and pinned PRs](COMMUNITY-FIXES.md). Component effects come from separate controlled whole-model experiments; never add them. Numerical correctness and throughput are separate evidence.

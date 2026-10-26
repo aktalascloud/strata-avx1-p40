@@ -29,4 +29,4 @@ Native preset: **128K · KV Q4 · MTP Q2/two drafts · xhigh · CPU vision**. Bu
 [Patches](p40/PATCHES.md) · [Checks](p40/INSTALLATION-VERIFICATION.md) · [Licenses](THIRD_PARTY_NOTICES.md) · [Upstream Strata](https://github.com/Niko1221/Strata)
 [Xolotl](https://github.com/Indras-Mirror/Xolotl) · [PolyStrata](https://github.com/VecSzn/PolyStrata) · [Maya](https://github.com/mw00/project-maya) · [Polaris source](https://github.com/AvilaCarlosDev/polaris-local-ai)
 
-Native engine **0.1.50**, official base [41cf05a06a25](https://github.com/Niko1221/Strata/commit/41cf05a06a25dd29103b7b27a2279a3f60c21876). No keys, private settings, logs, caches or SDKs in the ZIP. Trained GLM/DeepSeek and RX580 results are not claimed.
+Native engine **0.1.51**, official base [4b9e05a2a806](https://github.com/Niko1221/Strata/commit/4b9e05a2a806a3fe24f7b2560d98626c37dade35). No keys, private settings, logs, caches or SDKs in the ZIP. Trained GLM/DeepSeek and RX580 results are not claimed.

@@ -29,4 +29,4 @@ Native-профиль: **128К · KV Q4 · MTP Q2/два черновых ток
 [Патчи](p40/PATCHES.md) · [Проверки](p40/INSTALLATION-VERIFICATION.md) · [Лицензии](THIRD_PARTY_NOTICES.md) · [Оригинальная Strata](https://github.com/Niko1221/Strata)
 [Xolotl](https://github.com/Indras-Mirror/Xolotl) · [PolyStrata](https://github.com/VecSzn/PolyStrata) · [Maya](https://github.com/mw00/project-maya) · [Polaris](https://github.com/AvilaCarlosDev/polaris-local-ai)
 
-Native-движок **0.1.50**, официальная база [41cf05a06a25](https://github.com/Niko1221/Strata/commit/41cf05a06a25dd29103b7b27a2279a3f60c21876). Ключей, личных настроек, логов, кэшей и SDK в ZIP нет. Проверка обученных GLM/DeepSeek и реальной RX580 пока не заявляется.
+Native-движок **0.1.51**, официальная база [4b9e05a2a806](https://github.com/Niko1221/Strata/commit/4b9e05a2a806a3fe24f7b2560d98626c37dade35). Ключей, личных настроек, логов, кэшей и SDK в ZIP нет. Проверка обученных GLM/DeepSeek и реальной RX580 пока не заявляется.

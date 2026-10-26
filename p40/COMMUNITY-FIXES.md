@@ -45,3 +45,5 @@ CPU fused scheduling follows the StrataFast/txiki739 work, itself based on Franc
 - [PolyStrata#87](https://github.com/VecSzn/PolyStrata/pull/87): retained Pascal DP4A/cuBLAS compatibility; native trained heads remain distinct from assistant/lookup methods.
 
 GLM/DeepSeek formatting, template and MTP work draws on the linked MIT-licensed [Xolotl](https://github.com/Indras-Mirror/Xolotl), [PolyStrata](https://github.com/VecSzn/PolyStrata), [Maya](https://github.com/mw00/project-maya) and official model library. Other reviewed branches are not wholesale replacements for the native Qwen engine.
+
+- [Strata#2638](https://github.com/Niko1221/Strata/pull/2638), head 6aa11af505a4: retained AVX1 CPU optimization and IQ4_NL dispatch correction. Adaptation explicitly zeros odd-tail upper lanes; no ISA/FP guard is relaxed.

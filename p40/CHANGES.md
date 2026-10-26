@@ -1,9 +1,9 @@
 # Current build
 
-Official source `41cf05a06a25dd29103b7b27a2279a3f60c21876`.
+Official source `4b9e05a2a806a3fe24f7b2560d98626c37dade35`.
 
-- Upstream native0.1.50: asynchronous-tier auto selection when unset and guarded AVX512 self-checks; explicit async1 and the Ivy/P40 profile are preserved.
-- Local universal Windows kit: native Qwen, embedded CPU/CUDA/Vulkan and Poly CUDA, local GGUF/shard selection, compatible NextN checks and OpenAI API. RX580 remains experimental.
-- Local compatibility/security: BMI2 disabled for Ivy Bridge, bounded grammar/JSON recursion and Vulkan large-view handling. Native25 numerical/graph runs including5201 DenseF32 passed; no new throughput benchmark.
+- Native0.1.51: empty OpenAI message arrays return400; one-token probes no longer report an absurd decode rate.
+- Local PR2638: AVX1 IQ4_NL down dispatch correction, two-row NT1, exact FP16 fast conversion and reused Q2_0 activation sums; CPU/numerical gates passed, no throughput claim.
+- Universal package retains the same checked CPU/CUDA/Vulkan/Poly component bytes; their actual prior build versions and experimental RX580/trained-model limits are preserved.
 
 Measured performance is independently source-pinned in BENCHMARKS.md.

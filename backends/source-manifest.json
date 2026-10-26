@@ -17,7 +17,7 @@
   "files": {
     ".gitignore": "768a60e2a3c2c5cbbe33db1edb0d1680943fa36a4a411b16b0e9c0afcb75cdd5",
     "API-AND-MTP.md": "6f5e3adfecaba574fdbb59e21edd2047601c5b3a4c736e713a3166ebbb837319",
-    "api-compat-review.json": "8373b039c0bb145be2e41855ce9a94b92e5b1430e7a0b94f4a1572b18965e4f8",
+    "api-compat-review.json": "85b140f53aa125ab5953cf5d134db932f435f330637f3f48cd8b7d1ec9cbb77d",
     "api-compat.patch": "cb9c9926751250c164f48962b80ac195c0aad4aa56ed3adfafbde6d30d03e635",
     "build-ggml.ps1": "a41bf37e09be7eac82e8e637427be718de162986c80b7825a8a6816b6bfc92bb",
     "build-poly.ps1": "49845c1e13c9c946584591392207da4b751d814cd378f7c3e5d1187f7d9d0ef7",
@@ -91,5 +91,6 @@
     "verify-dependency.py": "6269e84bcc72d5be3dcfabd3cc341c03560d71c4df882fbf476be11f34b32526",
     "verify-sources.py": "5498a7e3e25e1c40236734e78f73cc02d77f931fac1e91b140c870d5bd541d53"
   },
-  "CPU_CUDA_numerical_checked": true
+  "CPU_CUDA_numerical_checked": true,
+  "qualification_status": "Same exact optional component binaries retained; native wrapper0.1.51 API delta reviewed/unit-checked. See component provenance; no trained-model/RX580 qualification."
 }

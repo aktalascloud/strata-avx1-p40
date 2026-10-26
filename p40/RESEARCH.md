@@ -18,3 +18,5 @@ Twenty-six focused candidates have complete file/diff/discussion inventories. Ap
 No unsupported ISA/SM/SRAM/feature guard is removed. No foreign driver/service installer is executed. New models were not downloaded and throughput comparisons were deferred. The model library stays separately pinned; the native Qwen dependency and selected profile are preserved.
 
 [Patches](PATCHES.md) · [Checks](INSTALLATION-VERIFICATION.md) · [Contributions](COMMUNITY-FIXES.md) · [Original/latest measured result](BENCHMARKS.md).
+
+26 October2026 incremental coverage:78 source/fork repositories,420 updated PR/issue records,186 commits and364 comments to an overlapping watermark;354 recently pushed fork default heads were separately indexed in4 pages. These are coverage records, not blanket semantic approval. Prepared CPU2638 was integrated; unrelated IQK/CPU-QSA or POSIX-only changes remain separate candidates.
