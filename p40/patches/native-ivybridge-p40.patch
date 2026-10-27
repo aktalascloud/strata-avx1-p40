@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index c4e6e8a185cb41797a3b4b18957e470668baf9b4..dc81751bb400ba6492c68379439e776f570c6b8b 100644
+index c4e6e8a1..dc81751b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -88,6 +88,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
@@ -189,7 +189,7 @@ index c4e6e8a185cb41797a3b4b18957e470668baf9b4..dc81751bb400ba6492c68379439e776f
 +endif()
 diff --git a/cmake/strata_ivybridge_o3.cmake b/cmake/strata_ivybridge_o3.cmake
 new file mode 100644
-index 0000000000000000000000000000000000000000..9db8b4c98f48ac99e96215f43f6eef24f45f47d6
+index 00000000..9db8b4c9
 --- /dev/null
 +++ b/cmake/strata_ivybridge_o3.cmake
 @@ -0,0 +1,22 @@
@@ -217,7 +217,7 @@ index 0000000000000000000000000000000000000000..9db8b4c98f48ac99e96215f43f6eef24
 +endif()
 diff --git a/cmake/strata_pascallama_overlay.cmake b/cmake/strata_pascallama_overlay.cmake
 new file mode 100644
-index 0000000000000000000000000000000000000000..753ef5f9dbd02b20779c1ca516a5cfb11117a4e5
+index 00000000..753ef5f9
 --- /dev/null
 +++ b/cmake/strata_pascallama_overlay.cmake
 @@ -0,0 +1,23 @@
@@ -245,7 +245,7 @@ index 0000000000000000000000000000000000000000..753ef5f9dbd02b20779c1ca516a5cfb1
 +  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
 +endfunction()
 diff --git a/docs/DETAILS.md b/docs/DETAILS.md
-index 43538ddca377f2a2d37a16ce5550e9ba31df37e8..8049a569b1b2a778550a3e4bfb7ee060448a5f1b 100644
+index 43538ddc..8049a569 100644
 --- a/docs/DETAILS.md
 +++ b/docs/DETAILS.md
 @@ -1332,3 +1332,37 @@ mean KL from the stock model 0.063 nats (max 4.1), perplexity +15% on code, +2.3
@@ -287,7 +287,7 @@ index 43538ddca377f2a2d37a16ce5550e9ba31df37e8..8049a569b1b2a778550a3e4bfb7ee060
 +decode and prompt speed after loading were unchanged in the same runs. None of this is built for Linux, macOS, AMD
 +(HIP) or Intel Arc (SYCL): there the start is as before.
 diff --git a/include/strata/core/conversation_cache.hpp b/include/strata/core/conversation_cache.hpp
-index b2e6a74f7785264a0882cc4105c65acace51bd00..f27064b7c1de9104e1e9bd8d7f748b7170efd40f 100644
+index b2e6a74f..f27064b7 100644
 --- a/include/strata/core/conversation_cache.hpp
 +++ b/include/strata/core/conversation_cache.hpp
 @@ -42,6 +42,11 @@ struct ConversationCheckpoint {
@@ -423,7 +423,7 @@ index b2e6a74f7785264a0882cc4105c65acace51bd00..f27064b7c1de9104e1e9bd8d7f748b71
                  ++dropped;
                  continue;
 diff --git a/include/strata/core/conversation_snapshot.hpp b/include/strata/core/conversation_snapshot.hpp
-index dcee29fa8859c1551dda8210c114db771b2f932e..034a589f6e3115bae200ed5f4477c417c3283f9c 100644
+index dcee29fa..034a589f 100644
 --- a/include/strata/core/conversation_snapshot.hpp
 +++ b/include/strata/core/conversation_snapshot.hpp
 @@ -84,6 +84,18 @@ struct ConversationView {
@@ -456,7 +456,7 @@ index dcee29fa8859c1551dda8210c114db771b2f932e..034a589f6e3115bae200ed5f4477c417
                                      const ModelGeometry& g, const QsaState* draft, std::string& error);
  ConversationRestore conversation_snapshot_restore(const SavedConversation& image, SessionState& session,
 diff --git a/include/strata/core/expert_source.hpp b/include/strata/core/expert_source.hpp
-index 3ab77dc2a78a41003f2d19bd7a142a264ed30d18..126e16b7144b493bf320e41ad1f1cf151fca323d 100644
+index 3ab77dc2..126e16b7 100644
 --- a/include/strata/core/expert_source.hpp
 +++ b/include/strata/core/expert_source.hpp
 @@ -43,6 +43,10 @@
@@ -496,7 +496,7 @@ index 3ab77dc2a78a41003f2d19bd7a142a264ed30d18..126e16b7144b493bf320e41ad1f1cf15
      uint64_t map_bytes_ = 0;
      std::vector<const uint8_t*> dev_slice_;   ///< device alias of each registered slice (or of the whole range)
 diff --git a/include/strata/kernels/cpu/pool.hpp b/include/strata/kernels/cpu/pool.hpp
-index 6c21d2d210a39760369f7adbf1522ef037910e25..402ad4c4212fbb5c0b1b5049cef37976cd6be589 100644
+index 6c21d2d2..402ad4c4 100644
 --- a/include/strata/kernels/cpu/pool.hpp
 +++ b/include/strata/kernels/cpu/pool.hpp
 @@ -248,6 +248,9 @@ public:
@@ -527,7 +527,7 @@ index 6c21d2d210a39760369f7adbf1522ef037910e25..402ad4c4212fbb5c0b1b5049cef37976
      // part the resident complement places on node k in step B), and each node's threads claim and count on their own
 diff --git a/include/strata/platform/cpu_pinning.hpp b/include/strata/platform/cpu_pinning.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..6108086ca1b9c4f81a4ca27ee7ca4373a0314cd1
+index 00000000..6108086c
 --- /dev/null
 +++ b/include/strata/platform/cpu_pinning.hpp
 @@ -0,0 +1,14 @@
@@ -547,7 +547,7 @@ index 0000000000000000000000000000000000000000..6108086ca1b9c4f81a4ca27ee7ca4373
 +}  // namespace strata
 diff --git a/include/strata/platform/win_numa_arena.hpp b/include/strata/platform/win_numa_arena.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e8763f0ec
+index 00000000..2eced255
 --- /dev/null
 +++ b/include/strata/platform/win_numa_arena.hpp
 @@ -0,0 +1,94 @@
@@ -646,7 +646,7 @@ index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e
 +} // namespace strata::platform::win_numa
 +#endif
 diff --git a/serve/dsml.py b/serve/dsml.py
-index c885e9703251450a62cf5e52092068eb9d208183..8416b294476115086a896c229c9a93a4c880cbb4 100644
+index c885e970..8416b294 100644
 --- a/serve/dsml.py
 +++ b/serve/dsml.py
 @@ -187,6 +187,7 @@ class DsmlOutputParser(OutputParser):
@@ -667,10 +667,18 @@ index c885e9703251450a62cf5e52092068eb9d208183..8416b294476115086a896c229c9a93a4
 +    text = to_dsml_force(force)
 +    return text.replace('<｜DSML｜ calls>', '<｜DSML｜tool_calls>').replace('<｜DSML｜ invoke', '<｜DSML｜invoke') if text else text
 diff --git a/serve/frontend.py b/serve/frontend.py
-index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e0731d04588 100644
+index a70494f0..9c63549c 100644
 --- a/serve/frontend.py
 +++ b/serve/frontend.py
-@@ -49,9 +49,13 @@ class ChatTemplate:
+@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
+ from pathlib import Path
+ 
+ import jinja2
++from serve.reason_modes import AuthorModes
+ from jinja2.sandbox import ImmutableSandboxedEnvironment
+ 
+ LOGGER = logging.getLogger(__name__)
+@@ -49,9 +50,14 @@ class ChatTemplate:
  
          env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, extensions=["jinja2.ext.loopcontrols"])
          env.filters["tojson"] = tojson
@@ -681,10 +689,11 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
 +        self.tool_style = "flat"
 +        self.model_family = None
 +        self.model_tokens = {}
++        self.author_modes = AuthorModes(self.source)
          self.caps = self._detect_caps()
  
      def render(self, messages: list[dict], tools: list[dict] | None = None, add_generation_prompt: bool = True,
-@@ -62,8 +66,25 @@ class ChatTemplate:
+@@ -62,8 +68,29 @@ class ChatTemplate:
                      if i == len(messages) - 1 or os.environ.get("STRATA_KEEP_EMPTY_TURNS") == "1" or not (isinstance(m, dict) and m.get("role") == "assistant"
                                                        and not _text_of(m.get("content")).strip()
                                                        and not _has_image(m.get("content")) and not m.get("tool_calls"))]
@@ -704,15 +713,19 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
 +                    calls.append({**call, "function": function})
 +                shaped.append({**m, "tool_calls": calls})
 +            messages = shaped
-+        text = self.template.render(messages=messages, tools=tools, add_generation_prompt=add_generation_prompt,
-+                                    **{**kwargs, **self.model_tokens})
++        kwargs = self.reasoning_kwargs(messages, kwargs)
++        text = self.author_modes.render(self.template.render, messages, tools, add_generation_prompt,
++                                        {**kwargs, **self.model_tokens})
 +        if self.model_family == "glm" and add_generation_prompt and kwargs.get("enable_thinking") is False and text.endswith("<think>"):
 +            text += "</think>"
 +        return text
++
++    def reasoning_kwargs(self, messages, kwargs):
++        return self.author_modes.kwargs(messages, kwargs)
  
      def _detect_caps(self) -> dict[str, bool]:
          """llama.cpp's capability names, checked at load time against this template and Strata's tool-call format.
-@@ -82,6 +103,7 @@ class ChatTemplate:
+@@ -82,6 +109,7 @@ class ChatTemplate:
                    "parameters": {"type": "object", "properties": {"arg": {"type": "string"}}}}
                   for i in range(2)]
          tool_prompt = render([user], tools)
@@ -720,7 +733,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
  
          def calls_supported(count):
              calls = [{"name": f"strata_caps_call_{i}", "arguments": {"arg": f"strata_caps_arg_{i}"}}
-@@ -93,20 +115,35 @@ class ChatTemplate:
+@@ -93,20 +121,35 @@ class ChatTemplate:
              prompt = render(messages, tools)
              # Instructions include example XML and literal tag names, which are not model output. Parse only
              # complete calls to our probe functions, using the same body parser as OutputParser.
@@ -767,7 +780,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
                  "supports_system_role": "strata_caps_system" in render(
                      [{"role": "system", "content": "strata_caps_system"}, user]),
                  "supports_parallel_tool_calls": calls_supported(2),
-@@ -141,14 +178,16 @@ EFFORT_DEEPSEEK = {"none": None, "off": None, "minimal": None, "disabled": None,
+@@ -141,14 +184,16 @@ EFFORT_DEEPSEEK = {"none": None, "off": None, "minimal": None, "disabled": None,
                     "low": "low", "medium": "medium", "high": "high", "xhigh": "max", "max": "max", "maximum": "max"}
  _EFFORT_QWEN = dict(EFFORT)
  _NUMERIC_EFFORT = False
@@ -785,7 +798,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
  
  
  def effort_kwargs(value) -> dict:
-@@ -166,6 +205,8 @@ def effort_kwargs(value) -> dict:
+@@ -166,6 +211,8 @@ def effort_kwargs(value) -> dict:
          raise ValueError(f"unknown reasoning effort {value!r}: use none, low, medium or high"
                           + (", max or 1..100" if _NUMERIC_EFFORT else ""))
      level = EFFORT[key]
@@ -794,7 +807,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
      return {"enable_thinking": False} if level is None else {"reasoning_effort": level}
  
  
-@@ -175,6 +216,8 @@ def budget_effort(tokens) -> dict:
+@@ -175,6 +222,8 @@ def budget_effort(tokens) -> dict:
          n = int(tokens)
      except (TypeError, ValueError):
          return {}
@@ -803,7 +816,23 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
      return {"reasoning_effort": "low" if n < 2048 else "medium" if n < 8192 else EFFORT["high"]}
  
  
-@@ -923,14 +966,18 @@ class OutputParser:
+@@ -583,6 +632,7 @@ def openai_to_messages(req: dict) -> tuple[list[dict], list[dict] | None, dict]:
+             kwargs = {"enable_thinking": False}
+         elif k == "reasoning_effort" and "enable_thinking" not in kwargs:
+             kwargs.update(effort_kwargs(v))
++    if req.get("reason_mode") is not None: kwargs["author_mode"] = req["reason_mode"]
+     return _env_to_user(_late_system_to_user(messages)), tools, kwargs
+ 
+ 
+@@ -684,6 +734,7 @@ def anthropic_to_messages(req: dict, think_unasked: bool = True) -> tuple[list[d
+         # A config's reasoning_effort still applies: Service.with_shared sets output_config before this runs.  A
+         # request that gives its own reasoning_budget_tokens (#123) asks for thinking, so it thinks as before.
+         kwargs["enable_thinking"] = False
++    if req.get("reason_mode") is not None: kwargs["author_mode"] = req["reason_mode"]
+     return _env_to_user(_late_system_to_user(messages)), tools, kwargs
+ 
+ 
+@@ -923,14 +974,18 @@ class OutputParser:
          # the client has no tool to run).  The Responses route leaves it off: a Codex compaction request keeps its
          # conversation's tools in the prompt only, and its calls come back as before.
          self.declared_only = declared_only
@@ -825,7 +854,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
          self.aliases = {alias: next(iter(names)) for alias, names in aliases.items()
                          if len(names) == 1 and alias not in self.schemas}
          self.unread = 0              # #3441: `<tool_call>` blocks that opened like a call and were returned as text
-@@ -1146,7 +1193,19 @@ class OutputParser:
+@@ -1146,7 +1201,19 @@ class OutputParser:
                  self._call_end_checked = len(self.buf)
                  return -1
              self._call_end_checked = -1
@@ -846,7 +875,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
  
      def _scan(self) -> list[Event]:
          """Advance the streaming view of the call body in self.buf (see stream_tools)."""
-@@ -1165,7 +1224,9 @@ class OutputParser:
+@@ -1165,7 +1232,9 @@ class OutputParser:
                  raw_name = rest[a + 10:b]
                  name = raw_name.strip()
                  name = self.aliases.get(name, name)
@@ -857,7 +886,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
                      return out
                  self.scall = ToolCall(name=name, arguments={})
                  props = ((self.schemas.get(name) or {}).get("parameters") or {}).get("properties") or {}
-@@ -1174,6 +1235,8 @@ class OutputParser:
+@@ -1174,6 +1243,8 @@ class OutputParser:
                  args("{")
                  self.sp += b + 1
                  self.ss = "between"
@@ -866,7 +895,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
              elif self.ss == "between":
                  stripped = rest.lstrip()
                  self.sp += len(rest) - len(stripped)
-@@ -1280,14 +1343,14 @@ class OutputParser:
+@@ -1280,14 +1351,14 @@ class OutputParser:
                  # #804: a `<tool_call>` inside the reasoning, with tools declared.  It is held whole (never streamed
                  # as a call) until it ends: a declared name is then a tool call, anything else stays reasoning text.
                  body = self.buf[len(CALL_START):]
@@ -884,7 +913,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
                              call.name = name
                      except ValueError:
                          pass
-@@ -1410,6 +1473,10 @@ class OutputParser:
+@@ -1410,6 +1481,10 @@ class OutputParser:
                      out.append(Event("content", self._track(self.buf[:i + len(CALL_START)])))
                      self.buf = self.buf[i + len(CALL_START):]
                      continue
@@ -895,7 +924,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
                  # A call is `<tool_call>` and then (after whitespace) `<function=`; the tag with anything else after
                  # it is prose that names the format ("I'll use a <tool_call> block") - content, not a malformed call
                  # that ends the request.  Until its follower has arrived it is held, like a partial tag.
-@@ -1540,7 +1607,7 @@ class OutputParser:
+@@ -1540,7 +1615,7 @@ class OutputParser:
                  self.buf = self.buf[i + drop:]
                  batch, self.batch = self.batch, False
                  out += self._finish_call(body)
@@ -904,7 +933,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
                      self.state, self.lead = "call", False
  
      def finish(self, reason: str | None = None) -> list[Event]:
-@@ -1572,6 +1639,14 @@ class OutputParser:
+@@ -1572,6 +1647,14 @@ class OutputParser:
              return out
          if self.state == "reasoning" and self.buf == THINK_END:   # the output ends on a held `</think>`: its end
              self.buf, self.state = "", "content"
@@ -919,7 +948,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
          if self.buf:
              # an unfinished call inside the reasoning (#804) is reasoning text, never a call
              kind = {"reasoning": "reasoning", "rcall": "reasoning", "content": "content"}.get(self.state, "content")
-@@ -1583,14 +1658,18 @@ class OutputParser:
+@@ -1583,14 +1666,18 @@ class OutputParser:
      def _finish_call(self, body: str) -> list[Event]:
          """A whole call body in the template's form -> its tool_call event.  With recover, one that still does not
          parse is the text it is instead of an error that ends the request."""
@@ -942,7 +971,7 @@ index a70494f0833005c3a6ec03a1e1ca50aea888c821..27e04f45489ed8cc0210f62548564e07
              if not self.recover:
 diff --git a/serve/glm.py b/serve/glm.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..1fc25263fce50b3b1d23800a2a3448dd94756372
+index 00000000..1fc25263
 --- /dev/null
 +++ b/serve/glm.py
 @@ -0,0 +1,167 @@
@@ -1115,7 +1144,7 @@ index 0000000000000000000000000000000000000000..1fc25263fce50b3b1d23800a2a3448dd
 +    return CALL_START + name
 diff --git a/serve/model_backends.py b/serve/model_backends.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..f7af76068a0488919a2c4c2cc890097544bc675b
+index 00000000..f7af7606
 --- /dev/null
 +++ b/serve/model_backends.py
 @@ -0,0 +1,53 @@
@@ -1172,8 +1201,928 @@ index 0000000000000000000000000000000000000000..f7af76068a0488919a2c4c2cc8900975
 +    if any(k in sampling for k in ('repetition_penalty','frequency_penalty','presence_penalty')) and 'penalty_last_n' not in sampling:
 +        result.append('penalty_last_n=64')
 +    return (' '+' '.join(result)) if result else ''
+diff --git a/serve/reason_modes.py b/serve/reason_modes.py
+new file mode 100644
+index 00000000..f9ea39c1
+--- /dev/null
++++ b/serve/reason_modes.py
+@@ -0,0 +1,888 @@
++# Mode routing adapted from TheHubUser4860938/Strata-Mnemosyne (MIT).
++# Exact origin: 2ac28be317c8ecbabc935f6153333506fb80f3e2; no memory/store/embedder code imported.
++# Russian keywords and explicit native-effort preservation are local adaptations.
++from __future__ import annotations
++import ast,re
++
++AUTO_WORDS = {'007': {'agent',
++         'agentic',
++         'automation',
++         'autonomous',
++         'backpressure',
++         'batch',
++         'cron',
++         'daemon',
++         'deterministic',
++         'execute',
++         'fallback',
++         'fleet',
++         'job',
++         'monitor',
++         'multi-step',
++         'orchestrate',
++         'orchestration',
++         'pipeline',
++         'retry',
++         'runbook',
++         'schedule',
++         'self-healing',
++         'tool-calls',
++         'unattended',
++         'watchdog',
++         'workflow'},
++ '007+coder': {'agentic',
++               'builds',
++               'circuit-breaker',
++               'idempotent',
++               'orchestration',
++               'rate-limiter',
++               'workers',
++               'автотесты',
++               'многошаговый',
++               'оркестрация',
++               'пайплайн'},
++ 'brainstorm': {'brainstorm',
++                'generate',
++                'ideate',
++                'list',
++                'many',
++                'quickly',
++                'solutions',
++                'брейншторм',
++                'мозговой'},
++ 'business': {'acquisition',
++              'b2b',
++              'b2c',
++              'boardroom',
++              'brand',
++              'business',
++              'churn',
++              'company',
++              'competitor',
++              'competitors',
++              'customer',
++              'customers',
++              'differentiation',
++              'funding',
++              'funnel',
++              'go-to-market',
++              'growth',
++              'gtm',
++              'investor',
++              'market',
++              'marketing',
++              'merger',
++              'monetization',
++              'okrs',
++              'pitch',
++              'positioning',
++              'pricing',
++              'profit',
++              'retention',
++              'revenue',
++              'saas',
++              'sales',
++              'startup',
++              'valuation',
++              'бизнесплан',
++              'выручка',
++              'конкуренты',
++              'маркетинг'},
++ 'business+hyper': {'five-forces', 'segment', 'swot', 'segments', 'white-space'},
++ 'coder': {'api',
++           'async',
++           'backend',
++           'bug',
++           'build',
++           'cache',
++           'caching',
++           'class',
++           'cli',
++           'code',
++           'coding',
++           'compile',
++           'concurrency',
++           'css',
++           'database',
++           'dependency',
++           'deploy',
++           'distributed',
++           'docker',
++           'endpoint',
++           'exception',
++           'fix',
++           'frontend',
++           'function',
++           'git',
++           'golang',
++           'grpc',
++           'html',
++           'implement',
++           'java',
++           'javascript',
++           'json',
++           'kubernetes',
++           'latency',
++           'leak',
++           'library',
++           'lint',
++           'merge',
++           'microservice',
++           'module',
++           'null',
++           'package',
++           'pip',
++           'program',
++           'pytest',
++           'python',
++           'queue',
++           'race',
++           'react',
++           'rebase',
++           'redis',
++           'refactor',
++           'regex',
++           'rust',
++           'schema',
++           'script',
++           'server',
++           'sql',
++           'stack',
++           'swift',
++           'throughput',
++           'trace',
++           'typescript',
++           'undefined',
++           'unittest',
++           'venv',
++           'vue',
++           'websocket',
++           'кодирование',
++           'программирование',
++           'репозиторий',
++           'рефакторинг',
++           'скрипт',
++           'функция'},
++ 'comedy': {'amuse',
++            'bit',
++            'comedian',
++            'funny',
++            'humor',
++            'humorous',
++            'humour',
++            'joke',
++            'jokes',
++            'laugh',
++            'laughing',
++            'meme',
++            'pun',
++            'satire',
++            'silly',
++            'stand-up',
++            'witty'},
++ 'curie': {'anatomy',
++           'atom',
++           'atoms',
++           'biology',
++           'chemistry',
++           'crispr',
++           'dna',
++           'enzyme',
++           'evolution',
++           'experiment',
++           'experiments',
++           'gene',
++           'genes',
++           'hormone',
++           'laboratory',
++           'measurement',
++           'mechanism',
++           'mechanistic',
++           'molecule',
++           'molecules',
++           'mrna',
++           'neuron',
++           'physiology',
++           'protein',
++           'radioactivity',
++           'rna',
++           'science',
++           'scientific',
++           'truth',
++           'vaccine'},
++ 'curie+teacher': {'lessons', 'crispr'},
++ 'deeptree': {'alternative',
++              'branch',
++              'causal',
++              'causality',
++              'contingency',
++              'counterfactual',
++              'decision',
++              'decision-tree',
++              'decisions',
++              'dependency',
++              'options',
++              'path',
++              'plan',
++              'planning',
++              'prune',
++              'pruning',
++              'roadmap',
++              'scenarios',
++              'stages',
++              'strategic',
++              'strategy',
++              'tree'},
++ 'deeptree+spoon': {'thesis', 'roadmaps'},
++ 'einstein': {'creative',
++              'creativity',
++              'divergent',
++              'ideas',
++              'ideation',
++              'imagine',
++              'improbable',
++              'invent',
++              'invention',
++              'lateral',
++              'novel',
++              'novelty',
++              'original',
++              'serendipity',
++              'speculative',
++              'surprising',
++              'thought-experiment',
++              'unusual',
++              'what-if'},
++ 'einstein+pkd': {'android',
++                  'cyberpunk',
++                  'dystopia',
++                  'dystopian',
++                  'fantasy',
++                  'paranoid',
++                  'sci-fi',
++                  'scifi',
++                  'simulation',
++                  'what-if',
++                  'worldbuilding'},
++ 'holodeck': {'adversarial',
++              'argue',
++              'both-sides',
++              'debate',
++              'debates',
++              'devil-advocate',
++              'discuss',
++              'discussion',
++              'opposing',
++              'panelists',
++              'perspectives',
++              'roundtable',
++              'simulate',
++              'sparring',
++              'symposium',
++              'tribunal',
++              'versus'},
++ 'house': {'abscess',
++           'ailment',
++           'allergies',
++           'allergy',
++           'autoimmune',
++           'bacteria',
++           'benign',
++           'broken',
++           'bug',
++           'cardiology',
++           'cause',
++           'clinic',
++           'condition',
++           'coredump',
++           'cough',
++           'crash',
++           'cyst',
++           'debug',
++           'debugging',
++           'dermatology',
++           'diagnose',
++           'diagnosis',
++           'differential',
++           'disease',
++           'dizziness',
++           'dizzy',
++           'doctor',
++           'eliminate',
++           'elimination',
++           'error',
++           'exception',
++           'failing',
++           'fails',
++           'failure',
++           'fatigue',
++           'fracture',
++           'headache',
++           'heisenbug',
++           'hospital',
++           'hypothesis',
++           'illness',
++           'infection',
++           'inflammation',
++           'intermittent',
++           'lesion',
++           'logs',
++           'lump',
++           'malady',
++           'malignant',
++           'medical',
++           'medication',
++           'medicine',
++           'migraine',
++           'mystery',
++           'nausea',
++           'neurology',
++           'oncology',
++           'oom',
++           'palpitations',
++           'patient',
++           'prescription',
++           'prognosis',
++           'rash',
++           'reflux',
++           'regression',
++           'remedy',
++           'rheumatology',
++           'root',
++           'sarcoma',
++           'segfault',
++           'sprain',
++           'stack',
++           'suddenly',
++           'surgery',
++           'surgical',
++           'swelling',
++           'symptom',
++           'symptoms',
++           'therapy',
++           'timeout',
++           'trace',
++           'treatment',
++           'triage',
++           'tumor',
++           'tumour',
++           'vertigo',
++           'virus',
++           'worked',
++           'дедлок',
++           'диагностика',
++           'исключение',
++           'сегфолт',
++           'трассировка'},
++ 'house+teacher': {'diagnostic', 'patient-friendly', 'layperson', 'second-opinion'},
++ 'hyper': {'audit',
++           'breakdown',
++           'categorize',
++           'decompose',
++           'deconstruct',
++           'deconstruction',
++           'dissect',
++           'exhaustive',
++           'frameworks',
++           'granularity',
++           'mece',
++           'outline',
++           'sections',
++           'segmentation',
++           'structure',
++           'taxonomy'},
++ 'hyper+socrates': {'structuring', 'essay', 'dissertation'},
++ 'joe': {'casual', 'honestly', 'folks', 'regular', 'friend', 'everyday', 'relatable'},
++ 'joe+comedy': {'relatable'},
++ 'joker': {'absurd',
++           'anarchic',
++           'anarchy',
++           'chaos',
++           'disrupt',
++           'fragile',
++           'invert',
++           'irony',
++           'irreverent',
++           'mad',
++           'paradox',
++           'provocateur',
++           'subvert',
++           'topsy-turvy',
++           'trick',
++           'unconventional',
++           'upend'},
++ 'joker+comedy': {'deadpan',
++                  'improv',
++                  'one-liner',
++                  'one-liners',
++                  'punchline',
++                  'punchlines',
++                  'roast',
++                  'roasts'},
++ 'joker+socrates': {'goad', 'advocates', 'advocate', 'raconteur'},
++ 'logic': {'axiom',
++           'consistent',
++           'contradiction',
++           'deduce',
++           'deduction',
++           'fallacy',
++           'first',
++           'formal',
++           'logic',
++           'logical',
++           'mathematics',
++           'modus-ponens',
++           'principles',
++           'proof',
++           'prove',
++           'proving',
++           'soundness',
++           'syllogism',
++           'tautology',
++           'theorem',
++           'validity'},
++ 'matlock': {'advocacy',
++             'arbitration',
++             'attorney',
++             'brief',
++             'compliance',
++             'contract',
++             'contracts',
++             'copyright',
++             'counsel',
++             'court',
++             'deposition',
++             'felony',
++             'gdpr',
++             'injunction',
++             'law',
++             'lawsuit',
++             'lawyer',
++             'legal',
++             'liability',
++             'litigation',
++             'misdemeanor',
++             'objection',
++             'patent',
++             'precedent',
++             'privacy',
++             'procedural',
++             'regulation',
++             'regulations',
++             'statute',
++             'subpoena',
++             'testimony',
++             'tort',
++             'trademark',
++             'verdict',
++             'witness',
++             'договор',
++             'законодательство',
++             'юридический'},
++ 'matlock+hyper': {'indemnity', 'fine-print', 'boilerplate', 'clause', 'clauses', 'addendum', 'redline'},
++ 'musk': {'aerodynamic',
++          'battery',
++          'costs',
++          'energy',
++          'feasible',
++          'first-principles',
++          'fundamental',
++          'manufacturing',
++          'material',
++          'materials',
++          'orbital',
++          'physical',
++          'physics',
++          'propulsion',
++          'rocket',
++          'silicon',
++          'thruster',
++          'tolerances',
++          'volumetric',
++          'wafer'},
++ 'musk+business': {'fundamentals', 'manufacturing'},
++ 'musk+logic': {'defensibility', 'thermodynamics', 'moat', 'unit-economics'},
++ 'neo': {'awake',
++         'belief',
++         'believe',
++         'consciousness',
++         'control',
++         'determinism',
++         'doubt',
++         'glitch',
++         'illusion',
++         'matrix',
++         'morpheus',
++         'prophecy',
++         'reality',
++         'red-pill',
++         'reframe',
++         'simulation-hypothesis',
++         'skeptical',
++         'zion'},
++ 'neo+story': {'peripeteia', 'deus-ex-machina', 'reversal', 'twists', 'foreshadow'},
++ 'omni': {'across',
++          'analogy',
++          'connections',
++          'convergent',
++          'cross-domain',
++          'culture',
++          'domains',
++          'everything',
++          'fields',
++          'holistic',
++          'interdisciplinary',
++          'isomorphism',
++          'lenses',
++          'metaphor',
++          'paradigm',
++          'parallel',
++          'synthesis',
++          'synthesize',
++          'unified'},
++ 'pkd+comedy': {'gallows', 'farce', 'parody', 'caricature', 'tragicomic'},
++ 'prompt': {'chain-of-thought',
++            'claude',
++            'context-window',
++            'few-shot',
++            'gpt',
++            'instruct',
++            'instruction-tuning',
++            'llm',
++            'meta-prompt',
++            'prompt',
++            'prompt-template',
++            'prompting',
++            'prompts',
++            'system-prompt',
++            'token-budget'},
++ 'prompt+prompt': {'tune', 'optimize'},
++ 'quinn': {'bold',
++           'confident',
++           'daring',
++           'edgy',
++           'flair',
++           'opinion',
++           'opinions',
++           'personality',
++           'playful',
++           'unapologetic'},
++ 'socrates': {'assumption',
++              'assumptions',
++              'clarify',
++              'counterexample',
++              'critique',
++              'define',
++              'definition',
++              'elenchus',
++              'examine',
++              'gaps',
++              'implication',
++              'implications',
++              'interrogate',
++              'meaning',
++              'premise',
++              'premises',
++              'probe',
++              'question',
++              'questions',
++              'refute',
++              'socratic'},
++ 'socrates+matlock': {'policies', 'jurisprudence', 'policy', 'briefs', 'cross-examination', 'dissent'},
++ 'socrates+teacher': {'argument',
++                      'drill',
++                      'drills',
++                      'ethics',
++                      'exam',
++                      'exams',
++                      'flashcards',
++                      'homework',
++                      'memorize',
++                      'philosophical',
++                      'philosophy',
++                      'position',
++                      'quiz',
++                      'quizzes',
++                      'rebuttal',
++                      'tutor',
++                      'tutoring'},
++ 'spoon': {'archival',
++           'bibliography',
++           'citation',
++           'cite',
++           'claims',
++           'dossier',
++           'evidence',
++           'experts',
++           'fact-checking',
++           'facts',
++           'literature',
++           'meta-analysis',
++           'methodology',
++           'panel',
++           'paper',
++           'papers',
++           'peer-reviewed',
++           'referencing',
++           'research',
++           'rigor',
++           'sources',
++           'studies',
++           'study',
++           'survey',
++           'исследование',
++           'источники',
++           'фактчекинг'},
++ 'stark': {'architect',
++           'architecture',
++           'blueprint',
++           'capacity',
++           'cluster',
++           'design',
++           'diagram',
++           'failover',
++           'foresight',
++           'infrastructure',
++           'integration',
++           'monolith',
++           'platform',
++           'redundancy',
++           'requirements',
++           'roadmapping',
++           'scalable',
++           'scaling',
++           'service',
++           'solutions',
++           'systems',
++           'topology',
++           'tradeoff',
++           'visionary',
++           'whiteboard',
++           'архитектура',
++           'масштабирование',
++           'микросервисы'},
++ 'stark+coder': {'frontends', 'apis', 'microservices'},
++ 'stark+prompt': {'system-card', 'output-format', 'guardrail', 'personas', 'guardrails', 'persona'},
++ 'story': {'antagonist',
++           'chapter',
++           'character',
++           'characters',
++           'climax',
++           'dialogue',
++           'ending',
++           'epic',
++           'fiction',
++           'lyrical',
++           'monologue',
++           'motif',
++           'narrative',
++           'novel',
++           'plot',
++           'poem',
++           'poetry',
++           'prose',
++           'protagonist',
++           'scene',
++           'screenplay',
++           'screenwriting',
++           'stories',
++           'story',
++           'tale',
++           'theme',
++           'themes',
++           'twist',
++           'writing',
++           'повесть',
++           'рассказ',
++           'сценарий'},
++ 'teacher': {'beginner',
++             'crash-course',
++             'eli5',
++             'explain',
++             'foundations',
++             'guide',
++             'intro',
++             'introduction',
++             'learn',
++             'learned',
++             'lesson',
++             'mentor',
++             'plain',
++             'primer',
++             'simply',
++             'step-by-step',
++             'teach',
++             'teaching',
++             'tutorial',
++             'understand',
++             'walkthrough',
++             'обучение',
++             'объяснение',
++             'объясни',
++             'учебник'},
++ 'ultra': {'acceptance',
++           'benchmark',
++           'careful',
++           'complete',
++           'deliverable',
++           'deliverables',
++           'eval',
++           'evaluation',
++           'final',
++           'flawless',
++           'perfect',
++           'perfection',
++           'polish',
++           'production',
++           'release',
++           'review',
++           'reviews',
++           'ship',
++           'sign-off',
++           'validation',
++           'verify',
++           'аудит',
++           'рецензия'},
++ 'ultra+coder': {'linting', 'refactoring', 'clean', 'code-review'},
++ 'vader': {'authority',
++           'choice',
++           'choose',
++           'command',
++           'commit',
++           'consequential',
++           'decide',
++           'decision',
++           'decisions',
++           'decree',
++           'duty',
++           'empire',
++           'irreversible',
++           'leadership',
++           'mandate',
++           'order',
++           'resolve',
++           'ruthless',
++           'sacrifice',
++           'ultimatum'}}
++GUIDE = {'007': 'agentic multi-step builds',
++ 'auto': 'the server picks per task (autonomous mode)',
++ 'brainstorm': 'ideation',
++ 'business': 'business strategy',
++ 'coder': 'code work',
++ 'comedy': 'humor',
++ 'curie': 'science explanation',
++ 'deeptree': 'branching strategy',
++ 'einstein': 'novelty, ideation',
++ 'holodeck': 'simulated debate',
++ 'house': 'debugging, medical (pair with logic)',
++ 'hyper': 'audits, deconstruction',
++ 'joe': 'plain human voice',
++ 'joker': 'reframe through chaos',
++ 'logic': 'first principles',
++ 'matlock': 'legal',
++ 'musk': 'physics-first sanity',
++ 'neo': 'question the frame',
++ 'omni': 'cross-domain synthesis',
++ 'prompt': 'prompt engineering',
++ 'quinn': 'bold voice',
++ 'socrates': 'probing questions',
++ 'spoon': 'research, fact-check',
++ 'stark': 'architecture',
++ 'story': 'narrative',
++ 'teacher': 'plain explanations',
++ 'ultra': 'final deliverables, review',
++ 'vader': 'hard decisions',
++ 'xlogic': 'first principles at xhigh'}
++
++DF={}
++for words in AUTO_WORDS.values():
++    for token in words:DF[token]=DF.get(token,0)+1
++AUTO_WEIGHTS={mode:{token:1.0/DF[token] for token in words} for mode,words in AUTO_WORDS.items()}
++
++def last_user_text(messages):
++    for message in reversed(messages or []):
++        if isinstance(message,dict) and message.get("role")=="user":
++            content=message.get("content")
++            if isinstance(content,list):return " ".join(str(p.get("text", "")) for p in content if isinstance(p,dict))
++            return str(content or "")
++    return ""
++
++def auto_pick(text,allowed):
++    # Cline's user goal outranks the surrounding environment/tool transcript.
++    task=re.search(r"<task>([\s\S]*?)</task>",text or "",re.I)
++    if task:text=task.group(1)
++    else:text=re.split(r"<environment_details>|<tool_result>",text or "",maxsplit=1,flags=re.I)[0]
++    hits=set(re.findall(r"[a-zа-яё0-9][a-zа-яё0-9+#'-]{1,}",text[:14000].lower()))
++    best,score,tied=None,0.0,False
++    for mode,weights in AUTO_WEIGHTS.items():
++        if not all(p in allowed for p in mode.split("+")):continue
++        value=sum(weights[t] for t in hits if t in weights)
++        if value>score:best,score,tied=mode,value,False
++        elif value==score and value>0 and mode!=best:tied=True
++    return best if best and score>=0.4 and not tied else None
++
++class AuthorModes:
++    def __init__(self,source):
++        match=re.search(r"set\s+reason_mods\s*=\s*(\[[^\]]+\])",source or "")
++        try:modes=ast.literal_eval(match.group(1)) if match and "{REASON:" in source else []
++        except (ValueError,SyntaxError):modes=[]
++        self.modes=frozenset(x for x in modes if isinstance(x,str))
++        self.supported="ultra" in self.modes
++        self.blocks={}
++    def valid(self,value):
++        if value in (None,"","off","native"):return True
++        if not isinstance(value,str) or len(value)>100:return False
++        if value in ("auto","adaptive"):return self.supported
++        return self.supported and len(value.split("+"))<=2 and all(x in self.modes and x!="off" for x in value.split("+"))
++    def tag(self,text):
++        match=re.match(r"\s*\{REASON:([a-z0-9+]{1,100})\}",text or "")
++        if not match:return None
++        value=match.group(1);candidate=value[1:] if value.startswith("i") else value
++        return value if candidate in self.modes or self.valid(candidate) and "+" in candidate else None
++    def selection(self,messages,kwargs):
++        raw=kwargs.get("author_mode");tag=self.tag(last_user_text(messages))
++        if not tag and raw is None:
++            for message in messages or []:
++                if message.get("role")=="user":
++                    content=message.get("content");candidate=self.tag(content) if isinstance(content,str) else None
++                    if candidate and content.strip()=="{REASON:"+candidate+"}":tag=candidate
++                    break
++        if raw is not None and not self.valid(raw):raise ValueError("Unsupported author reasoning mode")
++        if raw not in (None,"","off","native") and not self.supported:raise ValueError("This template does not support author reasoning modes")
++        value=tag or raw;off=False
++        if tag and tag.startswith("i"):value=tag[1:];off=True
++        if value in ("auto","adaptive"):value=auto_pick(last_user_text(messages),self.modes)
++        if value in ("off","native",""):value=None
++        return value,off,raw
++    def kwargs(self,messages,kwargs):
++        mode,off,_=self.selection(messages,kwargs)
++        return {**kwargs,**({"enable_thinking":False} if off else {})}
++    def render(self,render,messages,tools,add_generation_prompt,kwargs):
++        mode,off,raw=self.selection(messages,kwargs)
++        # No explicit author-mode field: preserve every original template byte.
++        if raw is None and not (mode and "+" in mode):return render(messages=messages,tools=tools,add_generation_prompt=add_generation_prompt,**kwargs)
++        kw=dict(kwargs);kw.pop("author_mode",None)
++        if off:kw["enable_thinking"]=False
++        clean=[]
++        for message in messages:
++            message=dict(message);content=message.get("content")
++            def strip(text):
++                return re.sub(r"\{REASON:([a-z0-9+]{1,100})\}",lambda m:"" if self.tag(m.group(0)) else m.group(0),text)
++            if isinstance(content,str):message["content"]=strip(content)
++            elif isinstance(content,list):message["content"]=[{**part,"text":strip(part["text"])} if isinstance(part,dict) and isinstance(part.get("text"),str) else part for part in content]
++            clean.append(message)
++        if mode:kw["reasoning_effort"]=mode.split("+")[0]
++        result=render(messages=clean,tools=tools,add_generation_prompt=add_generation_prompt,**kw)
++        if mode and "+" in mode:
++            a,b=mode.split("+")
++            def block(name):
++                if name not in self.blocks:
++                    probe=render(messages=[{"role":"user","content":"x"}],tools=None,add_generation_prompt=False,reasoning_effort=name,enable_thinking=True)
++                    match=re.search(r"<\|im_start\|>system\n([\s\S]*?)<\|im_end\|>",probe)
++                    self.blocks[name]=match.group(1).strip() if match else ""
++                return self.blocks[name]
++            ba,bb=block(a),block(b)
++            if not ba or not bb or ba not in result:raise ValueError("This author-mode pair cannot be rendered safely")
++            bridge="The first block frames reasoning. The second block frames the final answer: its voice and wrapper close the reply; the wrapper of your previous message does not carry over. Preserve tool schemas and caller instructions."
++            result=result.replace(ba,ba+"\n\n"+bridge+"\n\n"+bb,1)
++        return result
+diff --git a/serve/responses.py b/serve/responses.py
+index 8b7241b9..89c4ad9b 100644
+--- a/serve/responses.py
++++ b/serve/responses.py
+@@ -455,7 +455,7 @@ def template_kwargs(req: dict, shared: dict) -> dict:
+     if effort is None:
+         effort = shared.get("reasoning_effort")      # the Chat settings shared with apps, as on the chat path
+     try:
+-        return effort_kwargs(effort)
++        return {**effort_kwargs(effort), **({"author_mode": req["reason_mode"]} if req.get("reason_mode") is not None else {})}
+     except ValueError as e:
+         raise ResponsesError(str(e), "reasoning.effort") from None
+ 
+diff --git a/serve/runconfig.py b/serve/runconfig.py
+index 3448db06..3d147149 100644
+--- a/serve/runconfig.py
++++ b/serve/runconfig.py
+@@ -20,6 +20,8 @@ from strata_control import atomic as _atomic_mod
+ # (key, kind, help).  kind: "bool", "int>=0", "num>=0", ("enum", values), "names", or ("sampling", check) for a key
+ # of the "sampling" block, ("arg", flag) for an engine option kept in "args".
+ EDITABLE = [
++    ("reason_modes", "bool", "Enable author modes on compatible DavidAU templates"),
++    ("reason_mode", ("enum", ["off", "ultra", "auto"]), "Default author mode; explicit standard effort stays native"),
+     ("sampling.temperature", ("sampling", "num>=0"),
+      "Default temperature for requests that send none (0 = greedy; without it the model card's: 1.0 thinking, 0.7 not)"),
+     ("sampling.top_p", ("sampling", "0<x<=1"), "Default top_p for requests that send none"),
 diff --git a/serve/server.py b/serve/server.py
-index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7fdfc27610 100644
+index 76b5a2c7..21694300 100644
 --- a/serve/server.py
 +++ b/serve/server.py
 @@ -92,7 +92,11 @@ IMAGE_PAD = "<|image_pad|>"
@@ -1304,7 +2253,59 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
          import serve.frontend as _frontend
          _frontend.use_family(family)
  
-@@ -5080,11 +5129,13 @@ class Service:
+@@ -4474,9 +4523,42 @@ class Service:
+                     print(f"[strata] idle unload: {e}", flush=True)
+         threading.Thread(target=loop, daemon=True).start()
+ 
++    def author_reason_status(self):
++        author = getattr(self.template, "author_modes", None)
++        supported = bool(author and author.supported)
++        cfg = {}
++        if self.config_path:
++            cfg = runconfig.load(self.config_path)
++        enabled = supported and cfg.get("reason_modes") is True
++        return {"supported": supported, "enabled": enabled,
++                "default_mode": self.shared.get("reason_mode", cfg.get("reason_mode", "off")) if enabled else "off",
++                "modes": ["off", "ultra", "auto"] if supported else [],
++                "native_efforts": ["none", "low", "medium", "high", "xhigh"],
++                "memory_enabled_by_feature": False}
++
++    def author_reason_request(self, req, header=None):
++        status = self.author_reason_status()
++        explicit = header if header is not None else req.get("reason_mode")
++        if explicit is None:
++            ctk = req.get("chat_template_kwargs") or {}
++            # An explicitly selected standard level always keeps standard Qwen semantics.
++            native = (req.get("reasoning_effort") not in (None, "") or bool(req.get("reasoning"))
++                      or "thinking" in req or bool(req.get("output_config"))
++                      or isinstance(ctk, dict) and any(k in ctk for k in ("reasoning_effort", "enable_thinking")))
++            explicit = "off" if native else status["default_mode"]
++        if explicit in (None, "", "off", "native"):
++            if "reason_mode" not in req: return req
++            return {k:v for k,v in req.items() if k != "reason_mode"}
++        if not status["enabled"]: raise ValueError("Author reasoning modes are disabled or unsupported for this template")
++        if not self.template.author_modes.valid(explicit): raise ValueError("Unknown author reasoning mode")
++        return {**req, "reason_mode": "auto" if explicit == "adaptive" else explicit}
++
+     def set_shared(self, defaults) -> dict:
+         """The Chat settings every client gets for what it leaves out; {} / None = clients use their own again."""
+-        self.shared = clean_shared_defaults(defaults)
++        checked = clean_shared_defaults(defaults)
++        if checked.get("reason_mode") not in (None, "off") and not self.author_reason_status()["supported"]:
++            raise ValueError("Author reasoning modes are unsupported by this template")
++        self.shared = checked
+         if self.shared_path:
+             try:
+                 if self.shared:
+@@ -4822,6 +4904,7 @@ class Service:
+         """-> (ids, thinking, max_new). An unset or non-positive max_new (some clients send -1) means "unlimited":
+         the rest of the context.  `force` (forced_call): without thinking the reply starts with it, so it ends the
+         prompt; with thinking, Service.run writes it once the thinking is over."""
++        if hasattr(self.template, "reasoning_kwargs"): kwargs.update(self.template.reasoning_kwargs(messages, kwargs))
+         # `cancel` (#1999): set when the client hangs up; the downloads, the wait for the turn and the encodes stop
+         # between pictures and raise ClientGone
+         fetched = self._note_unreadable_tool_images(messages, cancel)
+@@ -5080,11 +5163,13 @@ class Service:
          """Yields ("event", Event) as text arrives, then ("done", {"finish": .., "completion_tokens": ..}).
          `force` (forced_call): the opening of the call the reply must make - see prepare()."""
          # the model card's sampling for this thinking state, then the config's block, then the Chat settings shared with
@@ -1322,7 +2323,7 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
          # #123: read after the merge, so a budget shared through POST /settings is seen like the other keys
          budget = self.reasoning_budget(sampling) if thinking else None
          if thinking and not budget and self.answer_room and max_new and max_new >= ANSWER_ROOM_MIN_CAP:
-@@ -5455,12 +5506,24 @@ class Service:
+@@ -5455,12 +5540,24 @@ class Service:
                              text = "\n" * (2 - (len(tail) - len(tail.rstrip("\n")))) + force
                          force = None
                          extra = self.tok.encode(text, parse_special=True)
@@ -1350,7 +2351,25 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
                              n += 1
                              raw_ids.append(t)
                              thinking_n += parser.state in ("reasoning", "rcall")
-@@ -6668,8 +6731,11 @@ def make_handler(svc: Service):
+@@ -6637,7 +6734,7 @@ def make_handler(svc: Service):
+                 self._json(200, {"status": "ok", "max_context": svc.reported_ctx(), "model": svc.model,
+                                  "images": svc.vision is not None, "api_key": bool(svc.api_key),
+                                  "image_generation": svc.images is not None,
+-                                 "loaded": svc.loaded(), "service": "strata"})
++                                 "loaded": svc.loaded(), "service": "strata", "author_reasoning": svc.author_reason_status()})
+             elif path.startswith("/v1/images/files/"):
+                 # response_format url: the name (32 random hex digits) is the access, as an OpenAI image URL is
+                 f = svc.images.file(path[len("/v1/images/files/"):]) if svc.images is not None else None
+@@ -6651,6 +6748,8 @@ def make_handler(svc: Service):
+                 self.send_header("Content-Length", str(len(body)))
+                 self.end_headers()
+                 self.wfile.write(body)
++            elif path == "/reason":
++                if self._authorized(): self._json(200, svc.author_reason_status())
+             elif path == "/status":
+                 if not self._authorized():                  # #212: it shows the end of the last answer
+                     return
+@@ -6668,8 +6767,11 @@ def make_handler(svc: Service):
              elif path in ("/v1/models", "/models"):
                  if self._authorized():
                      loaded = svc.loaded()
@@ -1359,11 +2378,19 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
 +                    # context_length), so a client that sizes its window from /v1/models reads it
                      model = {"id": svc.model, "object": "model", "status": {"value": "loaded"},
 -                             "meta": {"n_ctx": svc.reported_ctx()},
-+                             "max_model_len": ctx, "context_length": ctx, "meta": {"n_ctx": ctx},
++                             "max_model_len": ctx, "context_length": ctx, "meta": {"n_ctx": ctx, "supportsAuthorModes": bool(getattr(svc.template, "author_modes", None) and svc.template.author_modes.supported)},
                               "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
                                                "output_modalities": ["text"]}}
                      if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
-@@ -7174,10 +7240,20 @@ def make_handler(svc: Service):
+@@ -7133,6 +7235,7 @@ def make_handler(svc: Service):
+                 items.close()
+ 
+         def _openai(self, req):
++            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
+             req = svc.with_shared(req, "openai")
+             bias_api.normalize(req.get("logit_bias"), len(getattr(svc.tok, "tokens", ())) or None)
+             messages, tools, kw = openai_to_messages(req)
+@@ -7174,10 +7277,20 @@ def make_handler(svc: Service):
              if not req.get("stream"):
                  return self._json(200, openai_collect(chunks))
              self._sse()
@@ -1384,7 +2411,52 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
                      else:
                          self.wfile.write(b"data: " + json.dumps(c, ensure_ascii=False).encode() + b"\n\n")
                      self.wfile.flush()
-@@ -7871,6 +7947,8 @@ def apply_saved_tuning(cfg: dict, *, say=None) -> dict:
+@@ -7219,6 +7332,7 @@ def make_handler(svc: Service):
+         def _responses(self, req):
+             """#451: POST /v1/responses - OpenAI's Responses API, stateless (serve/responses.py), on the chat path.
+             Errors use the Responses format; once the stream has started they arrive as a response.failed event."""
++            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
+             try:
+                 title = (responses_api.thread_title_events(req, svc.model_for(req))
+                          if svc.codex_thread_titles else None)
+@@ -7379,6 +7493,7 @@ def make_handler(svc: Service):
+         def _count_tokens(self, req):
+             """Anthropic's token count, which Claude Code asks for its context figures: the prompt this server would
+             read for the same request, rendered and tokenized - the model does not run."""
++            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
+             req = svc.with_shared(req, "anthropic")
+             messages, tools, kw = anthropic_to_messages(req, svc.anthropic_think_unasked)
+             stop_strings(req)                                 # the same 400 as the request itself would get
+@@ -7386,6 +7501,7 @@ def make_handler(svc: Service):
+             self._json(200, {"input_tokens": len(svc.encode_prompt(messages, tools, kw, store=False))})
+ 
+         def _anthropic(self, req):
++            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
+             svc.load()
+             req = svc.with_shared(req, "anthropic")
+             messages, tools, kw = anthropic_to_messages(req, svc.anthropic_think_unasked)
+@@ -7747,7 +7863,7 @@ def origins_of(value, key: str, wildcard: bool) -> list[str]:
+     return out
+ 
+ 
+-SHARED_KEYS = ("reasoning_effort", "reasoning_budget_tokens", "temperature", "top_p", "top_k", "seed", "max_tokens",
++SHARED_KEYS = ("reason_mode", "reasoning_effort", "reasoning_budget_tokens", "temperature", "top_p", "top_k", "seed", "max_tokens",
+                "experimental_speed_projection")
+ 
+ 
+@@ -7763,8 +7879,10 @@ def clean_shared_defaults(d) -> dict:
+             continue
+         number = isinstance(value, (int, float)) and not isinstance(value, bool)
+         if key == "reasoning_effort":
+-            if value not in ("none", "low", "medium", "high"):
++            if value not in ("none", "low", "medium", "high", "xhigh"):
+                 raise ValueError("reasoning_effort: none, low, medium or high")
++        elif key == "reason_mode":
++            if value not in ("off", "ultra", "auto", "adaptive"): raise ValueError("reason_mode: off, ultra or auto")
+         elif key == "temperature":
+             if not number or not 0 <= value <= 2:
+                 raise ValueError("temperature: 0..2")
+@@ -7871,6 +7989,8 @@ def apply_saved_tuning(cfg: dict, *, say=None) -> dict:
      Every start path runs this (the Terminal, `runtime start`, the app's load, a restart of the app, an unload and a load), so the
      tuning is applied every time and never re-measured. A tune's own worker sets STRATA_NO_PRESET so that it measures the
      configuration it was given. Never fails a start: a store that cannot be read means the configuration as it is."""
@@ -1393,7 +2465,7 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
      if os.environ.get("STRATA_NO_PRESET"):
          return cfg
      say = say or (lambda line: print(line, flush=True))
-@@ -8070,6 +8148,49 @@ def model_card_sampling(arch, thinking) -> dict:
+@@ -8070,6 +8190,49 @@ def model_card_sampling(arch, thinking) -> dict:
      return dict(sets["thinking" if thinking else "instruct"]) if sets else {}
  
  
@@ -1443,7 +2515,7 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
  def default_model_name(cfg: dict) -> str:
      """The config's "model_name", else its family's name ("arch": qwen4exp, qwen35moe), else Flash-Next's."""
      return cfg.get("model_name") or FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next")
-@@ -8288,6 +8409,12 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+@@ -8288,6 +8451,12 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
          cfg["gpu"] = int(a.gpu) if a.gpu.strip().isdigit() else a.gpu
      a.host = a.host or cfg.get("host") or "127.0.0.1"   # issue #26: the run scripts pass no --host, the config can
      supplied_args = argv if argv is not None else sys.argv[1:]
@@ -1456,7 +2528,7 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
      if ("STRATA_API_KEY" in os.environ and not os.environ["STRATA_API_KEY"].strip()) or \
              any((x == "--api-key" and i + 1 < len(supplied_args) and not supplied_args[i + 1].strip()) or
                  x.strip() == "--api-key=" for i, x in enumerate(supplied_args)):
-@@ -8315,18 +8442,7 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+@@ -8315,18 +8484,7 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
          ap.error(f"the model's tokenizer is missing ({tpath / 'vocab.json'}); run setup again")
      if (tpath / "vocab.json").exists():
          import strata_tokenizer as ST
@@ -1478,7 +2550,7 @@ index 76b5a2c7971ffc6638cf45a48f3293d9b6fe2518..ec2854d5e6cd867414428478a0571f7f
          ap.error("--offline requires MCP servers and before_load commands to be disabled in this profile")
 diff --git a/serve/test_declared_tool_boundary.py b/serve/test_declared_tool_boundary.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8422f3ceca0820dd8aed4c97f31e725640675b58
+index 00000000..8422f3ce
 --- /dev/null
 +++ b/serve/test_declared_tool_boundary.py
 @@ -0,0 +1,73 @@
@@ -1557,7 +2629,7 @@ index 0000000000000000000000000000000000000000..8422f3ceca0820dd8aed4c97f31e7256
 +    unittest.main()
 diff --git a/serve/test_legacy_models.py b/serve/test_legacy_models.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..73c81f16705248b05359f865b49ce140b49f9b38
+index 00000000..73c81f16
 --- /dev/null
 +++ b/serve/test_legacy_models.py
 @@ -0,0 +1,173 @@
@@ -1735,7 +2807,7 @@ index 0000000000000000000000000000000000000000..73c81f16705248b05359f865b49ce140
 +
 +if __name__=='__main__':unittest.main()
 diff --git a/serve/test_responses.py b/serve/test_responses.py
-index 3e6188a1175fa5dbc9d2f92c73c0628b824b6b47..de93128b7f18747f36528ff3f70991c7d7ad3026 100644
+index 3e6188a1..de93128b 100644
 --- a/serve/test_responses.py
 +++ b/serve/test_responses.py
 @@ -737,10 +737,12 @@ class CodexCompactionOverHttp(Server):
@@ -1757,7 +2829,7 @@ index 3e6188a1175fa5dbc9d2f92c73c0628b824b6b47..de93128b7f18747f36528ff3f70991c7
          plain, code, r2 = self.compaction({})
 diff --git a/serve/test_sampling_merge.py b/serve/test_sampling_merge.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2ebc11fd096b70a0ef166852299f853ca7ef5e99
+index 00000000..2ebc11fd
 --- /dev/null
 +++ b/serve/test_sampling_merge.py
 @@ -0,0 +1,56 @@
@@ -1818,7 +2890,7 @@ index 0000000000000000000000000000000000000000..2ebc11fd096b70a0ef166852299f853c
 +if __name__ == "__main__":
 +    unittest.main()
 diff --git a/serve/test_server.py b/serve/test_server.py
-index 3e60dee4ee62653df7930b086fa63e38e898d2c1..da67a70591851f246978e8b80c25f1d8bfa09eaf 100644
+index 3e60dee4..da67a705 100644
 --- a/serve/test_server.py
 +++ b/serve/test_server.py
 @@ -633,6 +633,20 @@ class VisionTempFiles(unittest.TestCase):
@@ -1997,7 +3069,7 @@ index 3e60dee4ee62653df7930b086fa63e38e898d2c1..da67a70591851f246978e8b80c25f1d8
          from serve.server import REASONING_WRAP_UP
 diff --git a/serve/test_tool_name_alias.py b/serve/test_tool_name_alias.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..b5119fbb939b6dbbd401f3a96c6ee55ca3f37a43
+index 00000000..b5119fbb
 --- /dev/null
 +++ b/serve/test_tool_name_alias.py
 @@ -0,0 +1,179 @@
@@ -2180,8 +3252,530 @@ index 0000000000000000000000000000000000000000..b5119fbb939b6dbbd401f3a96c6ee55c
 +
 +if __name__ == "__main__":
 +    unittest.main()
+diff --git a/serve/web/app.css b/serve/web/app.css
+index f9bad8cc..4f425ed5 100644
+--- a/serve/web/app.css
++++ b/serve/web/app.css
+@@ -197,3 +197,8 @@ main { flex: 1; min-height: 0; display: flex; }
+ .img-results figure{margin:0}
+ .img-results img{max-width:100%;border-radius:var(--st-r-lg);display:block}
+ .img-results figcaption{font-size:var(--st-fs-sm, 13px);color:var(--st-ink-2, inherit);margin-top:4px}
++
++#s-thinking{flex-wrap:wrap;gap:4px} #s-thinking button{flex:1 0 27%}
++
++.st-language{font:inherit;color:var(--st-ink);background:var(--st-surface);border:1px solid var(--st-line);border-radius:7px;padding:5px;max-width:100px;margin-left:8px}
++@media(max-width:680px){.st-header{flex-wrap:wrap;height:auto;min-height:60px;gap:5px;padding:8px}.st-tabs{order:4;width:100%;justify-content:center}.st-language{max-width:88px}}
+diff --git a/serve/web/app.js b/serve/web/app.js
+index ac84f85d..1bc80c2c 100644
+--- a/serve/web/app.js
++++ b/serve/web/app.js
+@@ -114,6 +114,24 @@ async function loadHealth() {
+                                           : "Attach a text file (or drop it here)";
+     $("chat-empty-sub").textContent = `${health.model} runs on this PC. Nothing leaves it.`;
+     $("tab-btn-images").hidden = !health.image_generation;
++    const author = health.author_reasoning || {};
++    document.querySelectorAll("[data-author-choice]").forEach(b => { b.hidden = !author.enabled; b.disabled = !author.enabled; });
++    if (!author.enabled && ["ultra", "adaptive"].includes(settings.thinking)) settings.thinking = "high";
++    if (author.enabled && ["ultra", "auto", "adaptive"].includes(author.default_mode) && !store.get("author-default-seeded-v1", false)) {
++      settings.thinking = author.default_mode === "ultra" ? "ultra" : "adaptive";
++      store.set("sampling", settings); store.set("author-default-seeded-v1", true);
++    }
++    try {
++      const config = await fetch("config", {headers: headers()});
++      if (config.ok) {
++        const values = Object.fromEntries((await config.json()).keys.map(row => [row.key, row.value]));
++        if (!store.get("sampler-defaults-seeded-v1", false)) {
++          for (const key of ["temperature", "top_p", "top_k"]) if (values["sampling." + key] != null) settings[key] = values["sampling." + key];
++          store.set("sampling", settings); store.set("sampler-defaults-seeded-v1", true);
++        }
++      }
++    } catch (_) { /* API key entry can load this later. */ }
++
+     if (location.hash === "#images" && health.image_generation) showTab("images");
+   } catch (e) {
+     setTimeout(loadHealth, 2000);
+@@ -807,8 +825,7 @@ async function send() {
+   busy = {controller, msg: m};
+   setBusy(true);
+ 
+-  const body = {model: health.model, messages: apiMessages(), stream: true,
+-                reasoning_effort: settings.thinking};
++  const body = {model: health.model, messages: apiMessages(), stream: true, ...reasoningWire(settings.thinking)};
+   if (!(settings.temperature > 0)) {
+     body.temperature = 0;
+   } else if (!samplingUntouched(settings)) {
+@@ -1021,6 +1038,10 @@ function loadDrawer(s = settings) {
+   outputs();
+ }
+ // "Use for other apps too": the server keeps these settings as every client's defaults (GET/POST /settings)
++function reasoningWire(value) {
++  if (value === "ultra" || value === "adaptive") return {reasoning_effort: "xhigh", reason_mode: value === "adaptive" ? "auto" : "ultra"};
++  return {reasoning_effort: value, reason_mode: "off"};
++}
+ let sharedOn = false;
+ async function loadShared() {
+   try {
+@@ -1030,7 +1051,7 @@ async function loadShared() {
+   $("s-share").setAttribute("aria-checked", String(sharedOn));
+ }
+ function sharedDefaults(s) {
+-  const d = {reasoning_effort: s.thinking};
++  const d = reasoningWire(s.thinking);
+   if (!(+s.temperature > 0)) d.temperature = 0;
+   else if (!samplingUntouched(s)) Object.assign(d, {temperature: +s.temperature, top_p: +s.top_p, top_k: +s.top_k});
+   if (s.seed) d.seed = +s.seed;
+@@ -1059,7 +1080,7 @@ function outputs() {
+   $("o-topp").textContent = (+$("s-topp").value).toFixed(2);
+   $("o-topk").textContent = $("s-topk").value;
+   const sel = [...$("s-thinking").children].find((b) => b.getAttribute("aria-checked") === "true");
+-  $("o-thinking").textContent = sel ? {none: "answers right away", low: "short", medium: "medium", high: "thorough (default)"}[sel.dataset.v] : "";
++  $("o-thinking").textContent = sel ? {none: "answers right away", low: "short", medium: "medium", high: "native high", xhigh: "native xhigh", ultra: "author Ultra", adaptive: "automatic author-mode selection"}[sel.dataset.v] : "";
+   for (const id of ["s-topp", "s-topk"]) $(id).disabled = t === 0;
+ }
+ for (const b of $("s-thinking").children) b.onclick = () => { for (const x of $("s-thinking").children) x.setAttribute("aria-checked", String(x === b)); outputs(); };
+@@ -1101,7 +1122,7 @@ setBusy(false);
+ renderChat();
+ const startQuestion = new URLSearchParams(location.search).get("q");   // /?q=... starts a chat (a shortcut)
+ if (startQuestion) history.replaceState(null, "", location.pathname + location.hash);
+-loadHealth().then(loadMcp).then(() => { if (startQuestion) { $("input").value = startQuestion; send(); } });
++loadHealth().then(loadMcp).then(() => { if (startQuestion) { $("input").value = startQuestion; $("input").focus(); } }); // PR4221: a link cannot submit with the user's tools
+ showTab(location.hash.slice(1) || "chat");
+ poll();
+ 
+diff --git a/serve/web/i18n.js b/serve/web/i18n.js
+new file mode 100644
+index 00000000..4d820f37
+--- /dev/null
++++ b/serve/web/i18n.js
+@@ -0,0 +1,387 @@
++// RU/EN UI chrome only; no model requests or user-content rewriting.
++"use strict";
++(() => {
++const RU={
++  "Chat": "Чат",
++  "Images": "Изображения",
++  "Monitor": "Монитор",
++  "About": "О программе",
++  "Views": "Разделы",
++  "Connecting…": "Подключение…",
++  "Light / dark": "Светлая / тёмная",
++  "Switch between light and dark": "Переключить светлую и тёмную тему",
++  "Switch color theme": "Переключить тему",
++  "Ask anything": "Задайте вопрос",
++  "Ask anything…": "Задайте вопрос…",
++  "The model runs on this PC. Nothing leaves it.": "Модель работает на этом компьютере. Данные остаются здесь.",
++  "Attach a file": "Прикрепить файл",
++  "Attach a text file (or drop it here)": "Прикрепить текстовый файл или перетащить его сюда",
++  "Attach a text file or a picture (or drop it here)": "Прикрепить текстовый файл или изображение",
++  "New chat": "Новый чат",
++  "Save this chat": "Сохранить чат",
++  "Save this chat as Markdown": "Сохранить чат в Markdown",
++  "Sampling and thinking": "Генерация и рассуждения",
++  "Stop": "Остановить",
++  "Send": "Отправить",
++  "Message": "Сообщение",
++  "Make an image": "Создать изображение",
++  "Describe the image…": "Опишите изображение…",
++  "One image at a time; a chat request waits for it (and the other way round).": "Изображения создаются по одному. Чат и генерация изображений ожидают друг друга.",
++  "Size": "Размер",
++  "Random": "Случайно",
++  "random": "случайно",
++  "Generate": "Создать",
++  "Status": "Состояние",
++  "Time": "Время",
++  "Model": "Модель",
++  "Model and engine": "Модель и движок",
++  "This PC": "Этот компьютер",
++  "Connect your tools": "Подключение приложений",
++  "Any OpenAI- or Anthropic-compatible client works with these addresses.": "Эти адреса подходят для клиентов с API OpenAI или Anthropic.",
++  "Settings": "Настройки",
++  "API key": "Ключ API",
++  "only if the server was started with one": "нужен, только если задан на сервере",
++  "Not needed": "Не требуется",
++  "Dark theme": "Тёмная тема",
++  "Chats, settings and the key are kept in this browser only.": "Чаты, настройки и ключ хранятся только в этом браузере.",
++  "Strata on GitHub": "Strata на GitHub",
++  "Model settings": "Настройки модели",
++  "Kept in the model's run config for every client. An empty field is the default. They take effect the next time the model starts (close Strata's window and start it again).": "Сохраняются в конфигурации модели для всех клиентов. Пустое поле означает значение по умолчанию. Вычислительные параметры применяются при следующем запуске сервера; авторские режимы — сразу.",
++  "Save": "Сохранить",
++  "Sampling": "Параметры генерации",
++  "Thinking": "Рассуждения",
++  "Off": "Без рассуждений",
++  "Low": "Низкий",
++  "Medium": "Средний",
++  "High": "Высокий",
++  "XHigh": "Очень высокий",
++  "Ultra": "Ультра",
++  "Adaptive": "Адаптивный",
++  "native high": "нативный high",
++  "native xhigh": "нативный xhigh",
++  "author Ultra": "авторский Ultra",
++  "automatic author-mode selection": "автоматический выбор авторского режима",
++  "answers right away": "ответ без этапа рассуждений",
++  "short": "кратко",
++  "medium": "умеренно",
++  "thorough (default)": "подробно по умолчанию",
++  "Temperature": "Температура",
++  "0 = always the most likely word (exact, repeatable)": "0 — всегда наиболее вероятный токен, без случайного выбора",
++  "Top-p": "Top-p",
++  "Top-k": "Top-k",
++  "Max tokens": "Лимит токенов",
++  "empty = until done": "пусто — до завершения",
++  "Until done": "До завершения",
++  "Seed": "Случайное зерно",
++  "empty = random": "пусто — случайное",
++  "Show thinking": "Показывать рассуждения",
++  "expanded while it streams": "раскрывать во время генерации",
++  "Experimental speed projection": "Экспериментальная проекция ускорения",
++  "the engine's control vector; off = the stock model. Switching reads the chat again once": "управляющий вектор движка; выключено — исходная модель. Переключение повторно читает чат",
++  "Use tools from MCP servers": "Использовать инструменты MCP",
++  "the model may call them while it answers": "модель может вызывать их во время ответа",
++  "Use for other apps too": "Применять и для других приложений",
++  "omp and other API clients get these settings for anything they don't set themselves": "omp и другие API-клиенты наследуют параметры, которые не указали сами",
++  "and other API clients get these settings for anything they don't set themselves": "и другие API-клиенты наследуют параметры, которые не указали сами",
++  "Reset": "Сбросить",
++  "Apply": "Применить",
++  "Close": "Закрыть",
++  "Speed": "Скорость",
++  "GPU load": "Загрузка GPU",
++  "GPU temp": "Температура GPU",
++  "Power": "Потребление",
++  "Disk read": "Чтение диска",
++  "Decode": "Генерация",
++  "Prefill": "Обработка запроса",
++  "Decode now": "Генерация сейчас",
++  "Decode last request": "Генерация последнего запроса",
++  "Prefill now": "Обработка сейчас",
++  "Prefill last request": "Обработка последнего запроса",
++  "Prefill this request": "Обработка этого запроса",
++  "Engine timing · tokens / second": "Время движка · токенов в секунду",
++  "Recent requests": "Последние запросы",
++  "Show all": "Показать все",
++  "Show fewer": "Показать меньше",
++  "Request content": "Содержимое запроса",
++  "Request status": "Состояние запроса",
++  "No requests yet": "Запросов пока нет",
++  "No active requests": "Нет активных запросов",
++  "No matching requests.": "Совпадающих запросов нет.",
++  "No requests yet. API calls will appear here automatically.": "Запросов пока нет. Вызовы API появятся здесь автоматически.",
++  "Last request": "Последний запрос",
++  "Conversation cache": "Кэш диалогов",
++  "Parked conversations": "Сохранённые диалоги",
++  "Their memory (RAM)": "Занято в ОЗУ",
++  "MCP servers": "Серверы MCP",
++  "Their tools run on this PC with your rights, when the model decides to call them (in this page's chat only; switch it off in Sampling).": "Их инструменты выполняются на этом компьютере с вашими правами по решению модели, только в чате этой панели. Их можно отключить в параметрах генерации.",
++  "Duration": "Длительность",
++  "First token": "Первый токен",
++  "Decode t/s": "Генерация, ток/с",
++  "Prefill t/s": "Обработка, ток/с",
++  "VRAM hit rate": "Попадания в VRAM",
++  "New prompt tokens per second, excluding reused cache tokens (engine prompt time)": "Новых токенов запроса в секунду, без повторно использованного кэша, по времени движка",
++  "While writing the answer: the share of the experts looked up that were already in VRAM. Experts the GPU read over PCIe (--pcie-frac) are not counted in it; their share of all routed experts is shown after it (+N% PCIe)": "Доля нужных экспертов, уже находившихся в VRAM при генерации. Чтение экспертов через PCIe не включено; его доля указана отдельно (+N% PCIe).",
++  "Idle": "Ожидание",
++  "Queued": "В очереди",
++  "Reading": "Обработка",
++  "Generating": "Генерация",
++  "Completed": "Завершён",
++  "Error": "Ошибка",
++  "Errors": "Ошибки",
++  "Active": "Активные",
++  "All statuses": "Все состояния",
++  "Context": "Контекст",
++  "Context fill": "Заполнение контекста",
++  "System RAM": "Оперативная память",
++  "GPU temperature": "Температура GPU",
++  "Experts in VRAM": "Эксперты в VRAM",
++  "Strata API Monitor": "Монитор API Strata",
++  "API Monitor": "Монитор API",
++  "Local inference": "Локальная модель",
++  "Model status and every request, in one place.": "Состояние модели и все запросы в одном месте.",
++  "Load model": "Загрузить модель",
++  "Unload model": "Выгрузить модель",
++  "Only needed if the server has a key": "Нужен, только если задан на сервере",
++  "Connect": "Подключиться",
++  "Requests": "Запросы",
++  "Request list": "Список запросов",
++  "Requests retained": "Сохранено запросов",
++  "Last decode speed": "Последняя скорость генерации",
++  "Decode speed": "Скорость генерации",
++  "Model state": "Состояние модели",
++  "Model load": "Загрузка модели",
++  "Last wall-clock": "Последнее полное время",
++  "Wall-clock": "Полное время",
++  "Includes queue and model loading": "Включает очередь и загрузку модели",
++  "Filter requests": "Фильтр запросов",
++  "Search ID or endpoint": "Поиск по ID или адресу API",
++  "Inspect a request": "Просмотр запроса",
++  "Select a request to see its input, output, and timings.": "Выберите запрос, чтобы увидеть входные данные, ответ и время выполнения.",
++  "Prompt tokens": "Токены запроса",
++  "Output tokens": "Токены ответа",
++  "Queue wait": "Ожидание в очереди",
++  "Reused": "Из кэша",
++  "Input": "Входные данные",
++  "Output": "Ответ",
++  "Reasoning": "Рассуждения",
++  "Prompt": "Запрос",
++  "API response": "Ответ API",
++  "Response format": "Формат ответа",
++  "Copy": "Копировать",
++  "Copy code": "Копировать код",
++  "Copy the answer": "Копировать ответ",
++  "Copied": "Скопировано",
++  "Copied to clipboard": "Скопировано в буфер обмена",
++  "Last 100 requests kept in memory until restart. Inputs and outputs stay on this machine.": "Последние 100 запросов хранятся в ОЗУ до перезапуска. Входные данные и ответы остаются на этом компьютере.",
++  "Waiting for a request": "Ожидание запроса",
++  "Waiting for server": "Ожидание сервера",
++  "Failed to fetch": "Не удалось подключиться к серверу",
++  "Server not reachable": "Сервер недоступен",
++  "Disconnected · retrying": "Нет соединения · повторное подключение",
++  "Connected": "Подключено",
++  "Loaded": "Загружена",
++  "Loading…": "Загрузка…",
++  "Unloaded": "Выгружена",
++  "Unloading…": "Выгрузка…",
++  "Loads automatically on the next request": "Загрузится автоматически при следующем запросе",
++  "Nothing changed.": "Изменений нет.",
++  "Sampling saved": "Параметры генерации сохранены",
++  "Other apps (omp, API clients) use these settings from their next request.": "Другие приложения и API-клиенты применят эти параметры со следующего запроса.",
++  "Other apps use their own settings again.": "Другие приложения снова используют собственные параметры.",
++  "Saved here, but not for other apps": "Сохранено здесь, но не для других приложений",
++  "Greedy: the same question gives the same answer.": "Жадный выбор: всегда наиболее вероятный токен.",
++  "Stop the answer first.": "Сначала остановите генерацию ответа.",
++  "Nothing to save yet": "Пока нечего сохранять",
++  "File too large": "Файл слишком большой",
++  "Picture too large": "Изображение слишком большое",
++  "Not a text file": "Это не текстовый файл",
++  "Pictures are off": "Изображения отключены",
++  "No image": "Нет изображения",
++  "This model was set up for text only.": "Эта модель настроена только для текста.",
++  "Done. Right-click an image to save it.": "Готово. Нажмите на изображение правой кнопкой для сохранения.",
++  "Generating… (a minute or more on a small GPU)": "Генерация… На небольшой GPU это может занять минуту или больше.",
++  "Not saved": "Не сохранено",
++  "Kept in this browser only.": "Хранится только в этом браузере.",
++  "Browser storage is unavailable. Enter it again after reloading.": "Хранилище браузера недоступно. После обновления страницы введите ключ снова.",
++  "Thinking…": "Рассуждение…",
++  "Thoughts": "Рассуждения",
++  "Writing": "Генерация",
++  "Running": "Выполняется",
++  "Done": "Готово",
++  "Failed": "Ошибка",
++  "Stopped": "Остановлено",
++  "Not run": "Не выполнено",
++  "Still writing": "Генерация продолжается",
++  "Reading prompt": "Обработка запроса",
++  "Starting": "Запуск",
++  "Closed": "Закрыто",
++  "Arguments": "Аргументы",
++  "Result": "Результат",
++  "Remove": "Удалить",
++  "Undo": "Отменить",
++  "Files": "Файлы",
++  "In use": "Используется",
++  "Engine": "Движок",
++  "Model name": "Имя модели",
++  "OpenAI base URL": "Адрес API OpenAI",
++  "Anthropic base URL": "Адрес API Anthropic",
++  "Speculation": "Спекулятивное декодирование",
++  "Projection": "Проекция",
++  "Additive": "Добавочная",
++  "Parked": "Сохранено",
++  "Restored": "Восстановлено",
++  "Parked / restored": "Сохранено / восстановлено",
++  "Reused since start": "Повторно использовано с запуска",
++  "Last switch": "Последнее переключение",
++  "The engine keeps the last conversation": "Движок сохраняет последний диалог",
++  "The last one was cleared.": "Последний кэш был очищен.",
++  "No content.": "Нет содержимого.",
++  "The request failed": "Запрос завершился ошибкой",
++  "Original request body.": "Исходное тело запроса.",
++  "Model answer. JSON is formatted here for readability.": "Ответ модели. JSON отформатирован для удобства чтения.",
++  "Separate reasoning content, when enabled.": "Отдельный блок рассуждений, если он включён.",
++  "Raw model output retained for diagnosis. The API returned an error.": "Исходный ответ модели сохранён для диагностики. API вернул ошибку.",
++  "Streaming response: see Output and the request error, if any.": "Потоковый ответ: смотрите ответ и сведения об ошибке запроса.",
++  "sampling.temperature": "Температура по умолчанию",
++  "sampling.top_p": "Top-p по умолчанию",
++  "sampling.top_k": "Top-k по умолчанию",
++  "sampling.min_p": "Min-p по умолчанию",
++  "reasoning_budget_tokens": "Лимит токенов рассуждений",
++  "fit_max_tokens": "Подгонять ответ под контекст",
++  "anthropic_thinking": "Рассуждения для Anthropic",
++  "effort_position": "Расположение инструкции уровня",
++  "aliases": "Псевдонимы модели",
++  "idle_unload_s": "Выгрузка при простое, с",
++  "mtp": "MTP",
++  "lazy_load": "Загрузка по первому запросу",
++  "engine_silence_s": "Таймаут тишины движка, с",
++  "api_monitor": "Монитор API",
++  "open_browser": "Открывать панель в браузере",
++  "vram_reserve_mib": "Резерв VRAM, МиБ",
++  "reason_modes": "Авторские режимы",
++  "reason_mode": "Авторский режим по умолчанию",
++  "Enable author modes on compatible DavidAU templates": "Включить авторские режимы для совместимых шаблонов DavidAU",
++  "Default author mode; explicit standard effort stays native": "Авторский режим по умолчанию. Явный стандартный уровень сохраняет нативное поведение.",
++  "auto": "Автоматически",
++  "off": "выкл.",
++  "native": "Нативный",
++  "start": "В начале",
++  "end": "В конце",
++  "on_request": "По запросу",
++  "model": "Как у модели",
++  "none": "Нет",
++  "stream": "поток",
++  "JSON response": "ответ JSON",
++  "idle": "ожидание",
++  "queued": "в очереди",
++  "reading": "обработка",
++  "generating": "генерация",
++  "completed": "завершён",
++  "failed": "ошибка",
++  "cancelled": "отменён",
++  "Language": "Язык",
++  "Default temperature for requests that send none (0 = greedy; without it the model card's: 1.0 thinking, 0.7 not)": "Температура для запросов, в которых она не указана; 0 — наиболее вероятный токен.",
++  "Default top_p for requests that send none": "Top-p для запросов без собственного значения.",
++  "Default top_k for requests that send none (1-64)": "Top-k для запросов без собственного значения, от 1 до 64.",
++  "Default min_p for requests that send none": "Min-p для запросов без собственного значения, от 0 до 1.",
++  "Cap the thinking of every request at this many tokens (0 or empty: no cap)": "Лимит токенов рассуждений для запроса; 0 или пусто — без отдельного лимита.",
++  "Shorten a max_tokens that does not fit the context (on by default); off: answer 400 like llama.cpp": "Сокращать лимит ответа до свободного места в контексте. Иначе возвращается ошибка 400.",
++  "Anthropic requests that do not ask for thinking: think as the model does (model) or not (on_request)": "Думать по умолчанию или только по явному запросу клиента Anthropic.",
++  "Where a non-default reasoning effort goes: start (the default) or end (keeps the cache when it changes)": "Инструкция уровня в начале запроса или в конце для повторного использования кэша.",
++  "Other model names the server lists and answers to (comma-separated)": "Дополнительные имена этой модели, разделённые запятыми.",
++  "Unload the model after this many seconds without requests (0 or empty: never)": "Выгружать модель после указанного простоя; 0 — не выгружать.",
++  "Draft layer (MTP): off starts the engine without it (about 1 GB less graphics memory, slower words per second); empty or on: as installed": "Черновая голова MTP. Отключение снижает расход VRAM, но обычно замедляет генерацию.",
++  "Start without loading the model; the first request loads it (text only)": "Не загружать модель до первого текстового запроса.",
++  "End a request when the engine says nothing for this long (default 300 s, 0 = wait)": "Завершать запрос при отсутствии ответа движка дольше этого времени; 0 — ждать.",
++  "Keep the last 100 requests' prompts and answers in memory for /api-monitor": "Хранить последние 100 запросов и ответов в ОЗУ для монитора API.",
++  "Open the chat page in the browser when the model is ready": "Открывать страницу чата после готовности модели.",
++  "VRAM in MiB the engine leaves free for other programs (engine default 700)": "Объём VRAM, оставляемый для других программ, в МиБ.",
++  "Shift+Enter: new line": "Shift+Enter: новая строка",
++  "KV cache": "KV-кэш",
++  "on": "вкл.",
++  "default": "по умолчанию",
++  "A request that continues a parked conversation gets its state back instead of reading it again; the oldest goes when the slots or the memory are full.": "При продолжении сохранённого диалога его состояние восстанавливается из кэша. Если места недостаточно, удаляется самый старый диалог.",
++  "GB": "ГБ",
++  "MB/s": "МБ/с",
++  "W": "Вт"
++};
++let lang;try{lang=JSON.parse(localStorage.getItem("strata.language")||'"ru"')}catch(_){lang="ru"}
++if(!["ru","en"].includes(lang))lang="ru";
++const originals=new WeakMap(), attributes=new WeakMap();let observer=null;
++const normalize=s=>s.replace(/\s+/g," ").trim();
++function translate(source){
++ if(lang==="en")return source;
++ const key=normalize(source);let value=RU[key];
++ if(value===undefined){
++  const patterns=[
++   [/^last: (\d+) tokens? at (.+) tok\/s$/,(_,n,speed)=>`последний запрос: ${n} ток., ${speed} ток/с`],
++   [/^([\d\s,.]+) experts cached$/,(_,n)=>`Экспертов в кэше: ${n}`],
++   [/^of ([\d.,]+) W limit$/,(_,n)=>`лимит ${n} Вт`],
++   [/^to GPU (.+)$/,(_,n)=>`в GPU ${n}`],
++   [/^write (.+)$/,(_,n)=>`запись ${n}`],
++   [/^(\d+) cores · (\d+) threads$/,(_,a,b)=>`${a} ядер · ${b} потоков`],
++   [/^(.+), (\d+) threads$/,(_,a,n)=>`${a}, ${n} потоков`],
++   [/^MTP drafts up to ([\d\s.,]+)(?: tokens?)?$/,(_,n)=>`MTP: до ${n.trim()} черновых токенов`],
++   [/^(\d+)-bit \(Hadamard-rotated\), all in VRAM$/,(_,n)=>`${n} бит, преобразование Адамара; целиком в VRAM`],
++   [/^(.+) runs on this PC\. Nothing leaves it\.$/,(_,model)=>`${model} работает на этом компьютере. Данные остаются здесь.`],
++   [/^You · (.*)$/,(_,time)=>`Вы · ${time}`],
++   [/^Thought for ([\d.,]+) s$/,(_,n)=>`Рассуждение: ${n} с`],
++   [/^(\d+) tool calls?$/,(_,n)=>`Вызовы инструментов: ${n}`],
++   [/^(\d+) requests?$/,(_,n)=>`Запросов: ${n}`],
++   [/^(\d+) files?$/,(_,n)=>`Файлов: ${n}`]
++  ];
++  for(const [pattern,replace] of patterns)if(pattern.test(key)){value=key.replace(pattern,replace);break}
++ }
++ if(value===undefined)value=key.replace(/\btokens\/s\b|\btok\/s\b|\bt\/s\b/g,"ток/с").replace(/\bMB\/s\b/g,"МБ/с").replace(/\btokens\b/g,"ток.").replace(/\bMiB\b/g,"МиБ").replace(/\bGiB\b/g,"ГиБ").replace(/\bms\b/g,"мс");
++ value=value.replace(/\bGB\b/g,"ГБ").replace(/\bMB\/s\b/g,"МБ/с");
++ return source.slice(0,source.length-source.trimStart().length)+value+source.slice(source.trimEnd().length);
++}
++function skip(el,attr=false){
++ if(!el)return true;
++ if(el.closest("script,style,[data-i18n-ignore]"))return true;
++ if(el.closest("button,select,label,option,.msg-error,.think-title,.meta-text,.st-msg__meta,.tool-call__label,.tool-call .st-badge"))return false;
++ if(attr&&el.matches("input,textarea"))return false;
++ return !!el.closest(".st-bubble,.thinking,pre,code,textarea,input,.msg-images,#attachments,.tool-call__pre,.tool-call__preview,.req-preview,.request-preview,[data-user-content]");
++}
++function apply(root=document){
++ if(observer)observer.disconnect();
++ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
++ while(node=walker.nextNode()){
++  if(skip(node.parentElement)||!node.data.trim())continue;
++  if(!originals.has(node))originals.set(node,node.data);
++  const next=translate(originals.get(node));if(node.data!==next)node.data=next;
++ }
++ const all=root.querySelectorAll?root.querySelectorAll("[title],[aria-label],[placeholder]"):[];
++ for(const el of all){
++  if(skip(el,true))continue;let data=attributes.get(el);if(!data){data={};attributes.set(el,data)}
++  for(const key of ["title","aria-label","placeholder"]){
++   if(!el.hasAttribute(key))continue;if(!(key in data))data[key]=el.getAttribute(key);
++   const next=translate(data[key]);if(el.getAttribute(key)!==next)el.setAttribute(key,next);
++  }
++ }
++ document.documentElement.lang=lang;
++ if(observer)observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["title","aria-label","placeholder"]});
++}
++function setup(){
++ const header=document.querySelector(".st-header,header");
++ if(header&&!document.getElementById("strata-language")){
++  const select=document.createElement("select");select.id="strata-language";select.className="st-language";select.setAttribute("aria-label","Language");
++  select.innerHTML='<option value="ru">Русский</option><option value="en">English</option>';select.value=lang;
++  select.onchange=()=>{lang=select.value;localStorage.setItem("strata.language",JSON.stringify(lang));apply();window.dispatchEvent(new Event("strata-language-change"))};header.appendChild(select);
++ }
++ observer=new MutationObserver(mutations=>{
++  let changed=false;
++  for(const mutation of mutations){
++   const el=mutation.target.nodeType===3?mutation.target.parentElement:mutation.target;
++   if(skip(el))continue;
++   if(mutation.type==="characterData")originals.delete(mutation.target);
++   if(mutation.type==="attributes"){const data=attributes.get(mutation.target);if(data)delete data[mutation.attributeName]}
++   changed=true;
++  }
++  if(changed)apply();
++ });
++ apply();
++}
++window.StrataI18n={t:translate,apply,language:()=>lang,keys:Object.keys(RU)};
++if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup,{once:true});else setup();
++})();
+diff --git a/serve/web/index.html b/serve/web/index.html
+index 0c7847f2..df805ad2 100644
+--- a/serve/web/index.html
++++ b/serve/web/index.html
+@@ -1,7 +1,8 @@
+ <!doctype html>
+-<html lang="en" data-theme="light">
++<html lang="ru" data-theme="light">
+ <head>
+ <meta charset="utf-8">
++<script src="/web/i18n.js"></script>
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Strata</title>
+ <link rel="icon" href="web/favicon.svg" type="image/svg+xml">
+@@ -220,6 +221,9 @@
+       <div class="seg" id="s-thinking" role="radiogroup" aria-label="Thinking">
+         <button type="button" role="radio" data-v="none">Off</button><button type="button" role="radio" data-v="low">Low</button>
+         <button type="button" role="radio" data-v="medium">Medium</button><button type="button" role="radio" data-v="high">High</button>
++        <button type="button" role="radio" data-v="xhigh">XHigh</button>
++        <button type="button" role="radio" data-v="ultra" data-author-choice>Ultra</button>
++        <button type="button" role="radio" data-v="adaptive" data-author-choice>Adaptive</button>
+       </div>
+     </div>
+     <div class="st-field">
+diff --git a/serve/web/monitor.html b/serve/web/monitor.html
+index c1e87e7c..093931e3 100644
+--- a/serve/web/monitor.html
++++ b/serve/web/monitor.html
+@@ -1,7 +1,8 @@
+ <!doctype html>
+-<html lang="en" data-theme="dark">
++<html lang="ru" data-theme="dark">
+ <head>
+-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
++<meta charset="utf-8">
++<script src="/web/i18n.js"></script><meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Strata API Monitor</title>
+ <link rel="icon" href="/web/favicon.svg" type="image/svg+xml">
+ <link rel="stylesheet" href="/web/tokens.css">
 diff --git a/src/core/conversation_cache_test.cpp b/src/core/conversation_cache_test.cpp
-index a21c0d7fee06b2bd0bda9b3616eccd2fa03dd8ae..1d22da0b0825197622cea61a4b9bb47be1adb5bc 100644
+index a21c0d7f..1d22da0b 100644
 --- a/src/core/conversation_cache_test.cpp
 +++ b/src/core/conversation_cache_test.cpp
 @@ -502,6 +502,41 @@ int main() {
@@ -2283,7 +3877,7 @@ index a21c0d7fee06b2bd0bda9b3616eccd2fa03dd8ae..1d22da0b0825197622cea61a4b9bb47b
      std::printf("conversation_cache_test: %d checks passed\n", checks);
  }
 diff --git a/src/core/conversation_copy.hpp b/src/core/conversation_copy.hpp
-index 7e8341b3aa1ba10daffc06029f6086e1d10173cb..9ff320d1197ae63e26a345709e954717ae9db30c 100644
+index 7e8341b3..9ff320d1 100644
 --- a/src/core/conversation_copy.hpp
 +++ b/src/core/conversation_copy.hpp
 @@ -1,6 +1,7 @@
@@ -2391,7 +3985,7 @@ index 7e8341b3aa1ba10daffc06029f6086e1d10173cb..9ff320d1197ae63e26a345709e954717
  inline cudaError_t order_after_queued() {
 diff --git a/src/core/conversation_copy_lifetime_test.cpp b/src/core/conversation_copy_lifetime_test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..cd40cd6eaa5ab9260f6e88f393b280fb51b8da8b
+index 00000000..cd40cd6e
 --- /dev/null
 +++ b/src/core/conversation_copy_lifetime_test.cpp
 @@ -0,0 +1,173 @@
@@ -2570,7 +4164,7 @@ index 0000000000000000000000000000000000000000..cd40cd6eaa5ab9260f6e88f393b280fb
 +}
 diff --git a/src/core/conversation_reuse_identity_test.cpp b/src/core/conversation_reuse_identity_test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..7083d7c0dcc8b6bc00e3ccbb85ea98be565283af
+index 00000000..7083d7c0
 --- /dev/null
 +++ b/src/core/conversation_reuse_identity_test.cpp
 @@ -0,0 +1,223 @@
@@ -2798,7 +4392,7 @@ index 0000000000000000000000000000000000000000..7083d7c0dcc8b6bc00e3ccbb85ea98be
 +    return 0;
 +}
 diff --git a/src/core/conversation_state.cpp b/src/core/conversation_state.cpp
-index c64e09d9078bf3539739406b1ae7ae6d61d472bd..eae55a120d3a2457263cffc45085f6d765000d37 100644
+index c64e09d9..eae55a12 100644
 --- a/src/core/conversation_state.cpp
 +++ b/src/core/conversation_state.cpp
 @@ -4,6 +4,7 @@
@@ -2853,7 +4447,7 @@ index c64e09d9078bf3539739406b1ae7ae6d61d472bd..eae55a120d3a2457263cffc45085f6d7
      captured.kv = std::move(reuse.kv);
      const size_t layers = owned_qsa(ss);
 diff --git a/src/core/conversation_validation_test.cpp b/src/core/conversation_validation_test.cpp
-index c670ef138ed46ca058434d4b44dd17231fa65520..e5f47acc7aa71a42b0e104857f723cf619d0bda5 100644
+index c670ef13..e5f47acc 100644
 --- a/src/core/conversation_validation_test.cpp
 +++ b/src/core/conversation_validation_test.cpp
 @@ -26,6 +26,8 @@ extern "C" cudaError_t __wrap_cudaMemcpy(void* dst, const void* src, size_t n, c
@@ -2866,7 +4460,7 @@ index c670ef138ed46ca058434d4b44dd17231fa65520..e5f47acc7aa71a42b0e104857f723cf6
      *s = reinterpret_cast<cudaStream_t>(static_cast<uintptr_t>(1)); return cudaSuccess;
  }
 diff --git a/src/core/expert_source.cpp b/src/core/expert_source.cpp
-index b8ad8fb42129e506365978f556cdcf6c67ffcfc9..5ed3f7bd3ce68ce6620c43dfb77b40f7cb23c06b 100644
+index b8ad8fb4..5ed3f7bd 100644
 --- a/src/core/expert_source.cpp
 +++ b/src/core/expert_source.cpp
 @@ -5130,7 +5130,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
@@ -3104,7 +4698,7 @@ index b8ad8fb42129e506365978f556cdcf6c67ffcfc9..5ed3f7bd3ce68ce6620c43dfb77b40f7
      if (map_ != nullptr) munmap(map_, (size_t) map_bytes_);
  #endif
 diff --git a/src/core/native_dense.cpp b/src/core/native_dense.cpp
-index 25efb6f6217991100c2a1a6599a17917cba49cea..99e8d2f6d11e097001656b5a58cfc9bf29326962 100644
+index 25efb6f6..99e8d2f6 100644
 --- a/src/core/native_dense.cpp
 +++ b/src/core/native_dense.cpp
 @@ -22,6 +22,20 @@
@@ -3325,7 +4919,7 @@ index 25efb6f6217991100c2a1a6599a17917cba49cea..99e8d2f6d11e097001656b5a58cfc9bf
          weights_.reserve(pending.size());
          uint64_t packed_bytes = 0;
 diff --git a/src/core/pinned.cu b/src/core/pinned.cu
-index 0c45c051c5685a8581c1607f6d6f3bc7a7df2be5..026059e89e5623a861de524e1456af544ae8d945 100644
+index 0c45c051..026059e8 100644
 --- a/src/core/pinned.cu
 +++ b/src/core/pinned.cu
 @@ -6,6 +6,10 @@
@@ -3438,7 +5032,7 @@ index 0c45c051c5685a8581c1607f6d6f3bc7a7df2be5..026059e89e5623a861de524e1456af54
      // Register with CUDA BEFORE any page is touched: cudaHostRegister pins what is resident now, and a region
      // that has already been faulted in page by page is far more expensive to register and may fail outright.
 diff --git a/src/kernels/cpu/iq_avx1.cpp b/src/kernels/cpu/iq_avx1.cpp
-index f80cc652b05653a2e4080e19cfcfb49d918b8df0..d4e72de2c00cf1b0e524097e04c58dac69184b15 100644
+index f80cc652..d4e72de2 100644
 --- a/src/kernels/cpu/iq_avx1.cpp
 +++ b/src/kernels/cpu/iq_avx1.cpp
 @@ -31,6 +31,7 @@
@@ -3808,7 +5402,7 @@ index f80cc652b05653a2e4080e19cfcfb49d918b8df0..d4e72de2c00cf1b0e524097e04c58dac
  
  void iq128_gu_rows(int type, const uint8_t* blob, size_t gu_row, size_t up_off, int n, const void* const* act,
 diff --git a/src/kernels/cpu/iq_avx1_parity.cpp b/src/kernels/cpu/iq_avx1_parity.cpp
-index 2f83251f9b3b9db3fbd98b362763a66ed4630a79..d268f214f91044571063561117812c51e5f6c1b5 100644
+index 2f83251f..d268f214 100644
 --- a/src/kernels/cpu/iq_avx1_parity.cpp
 +++ b/src/kernels/cpu/iq_avx1_parity.cpp
 @@ -223,6 +223,7 @@ void run_bench(int mb, const std::vector<int>& nts) {
@@ -3858,7 +5452,7 @@ index 2f83251f9b3b9db3fbd98b362763a66ed4630a79..d268f214f91044571063561117812c51
      }
  }
 diff --git a/src/kernels/cpu/iq_avx2_parity.cpp b/src/kernels/cpu/iq_avx2_parity.cpp
-index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85b9123d82 100644
+index 67544c9d..46641b9a 100644
 --- a/src/kernels/cpu/iq_avx2_parity.cpp
 +++ b/src/kernels/cpu/iq_avx2_parity.cpp
 @@ -21,6 +21,7 @@
@@ -3878,7 +5472,7 @@ index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85
      if (cpu_index < 0 || cpu_index >= 64) return false;
      return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;
 diff --git a/src/kernels/cpu/iq_avx512.cpp b/src/kernels/cpu/iq_avx512.cpp
-index 444c64d28e8c8c53c40f54671f303f9a8a9e6304..6e7240f4aba7e89b830eba48f710d34901e19baf 100644
+index 444c64d2..6e7240f4 100644
 --- a/src/kernels/cpu/iq_avx512.cpp
 +++ b/src/kernels/cpu/iq_avx512.cpp
 @@ -588,11 +588,11 @@ static bool has_vpopcnt() {
@@ -3896,7 +5490,7 @@ index 444c64d28e8c8c53c40f54671f303f9a8a9e6304..6e7240f4aba7e89b830eba48f710d349
      }();
      return ok;
 diff --git a/src/kernels/cpu/kq_cpu_bench.cpp b/src/kernels/cpu/kq_cpu_bench.cpp
-index 0655bc0ea525874030bd36261194f779e5547424..3a2f9b8d3ddf78e3b386d03893a43292f264197b 100644
+index 0655bc0e..3a2f9b8d 100644
 --- a/src/kernels/cpu/kq_cpu_bench.cpp
 +++ b/src/kernels/cpu/kq_cpu_bench.cpp
 @@ -53,19 +53,23 @@ std::vector<std::string> split(const std::string& s) {
@@ -4003,7 +5597,7 @@ index 0655bc0ea525874030bd36261194f779e5547424..3a2f9b8d3ddf78e3b386d03893a43292
                          volatile float sink = outb[0] + ffb[0];
                          (void) sink;
 diff --git a/src/kernels/cpu/pool.cpp b/src/kernels/cpu/pool.cpp
-index cdcc8d79249e5af774112383942228453331e7fe..5587618b63fe66441572a01ba9c8f74bb1454819 100644
+index cdcc8d79..5587618b 100644
 --- a/src/kernels/cpu/pool.cpp
 +++ b/src/kernels/cpu/pool.cpp
 @@ -2,6 +2,7 @@
@@ -4182,7 +5776,7 @@ index cdcc8d79249e5af774112383942228453331e7fe..5587618b63fe66441572a01ba9c8f74b
      if (n <= 0) return;
      if (n_ == 1) {   // no workers: run inline, so a single-core machine still produces a token
 diff --git a/src/kernels/cpu/pool_affinity_win.hpp b/src/kernels/cpu/pool_affinity_win.hpp
-index 6f0e4020227a576269a07d5449cb05f936c020f9..c5ac8e1571bc67bb909b5e4fde25178eb1c7352e 100644
+index 6f0e4020..c5ac8e15 100644
 --- a/src/kernels/cpu/pool_affinity_win.hpp
 +++ b/src/kernels/cpu/pool_affinity_win.hpp
 @@ -9,13 +9,14 @@
@@ -4202,7 +5796,7 @@ index 6f0e4020227a576269a07d5449cb05f936c020f9..c5ac8e1571bc67bb909b5e4fde25178e
      target.Group = (WORD) (core / 64);
      target.Mask = KAFFINITY(1) << (core & 63);
 diff --git a/src/kernels/cpu/q2_avx1.cpp b/src/kernels/cpu/q2_avx1.cpp
-index 6d5b96991bc5ac522e5ec22383e03f4121456ed3..238e4d7b13fd5362e6aab03ab7a2529430e9a342 100644
+index 6d5b9699..238e4d7b 100644
 --- a/src/kernels/cpu/q2_avx1.cpp
 +++ b/src/kernels/cpu/q2_avx1.cpp
 @@ -31,7 +31,17 @@ namespace strata::kernels::cpu {
@@ -4224,7 +5818,7 @@ index 6d5b96991bc5ac522e5ec22383e03f4121456ed3..238e4d7b13fd5362e6aab03ab7a25294
      uint32_t exp = (h >> 10) & 0x1Fu, man = h & 0x3FFu, f;
      if (exp == 0) {
 diff --git a/src/kernels/cuda/iq_kernels.cu b/src/kernels/cuda/iq_kernels.cu
-index d2f2e34e8f59262506dcbb33c6ef24afd1db3c83..b305ccd38925dca945da7e947f4c006f23419077 100644
+index d2f2e34e..b305ccd3 100644
 --- a/src/kernels/cuda/iq_kernels.cu
 +++ b/src/kernels/cuda/iq_kernels.cu
 @@ -5257,10 +5257,15 @@ void native_expert_grouped(const NativeExpertLayout& L, const unsigned long long
@@ -4248,7 +5842,7 @@ index d2f2e34e8f59262506dcbb33c6ef24afd1db3c83..b305ccd38925dca945da7e947f4c006f
          const dim3 gl((unsigned) ((L.n_embd + LDS_RB - 1) / LDS_RB), (unsigned) cap_groups);
          const size_t sh = (size_t) LDS_NT * (size_t) (L.n_ff / 32) * sizeof(block_q8_1);
 diff --git a/src/kernels/cuda/ple.cu b/src/kernels/cuda/ple.cu
-index f945ef3b8dd8999e2721a993f0ad131d921eb90c..776c720a8fc8c7308557ef155ed91d5177c10425 100644
+index f945ef3b..776c720a 100644
 --- a/src/kernels/cuda/ple.cu
 +++ b/src/kernels/cuda/ple.cu
 @@ -54,6 +54,8 @@ __global__ void history_advance_kernel(float* __restrict__ history, const float*
@@ -4261,7 +5855,7 @@ index f945ef3b8dd8999e2721a993f0ad131d921eb90c..776c720a8fc8c7308557ef155ed91d51
      return (uint16_t) (i >> 16);
  }
 diff --git a/src/ngram/ple_reader.cpp b/src/ngram/ple_reader.cpp
-index 9d2a05051e504b36ac0f433f89a02910cec6d8b8..96351582b37fc5efa302ccc36c30b763ee0a9ddf 100644
+index 9d2a0505..96351582 100644
 --- a/src/ngram/ple_reader.cpp
 +++ b/src/ngram/ple_reader.cpp
 @@ -347,12 +347,13 @@ bool PleReader::open(const std::string& path, uint64_t table_offset, uint64_t n_
@@ -4288,7 +5882,7 @@ index 9d2a05051e504b36ac0f433f89a02910cec6d8b8..96351582b37fc5efa302ccc36c30b763
      m.threaded = false;
      m.stop = false;
 diff --git a/src/prefill/kernels.cu b/src/prefill/kernels.cu
-index a4f56f10cf9dc2211bcfef403de828a4205f72bb..b0d871dcd1b7b2688080ef722fb540ce53943814 100644
+index a4f56f10..b0d871dc 100644
 --- a/src/prefill/kernels.cu
 +++ b/src/prefill/kernels.cu
 @@ -35,6 +35,8 @@ __device__ __forceinline__ float warp_max(float v) {
@@ -4301,7 +5895,7 @@ index a4f56f10cf9dc2211bcfef403de828a4205f72bb..b0d871dcd1b7b2688080ef722fb540ce
      return (uint16_t) (u >> 16);
  }
 diff --git a/src/prefill/prefill.cpp b/src/prefill/prefill.cpp
-index 6cb888e50a4ed516a1bb90566d7140d1315dc372..f70ad4f50793b0c8d70c07630547e8b6216a825e 100644
+index 6cb888e5..f70ad4f5 100644
 --- a/src/prefill/prefill.cpp
 +++ b/src/prefill/prefill.cpp
 @@ -921,6 +921,12 @@ struct Prefill::Impl {
@@ -4610,7 +6204,7 @@ index 6cb888e50a4ed516a1bb90566d7140d1315dc372..f70ad4f50793b0c8d70c07630547e8b6
                          out[(size_t) i] = (uint16_t) (u >> 16);
                      }
 diff --git a/src/program/generate.cpp b/src/program/generate.cpp
-index 0b153ee16aa54042b0a1929ac057cff080445597..0615d44a63b0e4a91bce2b71cc339810e1e5a4cc 100644
+index 0b153ee1..0615d44a 100644
 --- a/src/program/generate.cpp
 +++ b/src/program/generate.cpp
 @@ -46,6 +46,7 @@
@@ -4991,7 +6585,7 @@ index 0b153ee16aa54042b0a1929ac057cff080445597..0615d44a63b0e4a91bce2b71cc339810
                  std::fprintf(stderr, "strata serve: the request first waited %.0f ms for the adaptive tier's round in flight\n",
                               serve_adapt_drain_ms);
 diff --git a/strata_control/procs.py b/strata_control/procs.py
-index b550c07b64fe2e04a9739dfb84652e742ea95b23..bf12810b73df3c41686c97263def05abcafc9b60 100644
+index b550c07b..bf12810b 100644
 --- a/strata_control/procs.py
 +++ b/strata_control/procs.py
 @@ -358,21 +358,27 @@ def orphans_of(engine_exe: str) -> list[Ident]:
@@ -5026,7 +6620,7 @@ index b550c07b64fe2e04a9739dfb84652e742ea95b23..bf12810b73df3c41686c97263def05ab
                  except psutil.NoSuchProcess:
                      pass
 diff --git a/sycl/src/program/generate.cpp b/sycl/src/program/generate.cpp
-index 2a4db4d163b2b57786253c359bf51906b1cee3db..5a111ea47accba1d81c821a9479e96fd2e74249d 100644
+index 2a4db4d1..5a111ea4 100644
 --- a/sycl/src/program/generate.cpp
 +++ b/sycl/src/program/generate.cpp
 @@ -7694,7 +7694,12 @@ int main(int argc, char **argv) try {
@@ -5063,7 +6657,7 @@ index 2a4db4d163b2b57786253c359bf51906b1cee3db..5a111ea47accba1d81c821a9479e96fd
                  std::fprintf(stderr, "strata serve: conversation cache: restored %lld tokens (%s) in %.1f ms; parked=%zu bytes=%zu\n",
 diff --git a/tests/cuda/bf16_nan_parity.cpp b/tests/cuda/bf16_nan_parity.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..39188efefb740c88aeaaac98ddc3d9a0c1c63157
+index 00000000..39188efe
 --- /dev/null
 +++ b/tests/cuda/bf16_nan_parity.cpp
 @@ -0,0 +1,55 @@
@@ -5124,7 +6718,7 @@ index 0000000000000000000000000000000000000000..39188efefb740c88aeaaac98ddc3d9a0
 +}
 diff --git a/tests/cuda/pascallama_mmq_screen.cpp b/tests/cuda/pascallama_mmq_screen.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..3d28f93d165ca49e159a74979ca475e3c3e15439
+index 00000000..3d28f93d
 --- /dev/null
 +++ b/tests/cuda/pascallama_mmq_screen.cpp
 @@ -0,0 +1,182 @@
@@ -5312,7 +6906,7 @@ index 0000000000000000000000000000000000000000..3d28f93d165ca49e159a74979ca475e3
 +}
 diff --git a/tests/cuda/prefill_group_scratch_parity.cpp b/tests/cuda/prefill_group_scratch_parity.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..97bfd7068bb500f4edcb9829a810feded3279f2f
+index 00000000..97bfd706
 --- /dev/null
 +++ b/tests/cuda/prefill_group_scratch_parity.cpp
 @@ -0,0 +1,92 @@
@@ -5410,7 +7004,7 @@ index 0000000000000000000000000000000000000000..97bfd7068bb500f4edcb9829a810fede
 +}
 diff --git a/tests/cuda/sm61_graph_parity.cu b/tests/cuda/sm61_graph_parity.cu
 new file mode 100644
-index 0000000000000000000000000000000000000000..ab1c48426abceabd838348a7bf71140bc403c092
+index 00000000..ab1c4842
 --- /dev/null
 +++ b/tests/cuda/sm61_graph_parity.cu
 @@ -0,0 +1,25 @@
@@ -5441,7 +7035,7 @@ index 0000000000000000000000000000000000000000..ab1c48426abceabd838348a7bf71140b
 +}
 diff --git a/tests/platform/cpu_format_parity.cpp b/tests/platform/cpu_format_parity.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..3d43a868f80daa99d196d34cc4637a3b2a245099
+index 00000000..3d43a868
 --- /dev/null
 +++ b/tests/platform/cpu_format_parity.cpp
 @@ -0,0 +1,181 @@
@@ -5628,7 +7222,7 @@ index 0000000000000000000000000000000000000000..3d43a868f80daa99d196d34cc4637a3b
 +}
 diff --git a/tests/platform/cpu_pool_fused_parity.cpp b/tests/platform/cpu_pool_fused_parity.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..dbac7de23701175894f414854caf48a610e0f00c
+index 00000000..dbac7de2
 --- /dev/null
 +++ b/tests/platform/cpu_pool_fused_parity.cpp
 @@ -0,0 +1,98 @@
@@ -5732,7 +7326,7 @@ index 0000000000000000000000000000000000000000..dbac7de23701175894f414854caf48a6
 +}
 diff --git a/tests/platform/no_cpu_pin_test.cpp b/tests/platform/no_cpu_pin_test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..631691ca42eb516e58a957e5b4e0399e570db7e2
+index 00000000..631691ca
 --- /dev/null
 +++ b/tests/platform/no_cpu_pin_test.cpp
 @@ -0,0 +1,245 @@
@@ -5983,7 +7577,7 @@ index 0000000000000000000000000000000000000000..631691ca42eb516e58a957e5b4e0399e
 +}
 diff --git a/tests/platform/ple_reader_lifecycle.cpp b/tests/platform/ple_reader_lifecycle.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..1f78f55613ab3c579a54a816703b40c0190162ba
+index 00000000..1f78f556
 --- /dev/null
 +++ b/tests/platform/ple_reader_lifecycle.cpp
 @@ -0,0 +1,127 @@
@@ -6116,7 +7710,7 @@ index 0000000000000000000000000000000000000000..1f78f55613ab3c579a54a816703b40c0
 +}
 diff --git a/tests/platform/windows_numa_arena_test.cpp b/tests/platform/windows_numa_arena_test.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..8f24a8d815cbc1ed5e172fba23b1561c1d1a7ee3
+index 00000000..8f24a8d8
 --- /dev/null
 +++ b/tests/platform/windows_numa_arena_test.cpp
 @@ -0,0 +1,49 @@
@@ -6170,7 +7764,7 @@ index 0000000000000000000000000000000000000000..8f24a8d815cbc1ed5e172fba23b1561c
 +    return 0;
 +}
 diff --git a/tests/terminal/test_launch_engine_first.py b/tests/terminal/test_launch_engine_first.py
-index 397249c55029519586e58ef3cea0f6eaf64f8c98..b2ce2cb2e5b46786e01a2e6c9567e4d119b722c6 100644
+index 397249c5..b2ce2cb2 100644
 --- a/tests/terminal/test_launch_engine_first.py
 +++ b/tests/terminal/test_launch_engine_first.py
 @@ -49,6 +49,12 @@ def update_events(status: str, note: str = "", code: int = 0) -> list[dict]:
@@ -6187,7 +7781,7 @@ index 397249c55029519586e58ef3cea0f6eaf64f8c98..b2ce2cb2e5b46786e01a2e6c9567e4d1
      r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=qwen_catalog(), emit=lambda e: None)
      r.check_cancel = lambda: None
 diff --git a/tools/strata_bench.py b/tools/strata_bench.py
-index 93d92ee1d18c8d1fa3d3f0bbaabd6e9347b21fc2..19de31e8040e415c82e077ef30ab0623d3810572 100644
+index 93d92ee1..19de31e8 100644
 --- a/tools/strata_bench.py
 +++ b/tools/strata_bench.py
 @@ -563,7 +563,8 @@ def detect_quant(view: dict) -> str | None:
@@ -6201,7 +7795,7 @@ index 93d92ee1d18c8d1fa3d3f0bbaabd6e9347b21fc2..19de31e8040e415c82e077ef30ab0623
      except OSError:
          return None
 diff --git a/tools/strata_tokenizer.py b/tools/strata_tokenizer.py
-index 33452af86ef072766a105655872e0235562db97c..b5fe5fe3558c17fb65546f9a99400dc80b10eb95 100644
+index 33452af8..b5fe5fe3 100644
 --- a/tools/strata_tokenizer.py
 +++ b/tools/strata_tokenizer.py
 @@ -77,6 +77,9 @@ DEEPSEEK3_PATTERNS = (
@@ -6305,7 +7899,7 @@ index 33452af86ef072766a105655872e0235562db97c..b5fe5fe3558c17fb65546f9a99400dc8
                      cache[piece] = got
              out.extend(got)
 diff --git a/tools/test_strata_bench.py b/tools/test_strata_bench.py
-index 30d3978b010cce1c7af3e5278680bc258945d99b..2291285e4647c2f7099643e948372f8ed03e62e1 100644
+index 30d3978b..2291285e 100644
 --- a/tools/test_strata_bench.py
 +++ b/tools/test_strata_bench.py
 @@ -339,6 +339,22 @@ class ReportTests(unittest.TestCase):
@@ -6332,7 +7926,7 @@ index 30d3978b010cce1c7af3e5278680bc258945d99b..2291285e4647c2f7099643e948372f8e
  if __name__ == "__main__":
      unittest.main()
 diff --git a/tools/test_strata_tokenizer.py b/tools/test_strata_tokenizer.py
-index e3cb498c2ffe75aa4b77133f8594912bc2ad5fcd..797a8f7fa3171326dc215e5226680a074707f474 100644
+index e3cb498c..797a8f7f 100644
 --- a/tools/test_strata_tokenizer.py
 +++ b/tools/test_strata_tokenizer.py
 @@ -1,6 +1,6 @@

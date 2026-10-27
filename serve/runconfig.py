@@ -20,6 +20,8 @@ from strata_control import atomic as _atomic_mod
 # (key, kind, help).  kind: "bool", "int>=0", "num>=0", ("enum", values), "names", or ("sampling", check) for a key
 # of the "sampling" block, ("arg", flag) for an engine option kept in "args".
 EDITABLE = [
+    ("reason_modes", "bool", "Enable author modes on compatible DavidAU templates"),
+    ("reason_mode", ("enum", ["off", "ultra", "auto"]), "Default author mode; explicit standard effort stays native"),
     ("sampling.temperature", ("sampling", "num>=0"),
      "Default temperature for requests that send none (0 = greedy; without it the model card's: 1.0 thinking, 0.7 not)"),
     ("sampling.top_p", ("sampling", "0<x<=1"), "Default top_p for requests that send none"),

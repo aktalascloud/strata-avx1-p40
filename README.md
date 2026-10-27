@@ -22,6 +22,8 @@
 
 ## Measured Qwen progress
 
+**RU/EN interface · separate Ultra and Adaptive modes.** Adaptive/Auto is the default. Explicit High/XHigh retain stock Qwen semantics. Adaptive selects an author persona per task; no memory service or database is included. [Modes and API](p40/REASONING-MODES.md) · [Mnemosyne source](https://github.com/TheHubUser4860938/Strata-Mnemosyne).
+
 **16.45 → 50.48 tokens/s** in the engine; whole API: 11.65 → 45.95. Measured 2026-10-26, engine 0.1.51, `02E0F926`. Historical cold response without MTP versus warmed MTP/xhigh: different settings, not a simultaneous A/B. Full 128K and the new models were not benchmarked. [Method and CPU/GPU evidence](p40/BENCHMARKS.md).
 
 Native preset: **128K · KV Q4 · MTP Q2/two drafts · xhigh · CPU vision**. Build: **Ivy Bridge O3/AVX1**, CUDA **O3/sm_61**, MSVC host **O2/Ob3**. Generic profiles start with F16 KV and model-specific limits.

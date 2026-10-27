@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import jinja2
+from serve.reason_modes import AuthorModes
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 LOGGER = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ class ChatTemplate:
         self.tool_style = "flat"
         self.model_family = None
         self.model_tokens = {}
+        self.author_modes = AuthorModes(self.source)
         self.caps = self._detect_caps()
 
     def render(self, messages: list[dict], tools: list[dict] | None = None, add_generation_prompt: bool = True,
@@ -80,11 +82,15 @@ class ChatTemplate:
                     calls.append({**call, "function": function})
                 shaped.append({**m, "tool_calls": calls})
             messages = shaped
-        text = self.template.render(messages=messages, tools=tools, add_generation_prompt=add_generation_prompt,
-                                    **{**kwargs, **self.model_tokens})
+        kwargs = self.reasoning_kwargs(messages, kwargs)
+        text = self.author_modes.render(self.template.render, messages, tools, add_generation_prompt,
+                                        {**kwargs, **self.model_tokens})
         if self.model_family == "glm" and add_generation_prompt and kwargs.get("enable_thinking") is False and text.endswith("<think>"):
             text += "</think>"
         return text
+
+    def reasoning_kwargs(self, messages, kwargs):
+        return self.author_modes.kwargs(messages, kwargs)
 
     def _detect_caps(self) -> dict[str, bool]:
         """llama.cpp's capability names, checked at load time against this template and Strata's tool-call format.
@@ -626,6 +632,7 @@ def openai_to_messages(req: dict) -> tuple[list[dict], list[dict] | None, dict]:
             kwargs = {"enable_thinking": False}
         elif k == "reasoning_effort" and "enable_thinking" not in kwargs:
             kwargs.update(effort_kwargs(v))
+    if req.get("reason_mode") is not None: kwargs["author_mode"] = req["reason_mode"]
     return _env_to_user(_late_system_to_user(messages)), tools, kwargs
 
 
@@ -727,6 +734,7 @@ def anthropic_to_messages(req: dict, think_unasked: bool = True) -> tuple[list[d
         # A config's reasoning_effort still applies: Service.with_shared sets output_config before this runs.  A
         # request that gives its own reasoning_budget_tokens (#123) asks for thinking, so it thinks as before.
         kwargs["enable_thinking"] = False
+    if req.get("reason_mode") is not None: kwargs["author_mode"] = req["reason_mode"]
     return _env_to_user(_late_system_to_user(messages)), tools, kwargs
 
 

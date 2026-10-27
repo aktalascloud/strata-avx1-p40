@@ -6,6 +6,7 @@ This is an independent community build, not endorsed by NVIDIA, Microsoft or ups
 | Component | License / distribution |
 |---|---|
 | Strata and local source modifications | MIT; upstream copyright preserved. |
+| Stateless Adaptive author-mode routing | Strata-Mnemosyne, MIT; pinned source and notice in p40/REASONING-MODES.md and p40/licenses/Strata-Mnemosyne-MIT.txt. No memory/database/embedder component is bundled. |
 | GGML/llama.cpp and Pascal source overlay | MIT; upstream notices preserved. |
 | PolyStrata source and optional CUDA worker | MIT; original license, origin and compatibility review retained in backends/poly and p40/licenses. Component qualification is distinct from trained-model qualification. |
 | Embedded model library and API adapters | MIT; the separate official model-library pin, original license and build-copy compatibility guards are preserved. CPU/CUDA/Vulkan workers are included; no separate llama-server is distributed. LLVM runtime code retains Apache2.0/LLVM exceptions. |

@@ -455,7 +455,7 @@ def template_kwargs(req: dict, shared: dict) -> dict:
     if effort is None:
         effort = shared.get("reasoning_effort")      # the Chat settings shared with apps, as on the chat path
     try:
-        return effort_kwargs(effort)
+        return {**effort_kwargs(effort), **({"author_mode": req["reason_mode"]} if req.get("reason_mode") is not None else {})}
     except ValueError as e:
         raise ResponsesError(str(e), "reasoning.effort") from None
 

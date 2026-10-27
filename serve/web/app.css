@@ -197,3 +197,8 @@ main { flex: 1; min-height: 0; display: flex; }
 .img-results figure{margin:0}
 .img-results img{max-width:100%;border-radius:var(--st-r-lg);display:block}
 .img-results figcaption{font-size:var(--st-fs-sm, 13px);color:var(--st-ink-2, inherit);margin-top:4px}
+
+#s-thinking{flex-wrap:wrap;gap:4px} #s-thinking button{flex:1 0 27%}
+
+.st-language{font:inherit;color:var(--st-ink);background:var(--st-surface);border:1px solid var(--st-line);border-radius:7px;padding:5px;max-width:100px;margin-left:8px}
+@media(max-width:680px){.st-header{flex-wrap:wrap;height:auto;min-height:60px;gap:5px;padding:8px}.st-tabs{order:4;width:100%;justify-content:center}.st-language{max-width:88px}}

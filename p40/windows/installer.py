@@ -121,7 +121,7 @@ def make_config(root, models, manifest, workers, numa, port=8093):
               '--suffix-draft','0','--lookup-chain','0','--ple-io','ram','--adapt-async','1','--pool-tasks','0'],
         model_name='davidau-qwen3.8-flash-next-iq3_s',host='127.0.0.1',port=port,
         log=str(root/'logs/engine.log'),mtp=True,open_browser=False,env=env,
-        reasoning_effort='high',sampling=dict(temperature=1.0,top_p=0.95,top_k=64,min_p=0.05,repetition_penalty=1.0),
+        reasoning_effort='high',reason_modes=True,reason_mode='auto',sampling=dict(temperature=1.0,top_p=0.95,top_k=64,min_p=0.05,repetition_penalty=1.0),
         vision=dict(exe=str(root/'runtime/vision/strata-vision.exe'),model=str(weights[0]),mmproj=str(projector),
                     gpu=False,threads=8,max_tokens=300))
 

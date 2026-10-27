@@ -4523,9 +4523,42 @@ class Service:
                     print(f"[strata] idle unload: {e}", flush=True)
         threading.Thread(target=loop, daemon=True).start()
 
+    def author_reason_status(self):
+        author = getattr(self.template, "author_modes", None)
+        supported = bool(author and author.supported)
+        cfg = {}
+        if self.config_path:
+            cfg = runconfig.load(self.config_path)
+        enabled = supported and cfg.get("reason_modes") is True
+        return {"supported": supported, "enabled": enabled,
+                "default_mode": self.shared.get("reason_mode", cfg.get("reason_mode", "off")) if enabled else "off",
+                "modes": ["off", "ultra", "auto"] if supported else [],
+                "native_efforts": ["none", "low", "medium", "high", "xhigh"],
+                "memory_enabled_by_feature": False}
+
+    def author_reason_request(self, req, header=None):
+        status = self.author_reason_status()
+        explicit = header if header is not None else req.get("reason_mode")
+        if explicit is None:
+            ctk = req.get("chat_template_kwargs") or {}
+            # An explicitly selected standard level always keeps standard Qwen semantics.
+            native = (req.get("reasoning_effort") not in (None, "") or bool(req.get("reasoning"))
+                      or "thinking" in req or bool(req.get("output_config"))
+                      or isinstance(ctk, dict) and any(k in ctk for k in ("reasoning_effort", "enable_thinking")))
+            explicit = "off" if native else status["default_mode"]
+        if explicit in (None, "", "off", "native"):
+            if "reason_mode" not in req: return req
+            return {k:v for k,v in req.items() if k != "reason_mode"}
+        if not status["enabled"]: raise ValueError("Author reasoning modes are disabled or unsupported for this template")
+        if not self.template.author_modes.valid(explicit): raise ValueError("Unknown author reasoning mode")
+        return {**req, "reason_mode": "auto" if explicit == "adaptive" else explicit}
+
     def set_shared(self, defaults) -> dict:
         """The Chat settings every client gets for what it leaves out; {} / None = clients use their own again."""
-        self.shared = clean_shared_defaults(defaults)
+        checked = clean_shared_defaults(defaults)
+        if checked.get("reason_mode") not in (None, "off") and not self.author_reason_status()["supported"]:
+            raise ValueError("Author reasoning modes are unsupported by this template")
+        self.shared = checked
         if self.shared_path:
             try:
                 if self.shared:
@@ -4871,6 +4904,7 @@ class Service:
         """-> (ids, thinking, max_new). An unset or non-positive max_new (some clients send -1) means "unlimited":
         the rest of the context.  `force` (forced_call): without thinking the reply starts with it, so it ends the
         prompt; with thinking, Service.run writes it once the thinking is over."""
+        if hasattr(self.template, "reasoning_kwargs"): kwargs.update(self.template.reasoning_kwargs(messages, kwargs))
         # `cancel` (#1999): set when the client hangs up; the downloads, the wait for the turn and the encodes stop
         # between pictures and raise ClientGone
         fetched = self._note_unreadable_tool_images(messages, cancel)
@@ -6700,7 +6734,7 @@ def make_handler(svc: Service):
                 self._json(200, {"status": "ok", "max_context": svc.reported_ctx(), "model": svc.model,
                                  "images": svc.vision is not None, "api_key": bool(svc.api_key),
                                  "image_generation": svc.images is not None,
-                                 "loaded": svc.loaded(), "service": "strata"})
+                                 "loaded": svc.loaded(), "service": "strata", "author_reasoning": svc.author_reason_status()})
             elif path.startswith("/v1/images/files/"):
                 # response_format url: the name (32 random hex digits) is the access, as an OpenAI image URL is
                 f = svc.images.file(path[len("/v1/images/files/"):]) if svc.images is not None else None
@@ -6714,6 +6748,8 @@ def make_handler(svc: Service):
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
+            elif path == "/reason":
+                if self._authorized(): self._json(200, svc.author_reason_status())
             elif path == "/status":
                 if not self._authorized():                  # #212: it shows the end of the last answer
                     return
@@ -6735,7 +6771,7 @@ def make_handler(svc: Service):
                     # the context size under the names other APIs use too (vLLM's max_model_len, OpenRouter's
                     # context_length), so a client that sizes its window from /v1/models reads it
                     model = {"id": svc.model, "object": "model", "status": {"value": "loaded"},
-                             "max_model_len": ctx, "context_length": ctx, "meta": {"n_ctx": ctx},
+                             "max_model_len": ctx, "context_length": ctx, "meta": {"n_ctx": ctx, "supportsAuthorModes": bool(getattr(svc.template, "author_modes", None) and svc.template.author_modes.supported)},
                              "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
                                               "output_modalities": ["text"]}}
                     if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
@@ -7199,6 +7235,7 @@ def make_handler(svc: Service):
                 items.close()
 
         def _openai(self, req):
+            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
             req = svc.with_shared(req, "openai")
             bias_api.normalize(req.get("logit_bias"), len(getattr(svc.tok, "tokens", ())) or None)
             messages, tools, kw = openai_to_messages(req)
@@ -7295,6 +7332,7 @@ def make_handler(svc: Service):
         def _responses(self, req):
             """#451: POST /v1/responses - OpenAI's Responses API, stateless (serve/responses.py), on the chat path.
             Errors use the Responses format; once the stream has started they arrive as a response.failed event."""
+            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
             try:
                 title = (responses_api.thread_title_events(req, svc.model_for(req))
                          if svc.codex_thread_titles else None)
@@ -7455,6 +7493,7 @@ def make_handler(svc: Service):
         def _count_tokens(self, req):
             """Anthropic's token count, which Claude Code asks for its context figures: the prompt this server would
             read for the same request, rendered and tokenized - the model does not run."""
+            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
             req = svc.with_shared(req, "anthropic")
             messages, tools, kw = anthropic_to_messages(req, svc.anthropic_think_unasked)
             stop_strings(req)                                 # the same 400 as the request itself would get
@@ -7462,6 +7501,7 @@ def make_handler(svc: Service):
             self._json(200, {"input_tokens": len(svc.encode_prompt(messages, tools, kw, store=False))})
 
         def _anthropic(self, req):
+            req = svc.author_reason_request(req, self.headers.get("X-Strata-Reason"))
             svc.load()
             req = svc.with_shared(req, "anthropic")
             messages, tools, kw = anthropic_to_messages(req, svc.anthropic_think_unasked)
@@ -7823,7 +7863,7 @@ def origins_of(value, key: str, wildcard: bool) -> list[str]:
     return out
 
 
-SHARED_KEYS = ("reasoning_effort", "reasoning_budget_tokens", "temperature", "top_p", "top_k", "seed", "max_tokens",
+SHARED_KEYS = ("reason_mode", "reasoning_effort", "reasoning_budget_tokens", "temperature", "top_p", "top_k", "seed", "max_tokens",
                "experimental_speed_projection")
 
 
@@ -7839,8 +7879,10 @@ def clean_shared_defaults(d) -> dict:
             continue
         number = isinstance(value, (int, float)) and not isinstance(value, bool)
         if key == "reasoning_effort":
-            if value not in ("none", "low", "medium", "high"):
+            if value not in ("none", "low", "medium", "high", "xhigh"):
                 raise ValueError("reasoning_effort: none, low, medium or high")
+        elif key == "reason_mode":
+            if value not in ("off", "ultra", "auto", "adaptive"): raise ValueError("reason_mode: off, ultra or auto")
         elif key == "temperature":
             if not number or not 0 <= value <= 2:
                 raise ValueError("temperature: 0..2")

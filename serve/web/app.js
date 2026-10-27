@@ -114,6 +114,24 @@ async function loadHealth() {
                                           : "Attach a text file (or drop it here)";
     $("chat-empty-sub").textContent = `${health.model} runs on this PC. Nothing leaves it.`;
     $("tab-btn-images").hidden = !health.image_generation;
+    const author = health.author_reasoning || {};
+    document.querySelectorAll("[data-author-choice]").forEach(b => { b.hidden = !author.enabled; b.disabled = !author.enabled; });
+    if (!author.enabled && ["ultra", "adaptive"].includes(settings.thinking)) settings.thinking = "high";
+    if (author.enabled && ["ultra", "auto", "adaptive"].includes(author.default_mode) && !store.get("author-default-seeded-v1", false)) {
+      settings.thinking = author.default_mode === "ultra" ? "ultra" : "adaptive";
+      store.set("sampling", settings); store.set("author-default-seeded-v1", true);
+    }
+    try {
+      const config = await fetch("config", {headers: headers()});
+      if (config.ok) {
+        const values = Object.fromEntries((await config.json()).keys.map(row => [row.key, row.value]));
+        if (!store.get("sampler-defaults-seeded-v1", false)) {
+          for (const key of ["temperature", "top_p", "top_k"]) if (values["sampling." + key] != null) settings[key] = values["sampling." + key];
+          store.set("sampling", settings); store.set("sampler-defaults-seeded-v1", true);
+        }
+      }
+    } catch (_) { /* API key entry can load this later. */ }
+
     if (location.hash === "#images" && health.image_generation) showTab("images");
   } catch (e) {
     setTimeout(loadHealth, 2000);
@@ -807,8 +825,7 @@ async function send() {
   busy = {controller, msg: m};
   setBusy(true);
 
-  const body = {model: health.model, messages: apiMessages(), stream: true,
-                reasoning_effort: settings.thinking};
+  const body = {model: health.model, messages: apiMessages(), stream: true, ...reasoningWire(settings.thinking)};
   if (!(settings.temperature > 0)) {
     body.temperature = 0;
   } else if (!samplingUntouched(settings)) {
@@ -1021,6 +1038,10 @@ function loadDrawer(s = settings) {
   outputs();
 }
 // "Use for other apps too": the server keeps these settings as every client's defaults (GET/POST /settings)
+function reasoningWire(value) {
+  if (value === "ultra" || value === "adaptive") return {reasoning_effort: "xhigh", reason_mode: value === "adaptive" ? "auto" : "ultra"};
+  return {reasoning_effort: value, reason_mode: "off"};
+}
 let sharedOn = false;
 async function loadShared() {
   try {
@@ -1030,7 +1051,7 @@ async function loadShared() {
   $("s-share").setAttribute("aria-checked", String(sharedOn));
 }
 function sharedDefaults(s) {
-  const d = {reasoning_effort: s.thinking};
+  const d = reasoningWire(s.thinking);
   if (!(+s.temperature > 0)) d.temperature = 0;
   else if (!samplingUntouched(s)) Object.assign(d, {temperature: +s.temperature, top_p: +s.top_p, top_k: +s.top_k});
   if (s.seed) d.seed = +s.seed;
@@ -1059,7 +1080,7 @@ function outputs() {
   $("o-topp").textContent = (+$("s-topp").value).toFixed(2);
   $("o-topk").textContent = $("s-topk").value;
   const sel = [...$("s-thinking").children].find((b) => b.getAttribute("aria-checked") === "true");
-  $("o-thinking").textContent = sel ? {none: "answers right away", low: "short", medium: "medium", high: "thorough (default)"}[sel.dataset.v] : "";
+  $("o-thinking").textContent = sel ? {none: "answers right away", low: "short", medium: "medium", high: "native high", xhigh: "native xhigh", ultra: "author Ultra", adaptive: "automatic author-mode selection"}[sel.dataset.v] : "";
   for (const id of ["s-topp", "s-topk"]) $(id).disabled = t === 0;
 }
 for (const b of $("s-thinking").children) b.onclick = () => { for (const x of $("s-thinking").children) x.setAttribute("aria-checked", String(x === b)); outputs(); };
@@ -1101,7 +1122,7 @@ setBusy(false);
 renderChat();
 const startQuestion = new URLSearchParams(location.search).get("q");   // /?q=... starts a chat (a shortcut)
 if (startQuestion) history.replaceState(null, "", location.pathname + location.hash);
-loadHealth().then(loadMcp).then(() => { if (startQuestion) { $("input").value = startQuestion; send(); } });
+loadHealth().then(loadMcp).then(() => { if (startQuestion) { $("input").value = startQuestion; $("input").focus(); } }); // PR4221: a link cannot submit with the user's tools
 showTab(location.hash.slice(1) || "chat");
 poll();
 
