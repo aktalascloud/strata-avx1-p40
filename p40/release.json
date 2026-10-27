@@ -1,14 +1,14 @@
 {
-  "tag": "v0.1.51-legacy-gpu-4b9e05a-02e0f926",
+  "tag": "v0.1.51-legacy-gpu-4b9e05a-02e0f926-r2",
   "source_sha": "4b9e05a2a806a3fe24f7b2560d98626c37dade35",
   "engine_sha256": "02E0F926EBAF88D6C577ED3CE7BA77F25AD47FEB4B60242997FA8EF2A1A3EB07",
-  "zip_name": "Strata-Legacy-GPU-v0.1.51-legacy-gpu-4b9e05a-02e0f926-win-x64.zip",
-  "zip_bytes": 689470552,
-  "zip_sha256": "c51d789f068d9e5de2b83509ade5bd6bbeeae1764a629c1dc548bdbb50382db2",
-  "download_url": "https://github.com/aktalascloud/strata-legacy-gpu/releases/download/v0.1.51-legacy-gpu-4b9e05a-02e0f926/Strata-Legacy-GPU-v0.1.51-legacy-gpu-4b9e05a-02e0f926-win-x64.zip",
+  "zip_name": "Strata-Legacy-GPU-v0.1.51-legacy-gpu-4b9e05a-02e0f926-r2-win-x64.zip",
+  "zip_bytes": 689513999,
+  "zip_sha256": "8985e66948ebc21ee7f8687a618bfff8ce9ed7337302c12f1eb6aa7c5d1febf3",
+  "download_url": "https://github.com/aktalascloud/strata-legacy-gpu/releases/download/v0.1.51-legacy-gpu-4b9e05a-02e0f926-r2/Strata-Legacy-GPU-v0.1.51-legacy-gpu-4b9e05a-02e0f926-r2-win-x64.zip",
   "weights_included": false,
   "logs_included": false,
   "caches_included": false,
   "credentials_included": false,
-  "qualification": "Exact native/vision/CUDA bytes passed CPU/ISA/private-DLL checks and 25 numerical/graph GPU runs, including the full 5,201-case DenseF32 sweep, BF16 bit parity and the two new checkpoint/MMQ checks. Offline installer/task/import/package checks passed. Unchanged launcher helpers retain their exact-byte clean-folder/S4U proof. No OS reboot or fresh-Windows test is claimed. Throughput remains tied to the separately identified measured source; this build is not a fresh throughput measurement."
+  "qualification": "Exact native/vision/CUDA bytes passed CPU/ISA/private-DLL checks and 25 numerical/graph GPU runs, including the full 5,201-case DenseF32 sweep, BF16 bit parity and the two new checkpoint/MMQ checks. Offline installer/task/import/package checks passed. Unchanged launcher helpers retain their exact-byte clean-folder/S4U proof. No OS reboot or fresh-Windows test is claimed. Direct model throughput was measured on this exact source; see the source-pinned original/latest record."
 }

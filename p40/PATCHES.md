@@ -22,3 +22,5 @@
 The preset keeps 131,072 tokens, KV q4_0, author xhigh, MTP Q2/two drafts (`--spec 3`, `--spec-min-p 0.25`), prefill 512, PLE RAM, PCIe auto and CPU vision. Expert dropping is off. Affinity, system NUMA policy, clocks and power are unchanged.
 
 [Original installation versus latest result](BENCHMARKS.md) · [Measured record](results/benchmarks.json) · [Authors and pinned PRs](COMMUNITY-FIXES.md). Component effects come from separate controlled whole-model experiments; never add them. Numerical correctness and throughput are separate evidence.
+
+Runtime dependency security: [Pillow 13](DEPENDENCY-SECURITY.md) and its source-install overlay are tracked separately from the unchanged native aggregate.

@@ -1,0 +1,17 @@
+{
+  "PR": "https://github.com/Niko1221/Strata/pull/4220",
+  "head": "617f8e10ff809f4554436ca6dbcc248854f3736d",
+  "advisory": "https://github.com/python-pillow/Pillow/security/advisories/GHSA-78g4-xqwv-q3g8",
+  "version": "13.0.0",
+  "python": "3.13",
+  "wheel": "pillow-13.0.0-cp313-cp313-win_amd64.whl",
+  "wheel_sha256": "9dda0788a9932776a75d8bcc020076edc308ce2508b51f6739a45e3158b3fc42",
+  "patch_sha256": "b3de43fa33117eaf6947f9d6e920022c29ec30e48df8f1a021d9359dc15bf28a",
+  "license": "MIT-CMU",
+  "native_rebuilt": false,
+  "codec_roundtrips": 7,
+  "normalization_formats": 7,
+  "EXIF_rotation": true,
+  "vision_unit_cases": 20,
+  "real_model_requests": 0
+}

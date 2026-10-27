@@ -10,6 +10,11 @@
     {
       "path": "p40/patches/pascallama-sm61.patch",
       "sha256": "83ed5d94cd23ee01a61b70e50888f2332affbe4d83d4c60477cd4ab5bed6ea8a"
+    },
+    {
+      "path": "p40/patches/pillow13-security.patch",
+      "sha256": "b3de43fa33117eaf6947f9d6e920022c29ec30e48df8f1a021d9359dc15bf28a",
+      "scope": "dependency-only rebuild overlay; bundled runtime already fixed"
     }
   ]
 }
