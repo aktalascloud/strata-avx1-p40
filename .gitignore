@@ -113,3 +113,8 @@ __pycache__/
 *.log
 *.gguf
 *.part
+# DGX Spark build outputs and local venv (docs/DGX_SPARK_LINUX.md)
+/out-spark/
+/build-spark/
+/build-vision-spark/
+/.venv-build/

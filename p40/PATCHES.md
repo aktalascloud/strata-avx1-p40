@@ -19,3 +19,5 @@
 Preset: 131,072 tokens, KV q4_0, MTP Q2/two drafts (`--spec 3`, minimum probability 0.25), prefill 512, PLE RAM, PCIe auto and CPU vision. Ivy Bridge `-O3 -march=ivybridge -mtune=ivybridge`, no AVX2/FMA/F16C; CUDA 12.9/O3/sm_61, MSVC `/O2 /Ob3 /favor:INTEL64 /fp:precise`. No fast-math, PGO/ThinLTO or expert dropping. Affinity, system NUMA, clocks and power stay unchanged.
 
 [First installation / latest selected measurement](BENCHMARKS.md) · [Qualification limits](INSTALLATION-VERIFICATION.md) · [Authors and reviewed ports](COMMUNITY-FIXES.md). CPU/GPU component effects come from separate controlled whole-model comparisons; percentages are never added. Hardware and trained-model support beyond the stated qualification remains experimental.
+
+Pascal Q8: the measured P40 setting is `STRATA_Q8_SM60=1`, `STRATA_MTP_Q8_SM60=0`; MTP Q2/spec3 stays enabled. This is an existing upstream opt-in, not a new CPU instruction set or a universal GPU speedup. Packed VRAM competes with expert slots; actual whole-model A/B selected this setting.

@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 369d699c..7b15cacd 100644
+index ee059921..3210ef5f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -99,6 +99,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
@@ -15,7 +15,7 @@ index 369d699c..7b15cacd 100644
  option(STRATA_MMQ_KQUANTS "Build the MMQ prompt kernels for Q4_K / Q5_K / Q5_1 / Q6_K: the experts of Unsloth's K-quant files, and on HIP the dense GGUF projections (STRATA_DENSE_MMQ)" ON)
  # Q6_K gate/up in the grouped expert kernels (Unsloth's UD-Q6_K_XL, and layer 2 of UD-Q5_K_XL; docs/QUANTS.md).  On by
  # default since MODEL-UPDATE Phase 1: one more instance per grouped kernel in iq_kernels.cu, +19 KB of sm_60 code,
-@@ -753,6 +759,11 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
+@@ -758,6 +764,11 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
      set_tests_properties(expert_cache_slot_guard_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
    endif()
    if(STRATA_BUILD_CONVERSATION_TESTS)
@@ -27,7 +27,7 @@ index 369d699c..7b15cacd 100644
      add_executable(conversation_snapshot_test src/core/conversation_snapshot_test.cpp)
      target_link_libraries(conversation_snapshot_test PRIVATE strata_engine)
      add_test(NAME conversation_snapshot_test COMMAND conversation_snapshot_test)
-@@ -769,12 +780,17 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
+@@ -774,12 +785,17 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
      target_link_libraries(conversation_validation_test PRIVATE strata_engine)
      add_test(NAME conversation_validation_test COMMAND conversation_validation_test)
      set_tests_properties(conversation_validation_test PROPERTIES ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" TIMEOUT 120)
@@ -46,7 +46,7 @@ index 369d699c..7b15cacd 100644
          -Wl,--wrap=cudaDeviceSynchronize -Wl,--wrap=cudaGetLastError)
        target_link_libraries(conversation_transfer_test PRIVATE strata_engine)
        add_test(NAME conversation_transfer_test COMMAND conversation_transfer_test)
-@@ -1799,6 +1815,9 @@ endif()
+@@ -1807,6 +1823,9 @@ endif()
  include(CheckCXXSourceCompiles)
  if(MSVC)
    set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
@@ -56,7 +56,7 @@ index 369d699c..7b15cacd 100644
  else()
    set(CMAKE_REQUIRED_FLAGS "-mavx2 -mfma -mf16c")
  endif()
-@@ -2029,6 +2048,11 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -2051,6 +2070,11 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_tq_llama "${strata_llamacpp_SOURCE_DIR}")
      endif()
      include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/strata_ggml_tq_overlay.cmake)
@@ -68,7 +68,7 @@ index 369d699c..7b15cacd 100644
      set(_strata_tq_overlay_dir "${CMAKE_BINARY_DIR}/ggml-tq-overlay")
      strata_ggml_tq_overlay("${_strata_tq_llama}" "${_strata_tq_overlay_dir}")
      if(STRATA_TQ_OVERLAY_OK)
-@@ -2058,6 +2082,10 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -2080,6 +2104,10 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_gg ${strata_llamacpp_SOURCE_DIR}/ggml)
      endif()
      set(_strata_mmq ${_strata_gg}/src/ggml-cuda)
@@ -79,7 +79,7 @@ index 369d699c..7b15cacd 100644
      set(_strata_quantize_cu ${_strata_mmq}/quantize.cu)   # the overlay's copy when the trellis overlay is on: it includes mmq.cuh
      if(_strata_mmq_tq_overlay)
        set(_strata_quantize_cu ${_strata_tq_overlay_dir}/quantize.cu)
-@@ -2488,7 +2516,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
+@@ -2510,7 +2538,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
  endif()
  
  if(STRATA_BUILD_TESTS)
@@ -102,7 +102,7 @@ index 369d699c..7b15cacd 100644
      add_executable(pool_affinity_test src/kernels/cpu/pool_affinity_test.cpp)
      target_link_libraries(pool_affinity_test PRIVATE strata_kernels_cpu)
      add_test(NAME pool_affinity_test COMMAND pool_affinity_test)
-@@ -2617,6 +2660,25 @@ if(STRATA_BUILD_TESTS)
+@@ -2639,6 +2682,25 @@ if(STRATA_BUILD_TESTS)
      target_include_directories(direct_file_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
      target_link_libraries(direct_file_async_test PRIVATE Threads::Threads)
      add_test(NAME direct_file_async_test COMMAND direct_file_async_test)
@@ -128,7 +128,7 @@ index 369d699c..7b15cacd 100644
    endif()
    # --aux-cpus: the CPU-set derivation (pure) and the placement of live threads; header-only, no GPU
    add_executable(aux_cpus_test tests/platform/aux_cpus_test.cpp)
-@@ -2708,3 +2770,63 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
+@@ -2730,3 +2792,63 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
      target_compile_definitions(ds4_gg_bench PRIVATE STRATA_DSV41_TQ_CPU=1)
    endif()
  endif()

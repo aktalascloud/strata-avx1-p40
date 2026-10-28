@@ -32,13 +32,13 @@
     "comparison_label": "Historical first-installation receipt, not a fresh stock run"
   },
   "latest_measured": {
-    "date": "2026-10-28",
-    "source_sha": "5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d",
-    "engine_version": "0.1.52",
-    "engine_sha256": "E1D5A2FB5FE296E716BFBAB1FCC5FC077044BD2644FD9B0642C523916800D8B6",
-    "vision_sha256": "4B0841F8CD76CC2C88C7AFD289B753CB3B473E9154486F21BB91FA9AB01056EA",
-    "patch_sha256": "63167833BCA76119DA5B8ED2166161AAE366A923E77E2E9ECB145A59B0426F07",
-    "profile": "Ivy Bridge O3 / CUDA12.9 sm61 / I64-J96 /14workers /NUMA0 /fused0 /guided0 /checkpoint-reuse1 /group-scratch1",
+    "date": "2026-10-29",
+    "source_sha": "46c152a1310f77cd2f0ce2c7cd213962df14fe83",
+    "engine_version": "0.1.53",
+    "engine_sha256": "C07363232B5944E35DB0DAB817002F2EA558FC16A2C1E665EDAC1F1F5AE415BF",
+    "vision_sha256": "0C13C1E5C673363C1845101033CBA67F51F3C981DDAD38A99F2B7F2F7A1A3925",
+    "patch_sha256": "6DC18C0334B204EEC86731F3B4B7B6ADC655346330B4E02CF914358E2256C757",
+    "profile": "Ivy O3/CUDA12.9 sm61/CA/I64-J96/14workers/NUMA0 + PascalQ8 main1/MTPprojection0",
     "context_capacity": 131072,
     "kv": "q4_0",
     "mtp": "Q2 / two draft tokens",
@@ -57,51 +57,59 @@
     "includes_reasoning_tokens": true,
     "full128k_speed_measured": false,
     "qualification_only_is_not_throughput": true,
-    "benchmark_kind": "Bounded guided CPU retry, equal fresh starts, two warmups and three measured responses per workload; selected guided0",
+    "benchmark_kind": "Bounded same-native3-profile PascalQ8 A/B, equal fresh starts,2warmups+3measured per workload;30requests total",
     "stock_remeasured": false,
-    "native_tok_s": 44.45216183365167,
-    "api_tok_s": 40.348114707536155,
+    "native_tok_s": 55.14626685623196,
+    "api_tok_s": 48.922706709554305,
     "native_samples_tok_s": [
-      43.793622553715615,
-      44.45216183365167,
-      46.95524578136464
+      52.009264150176755,
+      55.14626685623196,
+      55.27247603419984
     ],
     "api_samples_tok_s": [
-      38.89383384127942,
-      40.348114707536155,
-      41.793549270384645
+      46.01506151994904,
+      48.945353812629655,
+      48.922706709554305
     ],
     "payload_sha256": "62f96cdaeb67a559a85a28487a0dad033bf85030bba1b2af9b3e3c69edc339ff",
-    "first_reasoning_token_median_s": 0.36850119999144226,
+    "first_reasoning_token_median_s": 0.33000040001934394,
     "native_range_tok_s": [
-      43.793622553715615,
-      46.95524578136464
+      52.009264150176755,
+      55.27247603419984
     ],
-    "cached4k_native_tok_s": 44.4552495398187,
-    "cached4k_api_tok_s": 39.56112861961274,
+    "cached4k_native_tok_s": 51.23278898495037,
+    "cached4k_api_tok_s": 45.48681912854429,
     "cached4k_native_samples_tok_s": [
-      48.062481225593274,
-      44.4552495398187,
-      43.28272410644845
+      51.23278898495037,
+      47.32852652985765,
+      51.750626667744804
     ],
     "cached4k_api_samples_tok_s": [
-      42.63618889760748,
-      39.56112861961274,
-      38.837068877795275
+      45.48681912854429,
+      42.185518331092986,
+      45.819503659100945
     ],
     "cached4k_payload_sha256": "0967b627540156dc5f78d18c7d2d9981e262bd4b257ca7a838df1ecdb43b2d1a",
-    "cached4k_first_reasoning_token_median_s": 0.3700327000115067,
+    "cached4k_first_reasoning_token_median_s": 0.3507790999719873,
     "cached4k_native_range_tok_s": [
-      43.28272410644845,
-      48.062481225593274
+      47.32852652985765,
+      51.750626667744804
     ],
     "observed_gpu_clock_mhz_range": [
       1531,
       1531
     ],
     "author_reason_mode": "ultra",
-    "receipt_sha256": "e89e43179f00bb6a51ce40b6b1f8c252e2702f4de62f40c60bcaa04df51ccd66",
-    "guided_cpu_rejected": true
+    "receipt_sha256": "33de8613685fa8468652e319ab709b184ee6f84269d7ecf3fe1290d084af7e99",
+    "guided_cpu_rejected": true,
+    "L1_ca": true,
+    "measurement_scope": "Two fixed warmed workloads, not full128K speed; sampled outputs and adaptive expert residency vary; no guaranteed gain/quality claim.",
+    "measurement_finished_utc": "2026-10-28T22:11:29.375502+00:00",
+    "measurement_timezone": "Asia/Bishkek",
+    "Pascal_Q8_selected_flags": {
+      "STRATA_Q8_SM60": "1",
+      "STRATA_MTP_Q8_SM60": "0"
+    }
   },
   "comparison_limits": [
     "First-installation16.4495tok/s is the preserved historical cold64-token result; its executable was removed during authorized cleanup. The latest result is freshly measured, warmed128tokens, with different KV/MTP/reasoning/temperature settings. This is overall historical progress, not a controlled old/new binary A/B or an isolated patch gain.",

@@ -24,11 +24,13 @@
 
 **Интерфейс RU/EN · отдельные Ultra и Adaptive.** По умолчанию — Adaptive/Auto. Явные High/XHigh сохраняют стандартное поведение Qwen. Adaptive выбирает авторский режим под задачу; память и БД не включены. [Режимы и API](p40/REASONING-MODES.md) · [Источник Mnemosyne](https://github.com/TheHubUser4860938/Strata-Mnemosyne).
 
-**16.45 → 44.45 токена/с** в движке; полный API: 11.65 → 40.35. Замер 2026-10-28, движок 0.1.52, `E1D5A2FB`. Исторический холодный ответ без MTP против прогретого MTP/Ultra: разные режимы, не одновременный A/B. Полные 128К и новые модели не измерены. [Методика и доказательства CPU/GPU](p40/BENCHMARKS.md).
+**16.45 → 55.15 токена/с** в движке; полный API: 11.65 → 48.92. Замер 2026-10-29, движок 0.1.53, `C0736323`. Исторический холодный ответ без MTP против прогретого MTP/Ultra: разные режимы, не одновременный A/B. Полные 128К и новые модели не измерены. [Методика и доказательства CPU/GPU](p40/BENCHMARKS.md).
 
 Native-профиль: **128К · KV Q4 · MTP Q2/два черновых токена · xhigh · vision на CPU**. Сборка: **Ivy Bridge O3/AVX1**, CUDA **O3/sm_61**, MSVC host **O2/Ob3**. Остальные профили начинают с F16 KV и ограничений своей модели.
+
+Настройка измеренного профиля P40: `STRATA_Q8_SM60=1`, `STRATA_MTP_Q8_SM60=0`; второй флаг не отключает MTP Q2. Для других GPU этот выбор не измерен.
 
 [Патчи](p40/PATCHES.md) · [Проверки](p40/INSTALLATION-VERIFICATION.md) · [Лицензии](THIRD_PARTY_NOTICES.md) · [Оригинальная Strata](https://github.com/Niko1221/Strata)
 [Xolotl](https://github.com/Indras-Mirror/Xolotl) · [PolyStrata](https://github.com/VecSzn/PolyStrata) · [Maya](https://github.com/mw00/project-maya) · [Polaris](https://github.com/AvilaCarlosDev/polaris-local-ai)
 
-Native-движок **0.1.52**, официальная база [5e8a4cca7d69](https://github.com/Niko1221/Strata/commit/5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d). Ключей, личных настроек, логов, кэшей и SDK в ZIP нет. Проверка обученных GLM/DeepSeek и реальной RX580 пока не заявляется.
+Native-движок **0.1.53**, официальная база [46c152a1310f](https://github.com/Niko1221/Strata/commit/46c152a1310f77cd2f0ce2c7cd213962df14fe83). Ключей, личных настроек, логов, кэшей и SDK в ZIP нет. Проверка обученных GLM/DeepSeek и реальной RX580 пока не заявляется.

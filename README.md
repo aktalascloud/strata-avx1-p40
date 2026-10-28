@@ -24,11 +24,13 @@
 
 **RU/EN interface · separate Ultra and Adaptive modes.** Adaptive/Auto is the default. Explicit High/XHigh retain stock Qwen semantics. Adaptive selects an author persona per task; no memory service or database is included. [Modes and API](p40/REASONING-MODES.md) · [Mnemosyne source](https://github.com/TheHubUser4860938/Strata-Mnemosyne).
 
-**16.45 → 44.45 tokens/s** in the engine; whole API: 11.65 → 40.35. Measured 2026-10-28, engine 0.1.52, `E1D5A2FB`. Historical cold response without MTP versus warmed MTP/Ultra: different settings, not a simultaneous A/B. Full 128K and the new models were not benchmarked. [Method and CPU/GPU evidence](p40/BENCHMARKS.md).
+**16.45 → 55.15 tokens/s** in the engine; whole API: 11.65 → 48.92. Measured 2026-10-29, engine 0.1.53, `C0736323`. Historical cold response without MTP versus warmed MTP/Ultra: different settings, not a simultaneous A/B. Full 128K and the new models were not benchmarked. [Method and CPU/GPU evidence](p40/BENCHMARKS.md).
 
 Native preset: **128K · KV Q4 · MTP Q2/two drafts · xhigh · CPU vision**. Build: **Ivy Bridge O3/AVX1**, CUDA **O3/sm_61**, MSVC host **O2/Ob3**. Generic profiles start with F16 KV and model-specific limits.
+
+Measured P40 setting: `STRATA_Q8_SM60=1`, `STRATA_MTP_Q8_SM60=0`; the latter leaves MTP Q2 enabled. Other GPUs were not timed for this choice.
 
 [Patches](p40/PATCHES.md) · [Checks](p40/INSTALLATION-VERIFICATION.md) · [Licenses](THIRD_PARTY_NOTICES.md) · [Upstream Strata](https://github.com/Niko1221/Strata)
 [Xolotl](https://github.com/Indras-Mirror/Xolotl) · [PolyStrata](https://github.com/VecSzn/PolyStrata) · [Maya](https://github.com/mw00/project-maya) · [Polaris source](https://github.com/AvilaCarlosDev/polaris-local-ai)
 
-Native engine **0.1.52**, official base [5e8a4cca7d69](https://github.com/Niko1221/Strata/commit/5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d). No keys, private settings, logs, caches or SDKs in the ZIP. Trained GLM/DeepSeek and RX580 results are not claimed.
+Native engine **0.1.53**, official base [46c152a1310f](https://github.com/Niko1221/Strata/commit/46c152a1310f77cd2f0ce2c7cd213962df14fe83). No keys, private settings, logs, caches or SDKs in the ZIP. Trained GLM/DeepSeek and RX580 results are not claimed.
