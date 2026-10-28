@@ -47,3 +47,11 @@ CPU fused scheduling follows the StrataFast/txiki739 work, itself based on Franc
 GLM/DeepSeek formatting, template and MTP work draws on the linked MIT-licensed [Xolotl](https://github.com/Indras-Mirror/Xolotl), [PolyStrata](https://github.com/VecSzn/PolyStrata), [Maya](https://github.com/mw00/project-maya) and official model library. Other reviewed branches are not wholesale replacements for the native Qwen engine.
 
 - [Strata#2638](https://github.com/Niko1221/Strata/pull/2638), head 6aa11af505a4: retained AVX1 CPU optimization and IQ4_NL dispatch correction. Adaptation explicitly zeros odd-tail upper lanes; no ISA/FP guard is relaxed.
+
+## Current 0.1.52 integration
+
+- [Strata#4314](https://github.com/Niko1221/Strata/pull/4314), head `1e0cdeaf1915`: reject boolean/fractional output budgets at both API endpoints; preserve integer and 0/-1 compatibility. Eleven request-hardening tests passed.
+- Official `5e8a4cca7d69` supersedes the old capture-identity implementation with bounded checkpoint thread handles and moved storage. The local synchronous reuse, smallest-slot pressure policy and unsigned budget guard were adapted to this API; async DMA is not enabled.
+- Guided CPU scheduling from [zsariboga/Strata](https://github.com/zsariboga/Strata), pinned `fc5b2a7829e5`, remains optional/OFF after the real-model retry lost 4.32%. Independent epoch/CAS and per-job offsets are retained; no shared mutable scheduling table was imported.
+
+The review inventory includes deferred heads; downloading PR metadata is not semantic approval. Linux NUMA PR3730 and heterogeneous RTX PR4380 were reviewed but not selected for this single-P40 Windows host. Static wide-kernel annotation/defensive-entry PR4349 remains deferred; existing caller ISA guards are preserved.

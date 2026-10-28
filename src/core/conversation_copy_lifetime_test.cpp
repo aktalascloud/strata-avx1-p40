@@ -1,173 +1,67 @@
-// Exercise the actual header on host threads. No CUDA/HIP runtime call is made.
+// Host-only coverage of the actual upstream pooled copy helper. No CUDA/device calls.
 #include "strata/core/conversation_cache.hpp"
 #include "strata/core/progress.hpp"
 #include <cuda_runtime.h>
-
 #include <atomic>
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
-
 namespace fixture {
-constexpr cudaError_t failure = static_cast<cudaError_t>(1);
-std::mutex mutex;
-std::unordered_map<cudaStream_t, int> live;
-int created = 0, destroyed = 0;
-std::atomic<int> errors{0};
-thread_local int device = 0;
-thread_local bool fail_create = false, fail_get = false, fail_copy = false, fail_sync = false;
-
-cudaError_t get_device(int* d) {
-    if (fail_get) return failure;
-    *d = device;
-    return cudaSuccess;
+constexpr cudaError_t failure=static_cast<cudaError_t>(1);
+std::mutex mu;std::unordered_map<cudaStream_t,int> live;
+std::atomic<int> errors{0};int created=0;
+thread_local int device=0;
+thread_local bool fail_get=false,fail_create=false,fail_copy=false,fail_sync=false;
+cudaError_t get(int* d){if(fail_get)return failure;*d=device;return cudaSuccess;}
+cudaError_t set(int d){device=d;return cudaSuccess;}
+cudaError_t create(cudaStream_t* s,unsigned){std::lock_guard<std::mutex> l(mu);if(fail_create)return failure;*s=reinterpret_cast<cudaStream_t>(uintptr_t(++created));live.emplace(*s,device);return cudaSuccess;}
+cudaError_t destroy(cudaStream_t s){std::lock_guard<std::mutex> l(mu);if(!live.erase(s))++errors;return cudaSuccess;}
+cudaError_t copy(void*,const void*,size_t,decltype(cudaMemcpyDefault),cudaStream_t s){std::lock_guard<std::mutex> l(mu);if(!live.count(s)||live[s]!=device)++errors;return fail_copy?failure:cudaSuccess;}
+cudaError_t sync(cudaStream_t){return fail_sync?failure:cudaSuccess;}
+cudaError_t event_create(cudaEvent_t* e,unsigned){*e=reinterpret_cast<cudaEvent_t>(uintptr_t(1+device));return cudaSuccess;}
+cudaError_t event_record(cudaEvent_t,cudaStream_t){return cudaSuccess;}
+cudaError_t event_wait(cudaStream_t,cudaEvent_t,unsigned){return cudaSuccess;}
+void check(bool ok,const char* what){if(!ok){std::fprintf(stderr,"FAIL: %s\n",what);std::exit(1);}}
 }
-cudaError_t set_device(int d) { device = d; return cudaSuccess; }
-cudaError_t create(cudaStream_t* s, unsigned int) {
-    std::lock_guard<std::mutex> lock(mutex);
-    if (fail_create) {
-        *s = reinterpret_cast<cudaStream_t>(uintptr_t(999999));
-        return failure;
-    }
-    *s = reinterpret_cast<cudaStream_t>(uintptr_t(++created));
-    live.emplace(*s, device);
-    return cudaSuccess;
-}
-cudaError_t destroy(cudaStream_t s) {
-    std::lock_guard<std::mutex> lock(mutex);
-    auto it = live.find(s);
-    if (it == live.end() || it->second != device) {
-        ++errors;
-        return failure;
-    }
-    live.erase(it);
-    ++destroyed;
-    return cudaSuccess;
-}
-cudaError_t copy(void*, const void*, size_t, decltype(cudaMemcpyDefault), cudaStream_t) {
-    return fail_copy ? failure : cudaSuccess;
-}
-cudaError_t sync(cudaStream_t) { return fail_sync ? failure : cudaSuccess; }
-void check(bool ok, const char* what) {
-    if (!ok) { std::fprintf(stderr, "FAIL: %s\n", what); std::exit(1); }
-}
-struct CheckRestoredDevice {
-    int expected = 0;
-    ~CheckRestoredDevice() { if (device != expected) ++errors; }
-};
-}
-
-// Dependencies are already included. Redirect only the operations of this helper.
-#undef cudaGetDevice
-#undef cudaSetDevice
-#undef cudaStreamCreateWithFlags
-#undef cudaStreamDestroy
-#undef cudaMemcpyAsync
-#undef cudaStreamSynchronize
-#define cudaGetDevice fixture::get_device
-#define cudaSetDevice fixture::set_device
+namespace strata::core {int joins=0;void fixture_checkpoint_join(const void*){++joins;}}
+#define conversation_checkpoint_join fixture_checkpoint_join
+#define cudaGetDevice fixture::get
+#define cudaSetDevice fixture::set
 #define cudaStreamCreateWithFlags fixture::create
 #define cudaStreamDestroy fixture::destroy
 #define cudaMemcpyAsync fixture::copy
 #define cudaStreamSynchronize fixture::sync
+#define cudaEventCreateWithFlags fixture::event_create
+#define cudaEventRecord fixture::event_record
+#define cudaStreamWaitEvent fixture::event_wait
 #include "conversation_copy.hpp"
-
-using strata::core::conversation_detail::copy_nonblocking;
-
-int main() {
-    using namespace fixture;
-    using namespace strata::core;
-    using namespace strata::core::conversation_detail;
-    auto same = [](const ConversationCheckpoint& a, const ConversationCheckpoint& b) {
-        return a.ids == b.ids && a.imgs == b.imgs && a.gdn == b.gdn && a.ple == b.ple &&
-               a.tails == b.tails && a.dead == b.dead && a.block_pos == b.block_pos &&
-               a.capture == b.capture && a.used == b.used && a.pinned == b.pinned;
-    };
-    int park_cases = 0;
-    for (uint64_t seed = 1; seed <= 64; ++seed) {
-        ConversationCheckpoint c;
-        c.ids = {1, 2, 3}; c.capture = seed; c.used = seed + 5; c.pinned = seed % 2;
-        c.gdn.assign(31, uint8_t(seed)); c.ple.assign(7, 2); c.tails.assign(13, 3);
-        c.dead.assign(19, 4); c.block_pos.assign(5, 5);
-        const std::vector<ConversationCheckpoint> view{c};
-        ConversationParkSource plain;
-        auto copied = park_checkpoints(view, plain);
-        check(same(copied[0], c) && plain.copied == 1 && plain.moved == 0, "ordinary copy remains identical"); ++park_cases;
-        std::vector<ConversationCheckpoint> harvest{c};
-        harvest[0].used = 0; harvest[0].pinned = !c.pinned;
-        auto* storage = harvest[0].gdn.data();
-        ConversationParkSource src; src.harvest = &harvest;
-        auto moved = park_checkpoints(view, src);
-        check(same(moved[0], c) && moved[0].gdn.data() == storage && harvest[0].gdn.empty() &&
-              src.moved == 1 && src.copied == 0, "harvest moves state but preserves current metadata"); ++park_cases;
-        auto again = park_checkpoints(view, src);
-        check(same(again[0], c) && src.copied == 1, "spent harvest is never reused"); ++park_cases;
-        for (int fault = 0; fault < 4; ++fault) {
-            harvest = {c};
-            if (fault == 0) harvest[0].capture = 0;
-            if (fault == 1) harvest[0].capture += 1000;
-            if (fault == 2) harvest[0].gdn.push_back(0);
-            if (fault == 3) harvest[0].ids[0] = 8;
-            ConversationParkSource miss; miss.harvest = &harvest;
-            auto fallback = park_checkpoints(view, miss);
-            check(same(fallback[0], c) && miss.moved == 0 && miss.copied == 1, "identity/shape/token mismatch copies"); ++park_cases;
-        }
-        std::vector<ConversationCheckpoint> outgoing{c}; storage = outgoing[0].gdn.data();
-        ConversationParkSource consume; consume.consume = &outgoing;
-        auto consumed = park_checkpoints(outgoing, consume);
-        check(same(consumed[0], c) && consumed[0].gdn.data() == storage && outgoing[0].gdn.empty(), "consume moves the exact outgoing chain"); ++park_cases;
-        outgoing = {c}; consume = {}; consume.consume = &outgoing;
-        auto unrelated = park_checkpoints(view, consume);
-        check(same(unrelated[0], c) && !outgoing[0].gdn.empty() && consume.moved == 0, "equal tokens in another vector do not authorize consumption"); ++park_cases;
-    }
-    std::printf("PASS: %d checkpoint ownership/identity/copy cases\n", park_cases);
-    // Models one fresh async stage thread per chunk: retained streams used to
-    // increase by one each time, even after every worker had been joined.
-    for (int i = 0; i < 32; ++i) {
-        std::thread([] {
-            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "first copy");
-            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "reuse stream");
-        }).join();
-        check(live.empty(), "exited worker retains a stream");
-    }
-    check(created == 32 && destroyed == 32, "one stream per worker");
-    const int before = created;
-    std::thread([] {
-        for (int i = 0; i < 32; ++i)
-            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "persistent worker copy");
-    }).join();
-    check(created == before + 1 && live.empty(), "persistent worker reuses one stream");
-
-    std::vector<std::thread> workers;
-    for (int i = 0; i < 16; ++i) workers.emplace_back([] {
-        // Constructed before the stream owner, hence inspected after its cleanup.
-        thread_local CheckRestoredDevice after_owner;
-        for (int d : {2, 0, 3, 2}) {
-            device = d;
-            check(copy_nonblocking(nullptr, nullptr, 0) == cudaSuccess, "multi-device copy");
-        }
-        after_owner.expected = device;
-    });
-    for (auto& worker : workers) worker.join();
-    check(live.empty() && errors == 0, "multi-device cleanup and device restoration");
-
-    std::thread([] {
-        fail_get = true;
-        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "device query failure");
-        fail_get = false;
-        fail_create = true;
-        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "stream creation failure");
-        fail_create = false;
-        fail_copy = true;
-        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "copy failure");
-        fail_copy = false;
-        fail_sync = true;
-        check(copy_nonblocking(nullptr, nullptr, 0) == failure, "sync failure");
-        fail_sync = false;
-    }).join();
-    check(live.empty() && created == destroyed && errors == 0, "error paths release owned streams");
-    std::puts("PASS: worker exit, stream reuse, concurrent devices, failure cleanup");
+int main(){
+ using namespace fixture;using namespace strata::core;using namespace strata::core::conversation_detail;
+ for(int i=0;i<64;++i){
+   ConversationCheckpoint c;c.ids={1,2,3};c.used=i;c.pinned=i%2;c.dev_tag=i+1;
+   c.gdn.assign(31,uint8_t(i));c.ple.assign(7,2);c.tails.assign(13,3);c.dead.assign(19,4);c.block_pos.assign(5,5);
+   const std::vector<ConversationCheckpoint> view{c};
+   auto plain=copy_checkpoints_beating(view);
+   ConversationCheckpoint spare;spare.gdn.reserve(128);spare.gdn.assign(80,0);
+   auto* bytes=spare.gdn.data();std::vector<ConversationCheckpoint> storage;storage.push_back(std::move(spare));
+   auto reused=copy_checkpoints_beating(view,&storage);
+   check(storage.empty()&&reused[0].gdn.data()==bytes,"reuse capacity from a dropped checkpoint");
+   check(reused[0].ids==plain[0].ids&&reused[0].gdn==plain[0].gdn&&reused[0].ple==plain[0].ple&&reused[0].tails==plain[0].tails&&reused[0].dead==plain[0].dead&&reused[0].block_pos==plain[0].block_pos&&reused[0].used==c.used&&reused[0].pinned==c.pinned&&reused[0].dev_tag==c.dev_tag,"pooled state and metadata equal ordinary copy");
+   check(view[0].gdn==c.gdn,"source checkpoint remains untouched");
+ }
+ check(joins==128,"join each source checkpoint before both copy paths");
+ for(int i=0;i<64;++i)std::thread([]{check(copy_nonblocking(nullptr,nullptr,0)==cudaSuccess,"copy");check(order_after_queued()==cudaSuccess,"event ordering");}).join();
+ check(created==1&&live.size()==1,"64 exited workers retain at most one reusable stream");
+ std::atomic<int> ready{0};std::atomic<bool> go{false};std::vector<std::thread> threads;
+ for(int i=0;i<16;++i)threads.emplace_back([&]{for(int d:{0,2,3}){device=d;check(copy_nonblocking(nullptr,nullptr,0)==cudaSuccess,"per-device copy");}++ready;while(!go.load())std::this_thread::yield();});
+ while(ready.load()!=16)std::this_thread::yield();go=true;for(auto& t:threads)t.join();
+ check(created<=48&&errors==0,"pooled streams bounded by peak concurrent workers and devices");
+ const int held=created;
+ for(int i=0;i<64;++i)std::thread([]{for(int d:{0,2,3}){device=d;check(copy_nonblocking(nullptr,nullptr,0)==cudaSuccess,"reuse after peak");}}).join();
+ check(created==held,"no growth after 64 further sequential workers");
+ std::thread([]{device=99;fail_get=true;check(copy_nonblocking(nullptr,nullptr,0)==failure,"get-device failure");fail_get=false;fail_create=true;check(copy_nonblocking(nullptr,nullptr,0)==failure,"create failure");fail_create=false;fail_copy=true;check(copy_nonblocking(nullptr,nullptr,0)==failure,"copy failure");fail_copy=false;fail_sync=true;check(copy_nonblocking(nullptr,nullptr,0)==failure,"sync failure");fail_sync=false;}).join();
+ check(errors==0&&created==int(live.size()),"valid per-device ownership after error paths");
+ std::puts("PASS: 64 exact pooled-checkpoint cases, join-before-copy, bounded worker/device lifetime and errors");
 }

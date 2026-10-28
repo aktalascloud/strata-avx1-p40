@@ -33,3 +33,5 @@ p40/licenses/* -text
 src/kernels/b6_mmvq_bench.cpp text eol=lf
 src/kernels/expdec_bench.cpp text eol=lf
 tests/cuda/pascallama_mmq_screen.cpp text eol=lf
+# vendored KaTeX (serve/web/vendor): the files are hashed byte for byte (PROVENANCE.json), never convert their line endings.
+serve/web/vendor/** -text

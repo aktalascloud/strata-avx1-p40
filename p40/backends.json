@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "native_source_sha": "4b9e05a2a806a3fe24f7b2560d98626c37dade35",
+  "native_source_sha": "5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d",
   "engines": {
     "cpu": {
       "path": "runtime/backends/cpu/strata-ggml.exe",

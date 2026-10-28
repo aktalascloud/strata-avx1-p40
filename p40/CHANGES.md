@@ -1,10 +1,10 @@
 # Current build
 
-Official source `4b9e05a2a806a3fe24f7b2560d98626c37dade35`.
+Official source `5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d`.
 
-- Separate Ultra and Adaptive author modes; explicit High/XHigh retain stock Qwen behavior.
-- Russian interface with English switch; user/model text and code remain unchanged.
-- Stateless routing adapted from MIT Strata-Mnemosyne; no memory, database or embedding service.
-- Native/vision/CUDA bytes unchanged; existing 25 numerical/graph checks retained, with separate serving/API/UI checks.
+- Merge official 0.2.7 / native 0.1.52 with the retained Ivy Bridge/P40 ports and standalone backends.
+- QFUSE producer quantization and one-token commit corrections; current native profile passed 26 staged GPU runs plus an exact-library GDN check.
+- Updated web chat preserves upstream catalogs/history controls, Russian default and English switch; separate Ultra/Adaptive remain.
+- PR4314 rejects boolean/fractional output budgets; guided scheduling retry lost 4.32% and remains OFF.
 
 Measured performance is independently source-pinned in BENCHMARKS.md.

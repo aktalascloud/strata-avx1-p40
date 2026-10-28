@@ -1,10 +1,14 @@
 {
-  "scope": "Serving-only update; unchanged native bytes retain their original numerical qualification.",
-  "unit_cases": 14,
-  "direct_api_mode_requests": 6,
-  "cline_protocol_transitions": 9,
+  "scope": "Current serving delta on native 0.1.52; numerical native and serving checks are separate.",
+  "mode_unit_cases": 14,
+  "serving_unit_cases": 97,
+  "serving_skips": 1,
+  "budget_hardening_cases": 11,
+  "web_fixture": "RU/EN, persistent Adaptive, separate High/Ultra request fields; mocked SSE, no model request",
   "standard_efforts_preserved": true,
   "memory_service_included": false,
   "live_native_window_gui_test": false,
-  "fresh_throughput_measurement": false
+  "cline_current_build_retested": false,
+  "fresh_throughput_measurement": true,
+  "throughput_scope": "Twenty bounded direct API requests for the explicitly authorized CPU scheduling retry; not an agent-quality evaluation."
 }

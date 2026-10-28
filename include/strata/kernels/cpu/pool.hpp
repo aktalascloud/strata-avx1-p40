@@ -247,7 +247,8 @@ public:
     /// read once for all of its tokens.
     void run_split_multi(ExpertJobMulti* jobs, int n);
     /// Plan v0.3 P6: the same for a native pack's layer (ggml-cpu arithmetic, `nact` activations).
-    void run_split_multi_native(const NativeFmt& f, ExpertJobMulti* jobs, int n);
+    void run_split_multi_native(const NativeFmt& f, ExpertJobMulti* jobs, int n,
+                                NativeArithmetic arithmetic = NativeArithmetic::Default);
     // StrataFast PR16 / Francesco Albano: identical native rows in one phase.
     // NUMA-split pools and oversized batches retain the upstream two-phase path.
     void run_fused_native(const NativeFmt& f, ExpertJobMulti* jobs, int n);
@@ -369,6 +370,7 @@ private:
         alignas(64) uint8_t hq[MAXT][kNativeHBytes];   // plan v0.3 P6: native down activations
     };
     const NativeFmt* nfmt_ = nullptr;
+    NativeArithmetic narithmetic_ = NativeArithmetic::Default;
     std::vector<SplitBufMulti> split_multi_;
     struct FusedState {
         alignas(64) std::atomic<int> gu_done{0};

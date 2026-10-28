@@ -111,7 +111,7 @@ def make_config(root, models, manifest, workers, numa, port=8093):
         STRATA_DENSE_F32='1', STRATA_IQ_STAGE_TABLES='1', STRATA_IQ_STAGE_GRID_MMVQ='1',
         STRATA_QFUSE='1', STRATA_GR_NORM_FAST='1', STRATA_B6_MMVQ_ROWS='1', STRATA_EXPDEC='1',
         STRATA_EXPDEC_R='1', STRATA_DF_BRANCH='0', STRATA_PCIE_BALANCE='0', STRATA_SIDE_MIXER='0',
-        STRATA_CKPT_PARK_REUSE='1', STRATA_PF_GROUP_SCRATCH='1', STRATA_POOL_FUSED='0')
+        STRATA_CKPT_PARK_REUSE='1', STRATA_PF_GROUP_SCRATCH='1', STRATA_POOL_FUSED='0', STRATA_POOL_GUIDED='0', STRATA_POOL_GUIDED_MIN='128', STRATA_ROUTE_PRIOR='0')
     return dict(exe=str(root/'runtime/engine/strata.exe'), cwd=str(root/'app'), tokenizer=str(pack/'tokenizer'),
         args=['--pack',str(pack),'--native',str(weights[0]),'--ple-gguf',str(weights[1]),
               '--expert-profile',str(root/'app/data/expert-profile.bin'),'--expert-cache','auto',
