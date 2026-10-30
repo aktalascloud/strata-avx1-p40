@@ -1,14 +1,19 @@
 {
-  "scope": "Current serving delta on native 0.1.52; numerical native and serving checks are separate.",
-  "mode_unit_cases": 14,
-  "serving_unit_cases": 97,
-  "serving_skips": 1,
-  "budget_hardening_cases": 11,
-  "web_fixture": "RU/EN, persistent Adaptive, separate High/Ultra request fields; mocked SSE, no model request",
+  "scope": "Historical mode checks are retained as historical evidence, not renamed to this build. Current source/native qualification is independent.",
+  "source_sha": "870aedd9e1ebe1c91f94da93b59af17729f6c5c0",
+  "historical": {
+    "native_version": "0.1.52",
+    "mode_unit_cases": 14,
+    "serving_unit_cases": 97,
+    "serving_skips": 1,
+    "budget_hardening_cases": 11,
+    "web_fixture": "RU/EN, persistent Adaptive, separate High/Ultra request fields; mocked SSE"
+  },
   "standard_efforts_preserved": true,
   "memory_service_included": false,
+  "author_modes_scope": "Only the specific DavidAU model; Swift uses native High/XHigh and rejects Auto/Adaptive/Ultra.",
   "live_native_window_gui_test": false,
   "cline_current_build_retested": false,
-  "fresh_throughput_measurement": true,
-  "throughput_scope": "Twenty bounded direct API requests for the explicitly authorized CPU scheduling retry; not an agent-quality evaluation."
+  "fresh_throughput_measurement": false,
+  "throughput_scope": "The latest selected measurement keeps its original source/version in BENCHMARKS.md; no new throughput measurement is implied by a release."
 }

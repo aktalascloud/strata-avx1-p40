@@ -1,14 +1,14 @@
 {
-  "tag": "v0.1.53-legacy-gpu-46c152a-c0736323-r2",
-  "source_sha": "46c152a1310f77cd2f0ce2c7cd213962df14fe83",
-  "engine_sha256": "C07363232B5944E35DB0DAB817002F2EA558FC16A2C1E665EDAC1F1F5AE415BF",
-  "zip_name": "Strata-Legacy-GPU-v0.1.53-legacy-gpu-46c152a-c0736323-r2-win-x64.zip",
-  "zip_bytes": 709028461,
-  "zip_sha256": "b28d484113607d05b6d91a256581fedb080f446265a38c468dc357936a2ca76f",
-  "download_url": "https://github.com/aktalascloud/strata-legacy-gpu/releases/download/v0.1.53-legacy-gpu-46c152a-c0736323-r2/Strata-Legacy-GPU-v0.1.53-legacy-gpu-46c152a-c0736323-r2-win-x64.zip",
+  "tag": "v0.1.54-legacy-gpu-870aedd-3bcfb617",
+  "source_sha": "870aedd9e1ebe1c91f94da93b59af17729f6c5c0",
+  "engine_sha256": "3BCFB617FC077CF9C6AEDE3822AD2E2328861CA6935D3A26CA602ED4E93BF283",
+  "zip_name": "Strata-Legacy-GPU-v0.1.54-legacy-gpu-870aedd-3bcfb617-win-x64.zip",
+  "zip_bytes": 709043853,
+  "zip_sha256": "c0d65b3ad3656b274b451fd45989584842afe92d2405d972407f071e304cb4dd",
+  "download_url": "https://github.com/aktalascloud/strata-legacy-gpu/releases/download/v0.1.54-legacy-gpu-870aedd-3bcfb617/Strata-Legacy-GPU-v0.1.54-legacy-gpu-870aedd-3bcfb617-win-x64.zip",
   "weights_included": false,
   "logs_included": false,
   "caches_included": false,
   "credentials_included": false,
-  "qualification": "Exact native/vision/CUDA bytes passed CPU/ISA/private-DLL checks and 27 numerical/graph GPU runs, including the full 5,201-case DenseF32 sweep, BF16 bit parity, checkpoint/MMQ and GDN checks. Offline installer/task/import/package checks passed. Unchanged launcher helpers retain their exact-byte clean-folder/S4U proof. No OS reboot or fresh-Windows test is claimed. Direct model throughput was measured on this exact source; see the source-pinned original/latest record."
+  "qualification": "Exact native/vision/CUDA bytes passed CPU/ISA/private-DLL checks and 27 numerical/graph GPU runs, including the full 5,201-case DenseF32 sweep, BF16 bit parity, checkpoint/MMQ and GDN checks. Offline installer/task/import/package checks passed. Unchanged launcher helpers retain their exact-byte clean-folder/S4U proof. No OS reboot or fresh-Windows test is claimed. Throughput remains tied to the separately identified measured source; this build is not a fresh throughput measurement."
 }

@@ -1,6 +1,6 @@
 # Verification and limits
 
-Native **0.1.53**, official source [46c152a1310f](https://github.com/Niko1221/Strata/commit/46c152a1310f77cd2f0ce2c7cd213962df14fe83). Evidence is bound to exact source, EXE, DLL and library fingerprints.
+Native **0.1.54**, official source [870aedd9e1eb](https://github.com/Niko1221/Strata/commit/870aedd9e1ebe1c91f94da93b59af17729f6c5c0). Evidence is bound to exact source, EXE, DLL and library fingerprints.
 
 - Current CPU: AVX1/router/quantization, no-pin, real Windows NUMA (128 local / 0 remote samples), lifetime and cache checks; arithmetic parity: 4,866,048 finite bitwise comparisons; guided scheduling: 480 cases with each flag value.
 - Current GPU:27 staged numerical/Graph runs, including integrated GDN. Full DenseF32 5,201 cases, BF16 finite/NaN, actual-IQ MMQ, B6/EXPDEC and cache/copy identity passed. The selected Pascal Q8 runtime opt-in additionally passed65 direct + 65 Graph shape/column cases against the original reference tolerance; these supplement, not relabel, the native receipt.

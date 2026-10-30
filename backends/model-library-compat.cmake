@@ -46,3 +46,9 @@ endfunction()
 _strata_library_copy(llama "src/llama-grammar.cpp")
 _strata_library_copy(llama-common "common/jinja/value.cpp")
 _strata_library_copy(ggml-vulkan "ggml/src/ggml-vulkan/ggml-vulkan.cpp")
+
+# PR30454: retain the pinned dependency; compile only its reviewed CPU planner copy.
+_strata_library_copy(ggml-cpu "ggml/src/ggml-cpu/ggml-cpu.c")
+
+# PR31336: the neighbouring generated common.h bounds the model-specific loader.
+_strata_library_copy(llama-common "common/common.cpp")

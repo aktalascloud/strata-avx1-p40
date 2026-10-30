@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index ee059921..3210ef5f 100644
+index ee7e9f1beab0671c01a6da8064cc3bb8873ca7b9..6f73a24890fe62dcb598b766d8afe5a3bf5fdd88 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -99,6 +99,12 @@ option(STRATA_PREFILL_MMQ "Build the optional GGML MMQ prefill path for HIP" OFF
+@@ -124,6 +124,12 @@ endif()
  # HIP a code object loads on first use, so they cost other models nothing there (R9700: the same slots).  Used at run
  # time with STRATA_MMQ_KQ=1 (opt-in: it changes the prompt's rounding against the FP16 path).
  option(STRATA_MMQ_TQ_OVERLAY "Gyro trellis MMQ prompt kernels on an upstream llama.cpp: an overlay of its ggml-cuda headers written at configure time (cmake/strata_ggml_tq_overlay.cmake)" ON)
@@ -15,7 +15,7 @@ index ee059921..3210ef5f 100644
  option(STRATA_MMQ_KQUANTS "Build the MMQ prompt kernels for Q4_K / Q5_K / Q5_1 / Q6_K: the experts of Unsloth's K-quant files, and on HIP the dense GGUF projections (STRATA_DENSE_MMQ)" ON)
  # Q6_K gate/up in the grouped expert kernels (Unsloth's UD-Q6_K_XL, and layer 2 of UD-Q5_K_XL; docs/QUANTS.md).  On by
  # default since MODEL-UPDATE Phase 1: one more instance per grouped kernel in iq_kernels.cu, +19 KB of sm_60 code,
-@@ -758,6 +764,11 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
+@@ -783,6 +789,11 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
      set_tests_properties(expert_cache_slot_guard_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 60)
    endif()
    if(STRATA_BUILD_CONVERSATION_TESTS)
@@ -27,7 +27,7 @@ index ee059921..3210ef5f 100644
      add_executable(conversation_snapshot_test src/core/conversation_snapshot_test.cpp)
      target_link_libraries(conversation_snapshot_test PRIVATE strata_engine)
      add_test(NAME conversation_snapshot_test COMMAND conversation_snapshot_test)
-@@ -774,12 +785,17 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
+@@ -799,12 +810,17 @@ if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)
      target_link_libraries(conversation_validation_test PRIVATE strata_engine)
      add_test(NAME conversation_validation_test COMMAND conversation_validation_test)
      set_tests_properties(conversation_validation_test PROPERTIES ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" TIMEOUT 120)
@@ -46,7 +46,7 @@ index ee059921..3210ef5f 100644
          -Wl,--wrap=cudaDeviceSynchronize -Wl,--wrap=cudaGetLastError)
        target_link_libraries(conversation_transfer_test PRIVATE strata_engine)
        add_test(NAME conversation_transfer_test COMMAND conversation_transfer_test)
-@@ -1807,6 +1823,9 @@ endif()
+@@ -1841,6 +1857,9 @@ endif()
  include(CheckCXXSourceCompiles)
  if(MSVC)
    set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
@@ -56,7 +56,7 @@ index ee059921..3210ef5f 100644
  else()
    set(CMAKE_REQUIRED_FLAGS "-mavx2 -mfma -mf16c")
  endif()
-@@ -2051,6 +2070,11 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -2085,6 +2104,11 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_tq_llama "${strata_llamacpp_SOURCE_DIR}")
      endif()
      include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/strata_ggml_tq_overlay.cmake)
@@ -68,7 +68,7 @@ index ee059921..3210ef5f 100644
      set(_strata_tq_overlay_dir "${CMAKE_BINARY_DIR}/ggml-tq-overlay")
      strata_ggml_tq_overlay("${_strata_tq_llama}" "${_strata_tq_overlay_dir}")
      if(STRATA_TQ_OVERLAY_OK)
-@@ -2080,6 +2104,10 @@ if(STRATA_NATIVE_EXPERTS)
+@@ -2114,6 +2138,10 @@ if(STRATA_NATIVE_EXPERTS)
        set(_strata_gg ${strata_llamacpp_SOURCE_DIR}/ggml)
      endif()
      set(_strata_mmq ${_strata_gg}/src/ggml-cuda)
@@ -79,7 +79,7 @@ index ee059921..3210ef5f 100644
      set(_strata_quantize_cu ${_strata_mmq}/quantize.cu)   # the overlay's copy when the trellis overlay is on: it includes mmq.cuh
      if(_strata_mmq_tq_overlay)
        set(_strata_quantize_cu ${_strata_tq_overlay_dir}/quantize.cu)
-@@ -2510,7 +2538,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
+@@ -2544,7 +2572,22 @@ if(STRATA_ENABLE_CUDA AND STRATA_BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_
  endif()
  
  if(STRATA_BUILD_TESTS)
@@ -102,7 +102,7 @@ index ee059921..3210ef5f 100644
      add_executable(pool_affinity_test src/kernels/cpu/pool_affinity_test.cpp)
      target_link_libraries(pool_affinity_test PRIVATE strata_kernels_cpu)
      add_test(NAME pool_affinity_test COMMAND pool_affinity_test)
-@@ -2639,6 +2682,25 @@ if(STRATA_BUILD_TESTS)
+@@ -2673,6 +2716,25 @@ if(STRATA_BUILD_TESTS)
      target_include_directories(direct_file_async_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
      target_link_libraries(direct_file_async_test PRIVATE Threads::Threads)
      add_test(NAME direct_file_async_test COMMAND direct_file_async_test)
@@ -128,7 +128,7 @@ index ee059921..3210ef5f 100644
    endif()
    # --aux-cpus: the CPU-set derivation (pure) and the placement of live threads; header-only, no GPU
    add_executable(aux_cpus_test tests/platform/aux_cpus_test.cpp)
-@@ -2730,3 +2792,63 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
+@@ -2764,3 +2826,63 @@ if(STRATA_BUILD_DSV41 AND NOT STRATA_ENABLE_CUDA AND NOT STRATA_ENABLE_HIP AND N
      target_compile_definitions(ds4_gg_bench PRIVATE STRATA_DSV41_TQ_CPU=1)
    endif()
  endif()
@@ -194,7 +194,7 @@ index ee059921..3210ef5f 100644
 +endif()
 diff --git a/cmake/strata_ivybridge_o3.cmake b/cmake/strata_ivybridge_o3.cmake
 new file mode 100644
-index 00000000..9db8b4c9
+index 0000000000000000000000000000000000000000..9db8b4c98f48ac99e96215f43f6eef24f45f47d6
 --- /dev/null
 +++ b/cmake/strata_ivybridge_o3.cmake
 @@ -0,0 +1,22 @@
@@ -222,7 +222,7 @@ index 00000000..9db8b4c9
 +endif()
 diff --git a/cmake/strata_pascallama_overlay.cmake b/cmake/strata_pascallama_overlay.cmake
 new file mode 100644
-index 00000000..7cd4ef1a
+index 0000000000000000000000000000000000000000..7cd4ef1a5b3b8b8d840d1b72f96ffd711896a904
 --- /dev/null
 +++ b/cmake/strata_pascallama_overlay.cmake
 @@ -0,0 +1,90 @@
@@ -316,8 +316,21 @@ index 00000000..7cd4ef1a
 +  file(WRITE "${_pascal_stamp}" "${_pascal_record}")
 +  message(STATUS "Experimental P40 MMQ: complete pascallama J96 config and nine DP4A unroll hints; pinned dependency untouched")
 +endfunction()
+diff --git a/include/strata/artifact/gguf_reader.hpp b/include/strata/artifact/gguf_reader.hpp
+index 5800fe94c6b4b4a610733ebfd5a4b7d5578a793b..0908734f2a07eb61e33702045e89706693330274 100644
+--- a/include/strata/artifact/gguf_reader.hpp
++++ b/include/strata/artifact/gguf_reader.hpp
+@@ -295,7 +295,7 @@ class Cursor {
+ public:
+     Cursor(const uint8_t* base, size_t size) : base_(base), size_(size) {}
+     void need(size_t n) const {
+-        if (pos_ + n > size_) throw std::runtime_error("GGUF: unexpected end of file in header");
++        if (n > size_ - pos_) throw std::runtime_error("GGUF: unexpected end of file in header");   // pos_ + n could wrap
+     }
+     template <class T> T read() {
+         need(sizeof(T));
 diff --git a/include/strata/core/conversation_cache.hpp b/include/strata/core/conversation_cache.hpp
-index 34898345..ffb682f1 100644
+index 78ff9f189240434f38c74a836a3db49b3f609380..392ce92d222499a8da17f15c1cbe9e156e270946 100644
 --- a/include/strata/core/conversation_cache.hpp
 +++ b/include/strata/core/conversation_cache.hpp
 @@ -246,8 +246,8 @@ public:
@@ -366,7 +379,7 @@ index 34898345..ffb682f1 100644
      bool evict_oldest() {
          // the oldest entry that holds no pinned shared prefix and is not the guarded (borrowed) donor
          for (size_t i = 0; i < entries_.size(); ++i) {
-@@ -509,6 +519,8 @@ private:
+@@ -536,6 +546,8 @@ private:
      std::deque<uint64_t> serials_;          // entries_[i]'s identity, never reused
      uint64_t next_serial_ = 1, guarded_ = 0;
      bool guard_blocked_ = false;
@@ -376,10 +389,10 @@ index 34898345..ffb682f1 100644
  };
  
 diff --git a/include/strata/core/expert_source.hpp b/include/strata/core/expert_source.hpp
-index 2bcfca39..b53e8444 100644
+index 45ac7f7427fab534d9c50001fa680723101ff186..ee809cce517e58a659539a1a1721749fb2845d09 100644
 --- a/include/strata/core/expert_source.hpp
 +++ b/include/strata/core/expert_source.hpp
-@@ -43,6 +43,10 @@
+@@ -44,6 +44,10 @@
  #include <utility>
  #include <string>
  #include <vector>
@@ -390,7 +403,7 @@ index 2bcfca39..b53e8444 100644
  
  namespace strata::kernels::cpu {
  struct ExpertLayout;
-@@ -1304,9 +1308,24 @@ public:
+@@ -1315,9 +1319,24 @@ public:
      double load_seconds() const { return load_seconds_; }
      double load_read_seconds() const { return load_read_s_; }
      double load_copy_seconds() const { return load_copy_s_; }
@@ -416,7 +429,7 @@ index 2bcfca39..b53e8444 100644
      uint64_t map_bytes_ = 0;
      std::vector<const uint8_t*> dev_slice_;   ///< device alias of each registered slice (or of the whole range)
 diff --git a/include/strata/kernels/cpu/pool.hpp b/include/strata/kernels/cpu/pool.hpp
-index 64c4a6cd..1cd49f39 100644
+index 64c4a6cd28de661d40f7c23306db6158e6090d0d..1cd49f39c1b61162b7616a651a8e9fd59a61d199 100644
 --- a/include/strata/kernels/cpu/pool.hpp
 +++ b/include/strata/kernels/cpu/pool.hpp
 @@ -249,6 +249,9 @@ public:
@@ -447,7 +460,7 @@ index 64c4a6cd..1cd49f39 100644
      // part the resident complement places on node k in step B), and each node's threads claim and count on their own
 diff --git a/include/strata/platform/cpu_pinning.hpp b/include/strata/platform/cpu_pinning.hpp
 new file mode 100644
-index 00000000..6108086c
+index 0000000000000000000000000000000000000000..6108086ca1b9c4f81a4ca27ee7ca4373a0314cd1
 --- /dev/null
 +++ b/include/strata/platform/cpu_pinning.hpp
 @@ -0,0 +1,14 @@
@@ -467,7 +480,7 @@ index 00000000..6108086c
 +}  // namespace strata
 diff --git a/include/strata/platform/win_numa_arena.hpp b/include/strata/platform/win_numa_arena.hpp
 new file mode 100644
-index 00000000..2eced255
+index 0000000000000000000000000000000000000000..2eced255448ccd82a7c9edace6d5236e8763f0ec
 --- /dev/null
 +++ b/include/strata/platform/win_numa_arena.hpp
 @@ -0,0 +1,94 @@
@@ -566,7 +579,7 @@ index 00000000..2eced255
 +} // namespace strata::platform::win_numa
 +#endif
 diff --git a/serve/dsml.py b/serve/dsml.py
-index c885e970..8416b294 100644
+index c885e9703251450a62cf5e52092068eb9d208183..8416b294476115086a896c229c9a93a4c880cbb4 100644
 --- a/serve/dsml.py
 +++ b/serve/dsml.py
 @@ -187,6 +187,7 @@ class DsmlOutputParser(OutputParser):
@@ -587,7 +600,7 @@ index c885e970..8416b294 100644
 +    text = to_dsml_force(force)
 +    return text.replace('<｜DSML｜ calls>', '<｜DSML｜tool_calls>').replace('<｜DSML｜ invoke', '<｜DSML｜invoke') if text else text
 diff --git a/serve/frontend.py b/serve/frontend.py
-index 63e319b8..ab4edb89 100644
+index 3b3cdeb17a37e533a6f49f543de838d1f9387b22..ee62f5c3158451a16f7a229e4e98a532b51482e7 100644
 --- a/serve/frontend.py
 +++ b/serve/frontend.py
 @@ -26,6 +26,7 @@ from dataclasses import dataclass, field
@@ -752,7 +765,26 @@ index 63e319b8..ab4edb89 100644
      return _env_to_user(_late_system_to_user(messages)), tools, kwargs
  
  
-@@ -1188,7 +1239,19 @@ class OutputParser:
+@@ -953,8 +1004,17 @@ class _Lenient:
+                 self.i += 1
+                 e = s[self.i:self.i + 1]
+                 if e == "u" and re.fullmatch(r"[0-9a-fA-F]{4}", s[self.i + 1:self.i + 5]):
+-                    out.append(chr(int(s[self.i + 1:self.i + 5], 16)))
++                    code = int(s[self.i + 1:self.i + 5], 16)
+                     self.i += 5
++                    # JSON's escaped UTF-16 surrogate pair denotes one Unicode scalar.
++                    if 0xD800 <= code <= 0xDBFF and s[self.i:self.i + 2] == "\\u" and re.fullmatch(r"[0-9a-fA-F]{4}", s[self.i + 2:self.i + 6]):
++                        low = int(s[self.i + 2:self.i + 6], 16)
++                        if 0xDC00 <= low <= 0xDFFF:
++                            code = 0x10000 + ((code - 0xD800) << 10) + low - 0xDC00
++                            self.i += 6
++                    if 0xD800 <= code <= 0xDFFF:
++                        raise ValueError("unpaired unicode surrogate")
++                    out.append(chr(code))
+                     continue
+                 if e not in self._ESC:
+                     raise ValueError("bad escape")
+@@ -1356,7 +1416,19 @@ class OutputParser:
                  self._call_end_checked = len(self.buf)
                  return -1
              self._call_end_checked = -1
@@ -769,11 +801,11 @@ index 63e319b8..ab4edb89 100644
 +        return body.strip()[len(FUNC_START):].split(">", 1)[0]
 +
 +    def _parse_body(self, body: str, schema):
-+        return parse_tool_call(body, schema)
++        return parse_tool_call(body, schema, self.notes)
  
      def _scan(self) -> list[Event]:
          """Advance the streaming view of the call body in self.buf (see stream_tools)."""
-@@ -1207,7 +1270,9 @@ class OutputParser:
+@@ -1375,7 +1447,9 @@ class OutputParser:
                  raw_name = rest[a + 10:b]
                  name = raw_name.strip()
                  name = self.aliases.get(name, name)
@@ -784,7 +816,7 @@ index 63e319b8..ab4edb89 100644
                      return out
                  self.scall = ToolCall(name=name, arguments={})
                  props = ((self.schemas.get(name) or {}).get("parameters") or {}).get("properties") or {}
-@@ -1216,6 +1281,8 @@ class OutputParser:
+@@ -1384,6 +1458,8 @@ class OutputParser:
                  args("{")
                  self.sp += b + 1
                  self.ss = "between"
@@ -793,12 +825,17 @@ index 63e319b8..ab4edb89 100644
              elif self.ss == "between":
                  stripped = rest.lstrip()
                  self.sp += len(rest) - len(stripped)
-@@ -1322,14 +1389,14 @@ class OutputParser:
+@@ -1491,18 +1567,18 @@ class OutputParser:
                  # #804: a `<tool_call>` inside the reasoning, with tools declared.  It is held whole (never streamed
                  # as a call) until it ends: a declared name is then a tool call, anything else stays reasoning text.
                  body = self.buf[len(CALL_START):]
 -                end, think = call_end(body), body.find(THINK_END)
 +                end, think = self._body_end(body), body.find(THINK_END)
+                 drop = len(CALL_END)
+-                f = function_end(body)               # #4427: as in the answer, a following call opener confirms an omitted closer
++                f = -1 if self.native_call_format else function_end(body)               # #4427: as in the answer, a following call opener confirms an omitted closer
+                 if f >= 0 and (end < 0 or f < end) and re.match(r"<tool_call>\s*<function=\s*[^<>\s]+\s*>", body[f:].lstrip()):
+                     end, drop = f, 0
                  if end >= 0 and (think < 0 or think >= end):
                      call = None
                      try:
@@ -806,12 +843,12 @@ index 63e319b8..ab4edb89 100644
 +                        name = self._body_name(body[:end]).strip()
                          name = self.aliases.get(name, name)
                          if name in self.schemas:
--                            call = parse_tool_call(body[:end], self.schemas.get(name))
+-                            call = parse_tool_call(body[:end], self.schemas.get(name), self.notes)
 +                            call = self._parse_body(body[:end], self.schemas.get(name))
                              call.name = name
                      except ValueError:
                          pass
-@@ -1452,6 +1519,10 @@ class OutputParser:
+@@ -1638,6 +1714,10 @@ class OutputParser:
                      out.append(Event("content", self._track(self.buf[:i + len(CALL_START)])))
                      self.buf = self.buf[i + len(CALL_START):]
                      continue
@@ -822,7 +859,7 @@ index 63e319b8..ab4edb89 100644
                  # A call is `<tool_call>` and then (after whitespace) `<function=`; the tag with anything else after
                  # it is prose that names the format ("I'll use a <tool_call> block") - content, not a malformed call
                  # that ends the request.  Until its follower has arrived it is held, like a partial tag.
-@@ -1582,7 +1653,7 @@ class OutputParser:
+@@ -1768,7 +1848,7 @@ class OutputParser:
                  self.buf = self.buf[i + drop:]
                  batch, self.batch = self.batch, False
                  out += self._finish_call(body)
@@ -831,7 +868,7 @@ index 63e319b8..ab4edb89 100644
                      self.state, self.lead = "call", False
  
      def finish(self, reason: str | None = None) -> list[Event]:
-@@ -1614,6 +1685,14 @@ class OutputParser:
+@@ -1821,6 +1901,14 @@ class OutputParser:
              return out
          if self.state == "reasoning" and self.buf == THINK_END:   # the output ends on a held `</think>`: its end
              self.buf, self.state = "", "content"
@@ -846,7 +883,7 @@ index 63e319b8..ab4edb89 100644
          if self.buf:
              # an unfinished call inside the reasoning (#804) is reasoning text, never a call
              kind = {"reasoning": "reasoning", "rcall": "reasoning", "content": "content"}.get(self.state, "content")
-@@ -1625,14 +1704,18 @@ class OutputParser:
+@@ -1832,14 +1920,18 @@ class OutputParser:
      def _finish_call(self, body: str) -> list[Event]:
          """A whole call body in the template's form -> its tool_call event.  With recover, one that still does not
          parse is the text it is instead of an error that ends the request."""
@@ -862,14 +899,14 @@ index 63e319b8..ab4edb89 100644
          try:
              if raw_name != raw_name.strip() and name not in self.schemas:
                  raise ValueError("whitespace tool name is not declared")
--            call = parse_tool_call(body, self.schemas.get(name))
+-            call = parse_tool_call(body, self.schemas.get(name), self.notes)
 +            call = self._parse_body(body, self.schemas.get(name))
              call.name = name
          except ValueError:
              if not self.recover:
 diff --git a/serve/glm.py b/serve/glm.py
 new file mode 100644
-index 00000000..1fc25263
+index 0000000000000000000000000000000000000000..1fc25263fce50b3b1d23800a2a3448dd94756372
 --- /dev/null
 +++ b/serve/glm.py
 @@ -0,0 +1,167 @@
@@ -1042,7 +1079,7 @@ index 00000000..1fc25263
 +    return CALL_START + name
 diff --git a/serve/model_backends.py b/serve/model_backends.py
 new file mode 100644
-index 00000000..f7af7606
+index 0000000000000000000000000000000000000000..f7af76068a0488919a2c4c2cc890097544bc675b
 --- /dev/null
 +++ b/serve/model_backends.py
 @@ -0,0 +1,53 @@
@@ -1099,9 +1136,42 @@ index 00000000..f7af7606
 +    if any(k in sampling for k in ('repetition_penalty','frequency_penalty','presence_penalty')) and 'penalty_last_n' not in sampling:
 +        result.append('penalty_last_n=64')
 +    return (' '+' '.join(result)) if result else ''
+diff --git a/serve/model_identity.py b/serve/model_identity.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..82d052da491d48550e0988298ac1f6a02e7193c7
+--- /dev/null
++++ b/serve/model_identity.py
+@@ -0,0 +1,27 @@
++"""OpenAI-compatible machine IDs are distinct from human display names."""
++import hashlib
++import re
++
++_ALLOWED = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*\Z")
++
++
++def public_model_id(value):
++    if not isinstance(value, str) or not value.strip():
++        raise ValueError("Model ID must be a nonempty string")
++    if _ALLOWED.fullmatch(value):
++        return value
++    result = re.sub(r"[^A-Za-z0-9._:/-]+", "-", value.strip()).strip("-./:")
++    if not result:
++        result = "model-" + hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
++    if not result[0].isascii() or not result[0].isalnum():
++        result = "model-" + result
++    return result
++
++
++def configured_model_id(cfg, fallback):
++    explicit = cfg.get("api_model_id")
++    if explicit is not None:
++        if not isinstance(explicit, str) or public_model_id(explicit) != explicit:
++            raise ValueError("api_model_id must contain only portable ID characters, without spaces")
++        return explicit
++    return public_model_id(cfg.get("model_name") or fallback)
 diff --git a/serve/reason_modes.py b/serve/reason_modes.py
 new file mode 100644
-index 00000000..f9ea39c1
+index 0000000000000000000000000000000000000000..f9ea39c15620da6b490634f7633ed5c98af3ed20
 --- /dev/null
 +++ b/serve/reason_modes.py
 @@ -0,0 +1,888 @@
@@ -1994,7 +2064,7 @@ index 00000000..f9ea39c1
 +            result=result.replace(ba,ba+"\n\n"+bridge+"\n\n"+bb,1)
 +        return result
 diff --git a/serve/responses.py b/serve/responses.py
-index d5ea4cd0..bb25b7c6 100644
+index d5ea4cd00bd04f96c069964aa41c51ae63c4dc61..bb25b7c6e16c86964fb6f943536610056acf6275 100644
 --- a/serve/responses.py
 +++ b/serve/responses.py
 @@ -458,7 +458,7 @@ def template_kwargs(req: dict, shared: dict) -> dict:
@@ -2007,7 +2077,7 @@ index d5ea4cd0..bb25b7c6 100644
          raise ResponsesError(str(e), "reasoning.effort") from None
  
 diff --git a/serve/runconfig.py b/serve/runconfig.py
-index 3448db06..3d147149 100644
+index 3448db06460edef4c5c8dc68821bdb8ce5d5d932..3d147149cb840c84aa8fdaf868f8fc46f00183d7 100644
 --- a/serve/runconfig.py
 +++ b/serve/runconfig.py
 @@ -20,6 +20,8 @@ from strata_control import atomic as _atomic_mod
@@ -2020,10 +2090,19 @@ index 3448db06..3d147149 100644
       "Default temperature for requests that send none (0 = greedy; without it the model card's: 1.0 thinking, 0.7 not)"),
      ("sampling.top_p", ("sampling", "0<x<=1"), "Default top_p for requests that send none"),
 diff --git a/serve/server.py b/serve/server.py
-index 8c5213b1..2a74c326 100644
+index 5614dbf1eaf3ba1820b61a13d7eb5cc22f4e791a..ccc5d7772bbb958ecb735f08d1a10f8f9a662c55 100644
 --- a/serve/server.py
 +++ b/serve/server.py
-@@ -94,7 +94,11 @@ IMAGE_PAD = "<|image_pad|>"
+@@ -26,6 +26,8 @@ talks to it over stdin/stdout; `MockEngine` is a scripted stand-in that makes ev
+ """
+ from __future__ import annotations
+ 
++from serve.model_identity import public_model_id, configured_model_id
++
+ import argparse
+ import contextlib
+ import collections
+@@ -94,7 +96,11 @@ IMAGE_PAD = "<|image_pad|>"
  def popen(what: str, args: list, role: str = "engine", **kw):
      """#735: subprocess.Popen, but Windows' refusal to start a program (WinError 4551, or 1260 when a policy blocks it:
      Smart App Control on a clean Windows 11 blocks an exe that is not signed) is said in words instead of a bare
@@ -2036,7 +2115,7 @@ index 8c5213b1..2a74c326 100644
      try:
          return lifeline.popen(args, role, **kw)       # a child that cannot outlive this server (serve/lifeline.py)
      except OSError as e:
-@@ -1392,6 +1396,12 @@ class StrataEngine:
+@@ -1404,6 +1410,12 @@ class StrataEngine:
              if time.time() > deadline:
                  raise EngineDied("the engine did not answer the VRAM command")
  
@@ -2049,7 +2128,7 @@ index 8c5213b1..2a74c326 100644
      @staticmethod
      def sampling_keys(sampling: dict) -> str:
          keys = ""
-@@ -1815,7 +1825,7 @@ class StrataEngine:
+@@ -1827,7 +1839,7 @@ class StrataEngine:
              raise EngineDied("the engine is unavailable; this request was not sent")
          self.progress, self.progress_ms, self.reused = None, 0, 0
          born = self.gen                                 # the engine process this request is sent to
@@ -2058,7 +2137,7 @@ index 8c5213b1..2a74c326 100644
          # logprobs: only an admission's token can have an LP line here (the slot's "BT" lines carry none), so the
          # server refuses these requests unless max_tokens is 1.  The lines go to the request itself, through its
          # cancel Event: several requests read control lines at once, and the engine's lp_lines is one attribute.
-@@ -2235,6 +2245,9 @@ class StrataEngine:
+@@ -2247,6 +2259,9 @@ class StrataEngine:
          if not self.alive():
              raise EngineDied("the engine is unavailable; this request was not sent")
          bias_api.validate_request(sampling or {}, self, None)
@@ -2068,7 +2147,7 @@ index 8c5213b1..2a74c326 100644
          if getattr(self, "batch", 0):
              yield from self.generate_batched(ids, max_new, sampling, cancel, embeddings)
              return
-@@ -2247,8 +2260,8 @@ class StrataEngine:
+@@ -2259,8 +2274,8 @@ class StrataEngine:
          self.lp_lines = LPLines(cancel)
          carry = NO_LINE                  # a line read for a token's LP line, held until it is used
          # an image request takes the same sampling keys as text (#75: it used to decode greedily whatever was asked)
@@ -2079,7 +2158,7 @@ index 8c5213b1..2a74c326 100644
          if prefill_only:                                 # split serving (serve/split.py): read the prompt, make no token
              if embeddings or int(max_new) != 0:
                  raise ValueError("prefill_only is a text prompt and max_new 0")
-@@ -2375,6 +2388,8 @@ class StrataEngine:
+@@ -2387,6 +2402,8 @@ class StrataEngine:
                      if line.startswith("DONE"):
                          self._parse_done(line)
                          break
@@ -2088,7 +2167,7 @@ index 8c5213b1..2a74c326 100644
                      if not self.can_stop:
                          heard = time.monotonic()
  
-@@ -3150,6 +3165,9 @@ def engine_args(cfg: dict) -> list[str]:
+@@ -3162,6 +3179,9 @@ def engine_args(cfg: dict) -> list[str]:
      """The engine's arguments: the config's, and with several GPUs the layer split across them ("layer_split" in the
      config: "auto" by default, or the first layer of each later GPU's share, e.g. "18" or "16,32"; see
      layer_split_value)."""
@@ -2098,7 +2177,7 @@ index 8c5213b1..2a74c326 100644
      args = list(cfg["args"])
      # "user_args" (strata_control/user_args.py): the options the person set by hand, over the generated ones at every start,
      # so a setup run or the app rewriting "args" cannot undo them (#3216 #3215 #3270)
-@@ -3577,7 +3595,7 @@ def child_env(cfg: dict, *, offline: bool = False) -> dict:
+@@ -3592,7 +3612,7 @@ def child_env(cfg: dict, *, offline: bool = False) -> dict:
          env["HIP_VISIBLE_DEVICES"] = ""
      elif hip_visible(cfg) and cfg.get("backend") == "hip":   # AMD: numbered as HIP numbers them (hip_visible)
          env["HIP_VISIBLE_DEVICES"] = ",".join(str(i) for i in hip_visible(cfg))
@@ -2107,7 +2186,24 @@ index 8c5213b1..2a74c326 100644
          env["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"      # own default order (fastest first) can number the cards otherwise
          env["CUDA_VISIBLE_DEVICES"] = ",".join(str(i) for i in ordered_gpus(cfg))
      for k, v in (cfg.get("env") or {}).items():      # engine settings the config carries (AMD: the GEMM tuning table)
-@@ -4063,6 +4081,10 @@ class Service:
+@@ -3979,8 +3999,14 @@ def slot_save_dir(value, base: str | None = None) -> str:
+ class Service:
+     def __init__(self, engine: Engine, tokenizer, template: ChatTemplate, model_name: str = "qwen3.8-flash-next",
+                  vision: Vision | None = None, sampling_defaults: dict | None = None,
+-                 fit_max_tokens: bool = True):
+-        self.engine, self.tok, self.template, self.model, self.vision = engine, tokenizer, template, model_name, vision
++                 fit_max_tokens: bool = True, display_name: str | None = None):
++        self.engine, self.tok, self.template, self.model, self.vision = engine, tokenizer, template, public_model_id(model_name), vision
++        if display_name is not None and not isinstance(display_name, str):
++            raise ValueError("display_name must be a string")
++        self.display_name = display_name or model_name
++        self._original_model_names = {model_name, self.display_name, self.model}
++        self._model_name_map = {name: self.model for name in self._original_model_names}
++        self.alias_display_names = {}
+         self.literals = literal_tags(getattr(tokenizer, "control_tokens", ()))   # texts that stay text inside a message
+         self.fit_max_tokens = fit_max_tokens          # default: clamp the output cap to the room left; False (--no-fit-max-tokens) = 400
+         self.aliases: list[str] = []                  # #297: other names of the model (the config's `aliases`)
+@@ -4097,6 +4123,10 @@ class Service:
      def set_family(self, family: str | None) -> None:
          """A family whose text differs from the Qwen form this server was written for (DeepSeek-V4.1: its own end
          token, DSML tool calls, reasoning-effort words).  The others keep the defaults."""
@@ -2118,7 +2214,7 @@ index 8c5213b1..2a74c326 100644
          self.family = family
          if family == "deepseek41":
              from serve import dsml
-@@ -4070,6 +4092,33 @@ class Service:
+@@ -4104,6 +4134,33 @@ class Service:
              self.stop_ids = {int(eos)}
              self.parser_cls = dsml.DsmlOutputParser
              self._force_text = dsml.to_dsml_force
@@ -2152,7 +2248,43 @@ index 8c5213b1..2a74c326 100644
          import serve.frontend as _frontend
          _frontend.use_family(family)
  
-@@ -4603,9 +4652,42 @@ class Service:
+@@ -4289,19 +4346,29 @@ class Service:
+         if not isinstance(aliases, list) or not all(isinstance(x, str) for x in aliases):
+             raise ValueError(f"aliases={aliases!r}: expected a list of model names")
+         names = []
+-        for x in (x.strip() for x in aliases):
+-            if x and x != self.model and x not in names:
+-                names.append(x)
++        self._model_name_map = {name: self.model for name in self._original_model_names}
++        self.alias_display_names = {}
++        for display in (x.strip() for x in aliases):
++            if not display:
++                continue
++            canonical = public_model_id(display)
++            self._model_name_map[display] = canonical
++            self._model_name_map[canonical] = canonical
++            if canonical != self.model and canonical not in names:
++                names.append(canonical)
++                self.alias_display_names[canonical] = display
+         self.aliases = names
+ 
+     def model_names(self) -> list[str]:
+         return [self.model, *self.aliases]
+ 
++    def resolve_model_name(self, asked):
++        return self._model_name_map.get(asked) if isinstance(asked, str) else None
++
+     def model_for(self, req) -> str:
+-        """The name to answer with: the request's own when it is the model's name or an alias (#297), else the model's.
+-        Other names are still served, as before."""
++        """Advertised and reply IDs are portable; exact legacy display names remain accepted."""
+         asked = req.get("model") if isinstance(req, dict) else None
+-        return asked if isinstance(asked, str) and asked in self.aliases else self.model
++        return self.resolve_model_name(asked) or self.model
+ 
+     def reported_ctx(self) -> int:
+         """The context the endpoints report (/v1/status, /v1/models, /props, /health, /slots, /metrics): the engine's,
+@@ -4637,9 +4704,42 @@ class Service:
                      print(f"[strata] idle unload: {e}", flush=True)
          threading.Thread(target=loop, daemon=True).start()
  
@@ -2196,7 +2328,7 @@ index 8c5213b1..2a74c326 100644
          if self.shared_path:
              try:
                  if self.shared:
-@@ -4955,6 +5037,7 @@ class Service:
+@@ -4991,6 +5091,7 @@ class Service:
          """-> (ids, thinking, max_new). An unset or non-positive max_new (some clients send -1) means "unlimited":
          the rest of the context.  `force` (forced_call): without thinking the reply starts with it, so it ends the
          prompt; with thinking, Service.run writes it once the thinking is over."""
@@ -2204,7 +2336,7 @@ index 8c5213b1..2a74c326 100644
          # `cancel` (#1999): set when the client hangs up; the downloads, the wait for the turn and the encodes stop
          # between pictures and raise ClientGone
          # Cached tool images are references in browser history, never arbitrary file paths or huge base64 strings.
-@@ -5243,11 +5326,13 @@ class Service:
+@@ -5279,11 +5380,13 @@ class Service:
          """Yields ("event", Event) as text arrives, then ("done", {"finish": .., "completion_tokens": ..}).
          `force` (forced_call): the opening of the call the reply must make - see prepare()."""
          # the model card's sampling for this thinking state, then the config's block, then the Chat settings shared with
@@ -2222,7 +2354,7 @@ index 8c5213b1..2a74c326 100644
          # #123: read after the merge, so a budget shared through POST /settings is seen like the other keys
          budget = self.reasoning_budget(sampling) if thinking else None
          if thinking and not budget and self.answer_room and max_new and max_new >= ANSWER_ROOM_MIN_CAP:
-@@ -5618,12 +5703,24 @@ class Service:
+@@ -5654,12 +5757,24 @@ class Service:
                              text = "\n" * (2 - (len(tail) - len(tail.rstrip("\n")))) + force
                          force = None
                          extra = self.tok.encode(text, parse_special=True)
@@ -2250,7 +2382,7 @@ index 8c5213b1..2a74c326 100644
                              n += 1
                              raw_ids.append(t)
                              thinking_n += parser.state in ("reasoning", "rcall")
-@@ -7092,7 +7189,7 @@ def make_handler(svc: Service):
+@@ -7136,7 +7251,7 @@ def make_handler(svc: Service):
                  self._json(200, {"status": "ok", "max_context": svc.reported_ctx(), "model": svc.model,
                                   "images": svc.vision is not None, "api_key": bool(svc.api_key),
                                   "image_generation": svc.images is not None,
@@ -2259,7 +2391,7 @@ index 8c5213b1..2a74c326 100644
              elif path.startswith("/v1/images/files/"):
                  # response_format url: the name (32 random hex digits) is the access, as an OpenAI image URL is
                  f = svc.images.file(path[len("/v1/images/files/"):]) if svc.images is not None else None
-@@ -7106,6 +7203,8 @@ def make_handler(svc: Service):
+@@ -7150,6 +7265,8 @@ def make_handler(svc: Service):
                  self.send_header("Content-Length", str(len(body)))
                  self.end_headers()
                  self.wfile.write(body)
@@ -2268,20 +2400,50 @@ index 8c5213b1..2a74c326 100644
              elif path == "/status":
                  if not self._authorized():                  # #212: it shows the end of the last answer
                      return
-@@ -7123,8 +7222,11 @@ def make_handler(svc: Service):
+@@ -7167,8 +7284,11 @@ def make_handler(svc: Service):
              elif path in ("/v1/models", "/models"):
                  if self._authorized():
                      loaded = svc.loaded()
+-                    model = {"id": svc.model, "object": "model", "status": {"value": "loaded"},
+-                             "meta": {"n_ctx": svc.reported_ctx()},
 +                    ctx = svc.reported_ctx()
 +                    # the context size under the names other APIs use too (vLLM's max_model_len, OpenRouter's
 +                    # context_length), so a client that sizes its window from /v1/models reads it
-                     model = {"id": svc.model, "object": "model", "status": {"value": "loaded"},
--                             "meta": {"n_ctx": svc.reported_ctx()},
++                    model = {"id": svc.model, "object": "model", "display_name": svc.display_name, "status": {"value": "loaded"},
 +                             "max_model_len": ctx, "context_length": ctx, "meta": {"n_ctx": ctx, "supportsAuthorModes": bool(getattr(svc.template, "author_modes", None) and svc.template.author_modes.supported)},
                               "architecture": {"input_modalities": ["text", "image"] if svc.vision is not None else ["text"],
                                                "output_modalities": ["text"]}}
                      if not loaded and (svc.idle_unload_s or getattr(svc.engine, "unloaded", False)):
-@@ -7588,6 +7690,7 @@ def make_handler(svc: Service):
+@@ -7176,7 +7296,7 @@ def make_handler(svc: Service):
+                         loaded = True
+                     if svc.aliases:                       # #297: the aliases, and each one listed under its own id
+                         model["aliases"] = list(svc.aliases)
+-                    data = [model, *({**model, "id": x, "alias_of": svc.model} for x in svc.aliases)]
++                    data = [model, *({**model, "id": x, "display_name": svc.alias_display_names.get(x, x), "alias_of": svc.model} for x in svc.aliases)]
+                     data = data if loaded else []
+                     if svc.images is not None:            # the image model: POST /v1/images/generations
+                         data.append({"id": svc.images.model, "object": "model", "status": {"value": "loaded"},
+@@ -7432,8 +7552,8 @@ def make_handler(svc: Service):
+             self._json(200, gen.response(images, job, figures, f"{scheme}://{host}"))
+ 
+         def _props(self):
+-            model = parse_qs(urlsplit(self.path).query).get("model", [svc.model])[0]
+-            if model not in svc.model_names():
++            model = svc.resolve_model_name(parse_qs(urlsplit(self.path).query).get("model", [svc.model])[0])
++            if model is None:
+                 self._json(404, {"error": {"message": "model not found"}})
+                 return
+             if not svc.loaded() and not getattr(svc.engine, "unloaded", False):
+@@ -7447,7 +7567,7 @@ def make_handler(svc: Service):
+             params["n_predict"] = svc.shared.get("max_tokens", -1)
+             props = {"default_generation_settings": {"n_ctx": svc.reported_ctx(), "params": params},
+                      "total_slots": max(1, int(getattr(svc.engine, "batch", 0) or 0)),   # #1004: the batch slots
+-                     "model_alias": svc.model, "chat_template": svc.template.source,
++                     "model_alias": svc.model, "display_name": svc.display_name, "chat_template": svc.template.source,
+                      "chat_template_caps": svc.template.caps,
+                      "modalities": {"vision": svc.vision is not None}, "models_autoload": hasattr(svc.engine, "restart"),
+                      "is_sleeping": not svc.loaded()}
+@@ -7632,6 +7752,7 @@ def make_handler(svc: Service):
                  items.close()
  
          def _openai(self, req):
@@ -2289,7 +2451,7 @@ index 8c5213b1..2a74c326 100644
              req = svc.with_shared(req, "openai")
              bias_api.normalize(req.get("logit_bias"), len(getattr(svc.tok, "tokens", ())) or None)
              messages, tools, kw = openai_to_messages(req)
-@@ -7600,7 +7703,7 @@ def make_handler(svc: Service):
+@@ -7644,7 +7765,7 @@ def make_handler(svc: Service):
              if validator is not None and (tools or req.get("strata_mcp")):
                  raise ValueError("structured response_format with tools/MCP is not supported")
              svc.load()
@@ -2298,7 +2460,7 @@ index 8c5213b1..2a74c326 100644
              # No cap of our own on the reply's length when logprobs are asked for: the reply is already bounded by
              # max_tokens (by the rest of the context when it is not sent), which is the only bound OpenAI and vLLM
              # put on it either.  A reply that is not streamed does hold every entry (its token, bytes and up to 20
-@@ -7648,10 +7751,20 @@ def make_handler(svc: Service):
+@@ -7692,10 +7813,20 @@ def make_handler(svc: Service):
              if not req.get("stream"):
                  return self._json(200, openai_collect(chunks))
              self._sse()
@@ -2319,7 +2481,7 @@ index 8c5213b1..2a74c326 100644
                      else:
                          self.wfile.write(b"data: " + json.dumps(c, ensure_ascii=False).encode() + b"\n\n")
                      self.wfile.flush()
-@@ -7693,6 +7806,7 @@ def make_handler(svc: Service):
+@@ -7737,6 +7868,7 @@ def make_handler(svc: Service):
          def _responses(self, req):
              """#451: POST /v1/responses - OpenAI's Responses API, stateless (serve/responses.py), on the chat path.
              Errors use the Responses format; once the stream has started they arrive as a response.failed event."""
@@ -2327,7 +2489,7 @@ index 8c5213b1..2a74c326 100644
              try:
                  title = (responses_api.thread_title_events(req, svc.model_for(req))
                           if svc.codex_thread_titles else None)
-@@ -7853,6 +7967,7 @@ def make_handler(svc: Service):
+@@ -7897,6 +8029,7 @@ def make_handler(svc: Service):
          def _count_tokens(self, req):
              """Anthropic's token count, which Claude Code asks for its context figures: the prompt this server would
              read for the same request, rendered and tokenized - the model does not run."""
@@ -2335,7 +2497,7 @@ index 8c5213b1..2a74c326 100644
              req = svc.with_shared(req, "anthropic")
              messages, tools, kw = anthropic_to_messages(req, svc.anthropic_think_unasked)
              stop_strings(req)                                 # the same 400 as the request itself would get
-@@ -7860,6 +7975,7 @@ def make_handler(svc: Service):
+@@ -7904,6 +8037,7 @@ def make_handler(svc: Service):
              self._json(200, {"input_tokens": len(svc.encode_prompt(messages, tools, kw, store=False))})
  
          def _anthropic(self, req):
@@ -2343,7 +2505,7 @@ index 8c5213b1..2a74c326 100644
              svc.load()
              req = svc.with_shared(req, "anthropic")
              messages, tools, kw = anthropic_to_messages(req, svc.anthropic_think_unasked)
-@@ -7867,7 +7983,7 @@ def make_handler(svc: Service):
+@@ -7911,7 +8045,7 @@ def make_handler(svc: Service):
              if tool_choice_of(req.get("tool_choice"))[0] == "none":   # Anthropic's {"type": "none"}: no tools offered
                  tools = None
              force = svc.force_text(forced_call(req.get("tool_choice"), tools))        # "any" / {"type": "tool", "name": N}
@@ -2352,7 +2514,7 @@ index 8c5213b1..2a74c326 100644
              svc.reasoning_budget(req)                         # a bad value is a 400 before anything is sent
              stop_strings(req)                                 # ... and so is a bad stop / stop_sequences
              check_request_sampling(req)                       # ... and a sampling field of the wrong type
-@@ -8226,7 +8342,7 @@ def origins_of(value, key: str, wildcard: bool) -> list[str]:
+@@ -8270,7 +8404,7 @@ def origins_of(value, key: str, wildcard: bool) -> list[str]:
      return out
  
  
@@ -2361,7 +2523,7 @@ index 8c5213b1..2a74c326 100644
                 "experimental_speed_projection")
  
  
-@@ -8242,8 +8358,10 @@ def clean_shared_defaults(d) -> dict:
+@@ -8286,8 +8420,10 @@ def clean_shared_defaults(d) -> dict:
              continue
          number = isinstance(value, (int, float)) and not isinstance(value, bool)
          if key == "reasoning_effort":
@@ -2373,7 +2535,7 @@ index 8c5213b1..2a74c326 100644
          elif key == "temperature":
              if not number or not 0 <= value <= 2:
                  raise ValueError("temperature: 0..2")
-@@ -8350,6 +8468,8 @@ def apply_saved_tuning(cfg: dict, *, say=None) -> dict:
+@@ -8394,6 +8530,8 @@ def apply_saved_tuning(cfg: dict, *, say=None) -> dict:
      Every start path runs this (the Terminal, `runtime start`, the app's load, a restart of the app, an unload and a load), so the
      tuning is applied every time and never re-measured. A tune's own worker sets STRATA_NO_PRESET so that it measures the
      configuration it was given. Never fails a start: a store that cannot be read means the configuration as it is."""
@@ -2382,7 +2544,7 @@ index 8c5213b1..2a74c326 100644
      if os.environ.get("STRATA_NO_PRESET"):
          return cfg
      say = say or (lambda line: print(line, flush=True))
-@@ -8563,6 +8683,41 @@ FAMILY_MODEL_NAMES = {"qwen4exp": "qwen3.8-flash-next", "qwen35moe": "qwen3.6-35
+@@ -8607,6 +8745,41 @@ FAMILY_MODEL_NAMES = {"qwen4exp": "qwen3.8-flash-next", "qwen35moe": "qwen3.6-35
                        "deepseek41": "deepseek-v4.1-flash"}
  
  
@@ -2424,9 +2586,9 @@ index 8c5213b1..2a74c326 100644
  # The sampling each model card recommends ("Best Practices"), used when neither the request, the Chat settings nor the
  # run config's `sampling` block says otherwise.  Greedy is only for a request or config that asks for temperature 0.
  # min_p 0, repetition_penalty 1 and presence_penalty 0 are the engine's own "off", so they are not listed.
-@@ -8584,6 +8739,49 @@ def model_card_sampling(arch, thinking) -> dict:
-     return dict(sets["thinking" if thinking else "instruct"]) if sets else {}
- 
+@@ -8637,10 +8810,52 @@ def arch_from_tokenizer(arch, pre) -> str | None:
+         return arch
+     return "deepseek41" if str(pre or "").startswith("deepseek") else None
  
 +# A penalty (presence, frequency, repetition) makes the engine score the last penalty_last_n logits, and its
 +# speculation (MTP) is off for a request that needs them.  At temperature 0 a penalty cannot change which token
@@ -2470,11 +2632,15 @@ index 8c5213b1..2a74c326 100644
 +    lost = " ".join(f"{k} {v:g} -> {PENALTY_NEUTRAL[k]:g}" for k, v in dropped.items())
 +    return merged, f"[strata] greedy: penalty defaults not merged (MTP stays on): {lost}"
 +
-+
+ 
  def default_model_name(cfg: dict) -> str:
      """The config's "model_name", else its family's name ("arch": qwen4exp, qwen35moe), else Flash-Next's."""
-     return cfg.get("model_name") or FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next")
-@@ -8812,6 +9010,12 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+-    return cfg.get("model_name") or FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next")
++    return configured_model_id(cfg, FAMILY_MODEL_NAMES.get(cfg.get("arch") or "qwen4exp", "qwen3.8-flash-next"))
+ 
+ 
+ def with_current_reader(cfg: dict, package: Path) -> dict:
+@@ -8875,6 +9090,12 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
          cfg["gpu"] = int(a.gpu) if a.gpu.strip().isdigit() else a.gpu
      a.host = a.host or cfg.get("host") or "127.0.0.1"   # issue #26: the run scripts pass no --host, the config can
      supplied_args = argv if argv is not None else sys.argv[1:]
@@ -2487,7 +2653,7 @@ index 8c5213b1..2a74c326 100644
      if ("STRATA_API_KEY" in os.environ and not os.environ["STRATA_API_KEY"].strip()) or \
              any((x == "--api-key" and i + 1 < len(supplied_args) and not supplied_args[i + 1].strip()) or
                  x.strip() == "--api-key=" for i, x in enumerate(supplied_args)):
-@@ -8839,18 +9043,7 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+@@ -8903,19 +9124,9 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
          ap.error(f"the model's tokenizer is missing ({tpath / 'vocab.json'}); run setup again")
      if (tpath / "vocab.json").exists():
          import strata_tokenizer as ST
@@ -2497,19 +2663,30 @@ index 8c5213b1..2a74c326 100644
 -            tokens[i] = t
 -        merges = (tpath / "merges.txt").read_text(encoding="utf-8").split("\n")
 -        types = json.loads((tpath / "token_type.json").read_text())
--        tcfg = {}
 -        try:                                            # the pack's pre-tokenizer name and special ids (DeepSeek's differ)
 -            tcfg = json.loads((tpath / "tokenizer.json").read_text(encoding="utf-8"))
 -        except (OSError, ValueError):
 -            pass
 -        tok = ST.Tokenizer(tokens, merges, types, tcfg.get("pre") or "qwen35", tcfg.get("special_ids") or None)
+-    if a.engine == "strata" and not cfg.get("arch") and arch_from_tokenizer(None, tcfg.get("pre")):
+-        cfg["arch"] = arch_from_tokenizer(None, tcfg.get("pre"))
 +        tok = ST.Tokenizer.from_dir(tpath)
++    if a.engine == "strata" and not cfg.get("arch") and arch_from_tokenizer(None, tok.pre):
++        cfg["arch"] = arch_from_tokenizer(None, tok.pre)
+         print(f"[strata] the config names no \"arch\" and this tokenizer is DeepSeek's: serving it as {cfg['arch']} (its end token, DSML tool "
+               f"calls and effort words); add \"arch\": \"{cfg['arch']}\" to the config to say it outright", flush=True)
      hub = hub_from_config(cfg, a.mcp_config)            # before the minutes of loading: a bad entry stops here
-     if a.offline and (hub is not None or cfg.get("before_load") or a.before_load):
-         ap.error("--offline requires MCP servers and before_load commands to be disabled in this profile")
+@@ -9045,6 +9256,7 @@ def main(argv=None, *, lifecycle_event=None, interrupt_exit_code: int = 0) -> in
+                   "using the V4.1 template so tool calls come back as real calls", flush=True)
+     svc = Service(engine, tok, ChatTemplate(tpl if tpl.exists() else ROOT / "serve/chat_template.jinja"),
+                   model_name=default_model_name(cfg), vision=vision,
++                  display_name=cfg.get("display_name") or cfg.get("model_name"),
+                   sampling_defaults=sampling_defaults,
+                   fit_max_tokens=a.fit_max_tokens or (not a.no_fit_max_tokens and cfg.get("fit_max_tokens") is not False))
+     svc.launch_attestation = launch_attestation
 diff --git a/serve/test_declared_tool_boundary.py b/serve/test_declared_tool_boundary.py
 new file mode 100644
-index 00000000..8422f3ce
+index 0000000000000000000000000000000000000000..8422f3ceca0820dd8aed4c97f31e725640675b58
 --- /dev/null
 +++ b/serve/test_declared_tool_boundary.py
 @@ -0,0 +1,73 @@
@@ -2588,7 +2765,7 @@ index 00000000..8422f3ce
 +    unittest.main()
 diff --git a/serve/test_legacy_models.py b/serve/test_legacy_models.py
 new file mode 100644
-index 00000000..73c81f16
+index 0000000000000000000000000000000000000000..73c81f16705248b05359f865b49ce140b49f9b38
 --- /dev/null
 +++ b/serve/test_legacy_models.py
 @@ -0,0 +1,173 @@
@@ -2765,8 +2942,146 @@ index 00000000..73c81f16
 +  self.assertEqual(data['choices'][0]['message']['tool_calls'][0]['function']['name'],'files.write')
 +
 +if __name__=='__main__':unittest.main()
+diff --git a/serve/test_lenient_unicode.py b/serve/test_lenient_unicode.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..cce2f13bd67619e6ddb0191a3a3c83772f7ccc6d
+--- /dev/null
++++ b/serve/test_lenient_unicode.py
+@@ -0,0 +1,36 @@
++"""CPU-only regression for malformed XML JSON arguments containing escaped surrogate pairs."""
++import json,unittest
++from serve.frontend import coerce_value,OutputParser
++import serve.test_tool_routes as route_fixture
++call=route_fixture.call
++
++class LenientUnicode(unittest.TestCase):
++ def test_pairs_are_unicode_scalars(self):
++  for cp in [0x10000,0x1f600,0x1f642,0x10ffff,0x041f]:
++   text=chr(cp);esc=json.dumps(text,ensure_ascii=True)
++   for quote in [esc,"'"+esc[1:-1]+"'"]:
++    for kind,raw,want in [('array','['+quote+',]',[text]),('object','{"v":'+quote+',}',{'v':text})]:
++     with self.subTest(cp=cp,kind=kind):
++      got=coerce_value(raw,kind);self.assertEqual(got,want);json.dumps(got,ensure_ascii=False).encode('utf-8')
++ def test_unpaired_lenient_values_keep_safe_raw_text(self):
++  for value in [r'["\ud800",]',r'["\udc00",]',r'["\ud800x",]',r'["\ud800\u0041",]',r'["\u0041\udc00",]']:
++   with self.subTest(value=value):
++    self.assertEqual(coerce_value(value,'array'),value)
++    json.dumps(coerce_value(value,'array'),ensure_ascii=False).encode('utf-8')
++ def test_declared_strings_and_unknown_names(self):
++  for value in [r'["\ud83d\ude00",]',r'["\ud800",]','raw\ntext']:
++   self.assertEqual(coerce_value(value,'string'),value)
++  raw=call('unknown',todos=r'["\ud83d\ude00",]')
++  for chunk in (1,7,len(raw)):
++   p=OutputParser(thinking=False,tools=[{'name':'todo_write','parameters':{'properties':{'todos':{'type':'array'}}}}]);ev=[]
++   for i in range(0,len(raw),chunk):ev+=p.feed(raw[i:i+chunk])
++   ev+=p.finish();self.assertEqual([e for e in ev if e.kind=='tool_call'],[])
++ def test_valid_json_unpaired_behavior_is_unchanged(self):
++  for raw in [r'["\ud800"]',r'["\udc00"]']:
++   self.assertEqual(coerce_value(raw,'array'),json.loads(raw))
++ def test_all_mock_http_routes(self):
++  routes=route_fixture.Routes()
++  for raw,want in [(r'["\ud83d\ude00",]',['😀']),(r'["\ud800",]',r'["\ud800",]')]:
++   routes.every_route('Plan.\n</think>\n\n'+call('todo_write',todos=raw),[('todo_write',{'todos':want})])
++  literal=r'["\ud83d\ude00",]'
++  routes.every_route('Plan.\n</think>\n\n'+call('write_file',path='x.txt',content=literal),[('write_file',{'path':'x.txt','content':literal})])
+diff --git a/serve/test_model_identity.py b/serve/test_model_identity.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e0c482683b2e7dba53e6719081acd0118f25c9b6
+--- /dev/null
++++ b/serve/test_model_identity.py
+@@ -0,0 +1,90 @@
++import json
++from pathlib import Path
++import re
++import unittest
++import urllib.parse
++import urllib.request
++
++from serve.frontend import ChatTemplate
++from serve.model_identity import public_model_id, configured_model_id
++from serve.server import ByteTokenizer, MockEngine, Service, serve
++
++
++class MachineIds(unittest.TestCase):
++    def test_existing_ids_unchanged(self):
++        for value in ['swift-1.5-iq3-s', 'Qwen3.8', 'org/model:Q4_K_M']:
++            self.assertEqual(public_model_id(value), value)
++
++    def test_friendly_names_are_not_protocol_ids(self):
++        self.assertEqual(public_model_id('SC117 Swift1.5 IQ3_S — Q2 baseline'), 'SC117-Swift1.5-IQ3_S-Q2-baseline')
++        self.assertEqual(public_model_id('  model name  '), 'model-name')
++        self.assertRegex(public_model_id('Модель'), r'^model-[0-9a-f]{12}$')
++        self.assertEqual(public_model_id('Модель'), public_model_id('Модель'))
++
++    def test_explicit_id_is_validated(self):
++        for value in ['bad id', ' id', '', [], 4]:
++            with self.assertRaises(ValueError):
++                configured_model_id({'api_model_id': value}, 'fallback')
++        self.assertEqual(configured_model_id({'api_model_id': 'safe-id', 'model_name': 'Friendly Name'}, 'x'), 'safe-id')
++
++    def test_aliases_are_safe_and_exact_legacy_labels_work(self):
++        tok = ByteTokenizer()
++        svc = Service(MockEngine(tok, 'ok'), tok, ChatTemplate(Path(__file__).with_name('chat_template.jinja')),
++                      model_name='Friendly Model')
++        svc.set_aliases(['Alias One', 'alias-two', 'Alias One'])
++        self.assertEqual(svc.model_names(), ['Friendly-Model', 'Alias-One', 'alias-two'])
++        self.assertEqual(svc.model_for({'model': 'Alias One'}), 'Alias-One')
++        self.assertEqual(svc.model_for({'model': 'Friendly Model'}), 'Friendly-Model')
++        self.assertEqual(svc.model_for({'model': ['bad']}), 'Friendly-Model')
++        svc.set_aliases([])
++        self.assertIsNone(svc.resolve_model_name('Alias One'))
++
++
++class HttpContract(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        tok = ByteTokenizer()
++        cls.svc = Service(MockEngine(tok, 'ok'), tok, ChatTemplate(Path(__file__).with_name('chat_template.jinja')),
++                          model_name='SC117 Swift1.5 IQ3_S — Q2 baseline')
++        cls.svc.set_aliases(['Legacy Alias'])
++        cls.httpd = serve(cls.svc, host='127.0.0.1', port=0)
++        cls.base = 'http://127.0.0.1:' + str(cls.httpd.server_address[1])
++
++    @classmethod
++    def tearDownClass(cls):
++        cls.httpd.shutdown(); cls.httpd.server_close()
++
++    def get(self, path):
++        with urllib.request.urlopen(self.base + path, timeout=10) as response:
++            return json.load(response)
++
++    def test_all_discovery_ids_pass_no_whitespace_client_validation(self):
++        for path in ['/v1/models', '/models']:
++            data = self.get(path)['data']
++            for model in data:
++                self.assertIsNone(re.search(r'\s', model['id']))
++                self.assertTrue(model['display_name'])
++                for alias in model.get('aliases', []):
++                    self.assertIsNone(re.search(r'\s', alias))
++        self.assertEqual(data[0]['display_name'], 'SC117 Swift1.5 IQ3_S — Q2 baseline')
++
++    def test_chat_reply_uses_the_advertised_id(self):
++        identity = self.get('/v1/models')['data'][0]['id']
++        for asked in [identity, 'SC117 Swift1.5 IQ3_S — Q2 baseline', 'Legacy Alias']:
++            payload = {'model': asked, 'messages': [{'role': 'user', 'content': 'hi'}],
++                       'max_tokens': 8, 'stream': False}
++            req = urllib.request.Request(self.base + '/v1/chat/completions', data=json.dumps(payload).encode(),
++                                         headers={'Content-Type': 'application/json'})
++            with urllib.request.urlopen(req, timeout=10) as response:
++                result = json.load(response)
++            self.assertIsNone(re.search(r'\s', result['model']))
++            self.assertTrue(result['choices'])
++
++    def test_legacy_display_name_props_still_resolves(self):
++        props = self.get('/props?model=' + urllib.parse.quote('SC117 Swift1.5 IQ3_S — Q2 baseline'))
++        self.assertIsNone(re.search(r'\s', props['model_alias']))
++        self.assertEqual(props['display_name'], 'SC117 Swift1.5 IQ3_S — Q2 baseline')
++
++
++if __name__ == '__main__':
++    unittest.main()
 diff --git a/serve/test_request_hardening.py b/serve/test_request_hardening.py
-index 37eb849c..0d83a8a0 100644
+index 37eb849c8e606f0051c857ed8999fc4684f5fa72..0d83a8a0c9f0096875385a30b5b3d356e3cf6ee0 100644
 --- a/serve/test_request_hardening.py
 +++ b/serve/test_request_hardening.py
 @@ -115,6 +115,36 @@ class Hardening(unittest.TestCase):
@@ -2807,7 +3122,7 @@ index 37eb849c..0d83a8a0 100644
          from serve.server import check_request_sampling
          req = {"temperature": "0.7", "top_p": " 1 ", "top_k": "40", "seed": "7", "top_k_x": "keep", "min_p": "0"}
 diff --git a/serve/test_responses.py b/serve/test_responses.py
-index 866582c3..dc436a54 100644
+index 866582c34044be62e98cc6561aef40cd062f97ab..dc436a5403bf6e222378113cb746493574dc82b0 100644
 --- a/serve/test_responses.py
 +++ b/serve/test_responses.py
 @@ -751,10 +751,12 @@ class CodexCompactionOverHttp(Server):
@@ -2829,7 +3144,7 @@ index 866582c3..dc436a54 100644
          plain, code, r2 = self.compaction({})
 diff --git a/serve/test_sampling_merge.py b/serve/test_sampling_merge.py
 new file mode 100644
-index 00000000..2ebc11fd
+index 0000000000000000000000000000000000000000..2ebc11fd096b70a0ef166852299f853ca7ef5e99
 --- /dev/null
 +++ b/serve/test_sampling_merge.py
 @@ -0,0 +1,56 @@
@@ -2890,7 +3205,7 @@ index 00000000..2ebc11fd
 +if __name__ == "__main__":
 +    unittest.main()
 diff --git a/serve/test_server.py b/serve/test_server.py
-index 09c88024..f2715cc7 100644
+index 251f1837664f3c26942aad54f70109c9ffd80d95..6b3fec490dd7c6cf478c3ffa4c2f7502a4d752be 100644
 --- a/serve/test_server.py
 +++ b/serve/test_server.py
 @@ -633,6 +633,20 @@ class VisionTempFiles(unittest.TestCase):
@@ -2914,7 +3229,7 @@ index 09c88024..f2715cc7 100644
  
  class ListenProblem(unittest.TestCase):
      """#769: only an address that is taken is "already in use"."""
-@@ -2001,6 +2015,65 @@ class HipEnvGuard(unittest.TestCase):
+@@ -2024,6 +2038,65 @@ class HipEnvGuard(unittest.TestCase):
              del os.environ["HIP_PATH"]
  
  
@@ -2980,7 +3295,7 @@ index 09c88024..f2715cc7 100644
  class RecordingPrompt(MockEngine):
      def generate(self, ids, max_new, sampling, cancel, embeddings=None):
          self.last_ids = list(ids)
-@@ -3507,6 +3580,7 @@ class WebApp(unittest.TestCase):
+@@ -3530,6 +3603,7 @@ class WebApp(unittest.TestCase):
                      self.assertEqual(model["id"], svc.model)
                      self.assertEqual(model["status"]["value"], "loaded")
                      self.assertEqual(model["meta"]["n_ctx"], 262144)
@@ -2988,7 +3303,7 @@ index 09c88024..f2715cc7 100644
                      self.assertEqual(model["architecture"]["input_modalities"],
                                       ["text", "image"] if vision else ["text"])
                  code, _, body = self.get("/props?model=" + svc.model + "&autoload=false")
-@@ -4123,6 +4197,28 @@ class ThinkingEngine(MockEngine):
+@@ -4146,6 +4220,28 @@ class ThinkingEngine(MockEngine):
              yield t
  
  
@@ -3017,7 +3332,7 @@ index 09c88024..f2715cc7 100644
  class EndsInsideThinkingEngine(ThinkingEngine):
      """The #1053 reply: one sentence of reasoning, then the end-of-turn token, no </think>.  A prompt that ends the
      thinking (the retry) gets the answer."""
-@@ -4242,6 +4338,49 @@ class ThinkingBudget(unittest.TestCase):
+@@ -4265,6 +4361,49 @@ class ThinkingBudget(unittest.TestCase):
          self.assertEqual(b["usage"]["completion_tokens"], 20 + len(extra) + len(ThinkingEngine.ANSWER) + 1)
          self.assertEqual(b["usage"]["prompt_tokens"], len(first))
  
@@ -3068,7 +3383,7 @@ index 09c88024..f2715cc7 100644
          """llama.cpp's name (pi-llama-cpp sends it): the same wrap-up; reasoning_budget_tokens wins when both are set."""
          from serve.server import REASONING_WRAP_UP
 diff --git a/serve/web/app.css b/serve/web/app.css
-index 18f1c906..3faf44ba 100644
+index 18f1c906170f04850e9bb4b332739bc2b9a8a866..3faf44ba1b49f0d1adfe38586e6f1401d668e2e6 100644
 --- a/serve/web/app.css
 +++ b/serve/web/app.css
 @@ -341,3 +341,7 @@ main { flex: 1; min-height: 0; display: flex; }
@@ -3080,7 +3395,7 @@ index 18f1c906..3faf44ba 100644
 +.st-language{font:inherit;color:var(--st-ink);background:var(--st-surface);border:1px solid var(--st-line);border-radius:7px;padding:5px;max-width:100px;margin-left:8px}
 +@media(max-width:680px){.st-header{flex-wrap:wrap;height:auto;min-height:60px;gap:5px;padding:8px}.st-tabs{order:4;width:100%;justify-content:center}.st-language{max-width:88px}}
 diff --git a/serve/web/app.js b/serve/web/app.js
-index 6c7d5184..e778acb8 100644
+index 6c7d51846d3b1de3162829b3839f99b0279d5595..e778acb8ef7ac9a8ab8cc0ad634fcf457f5c55b9 100644
 --- a/serve/web/app.js
 +++ b/serve/web/app.js
 @@ -119,6 +119,24 @@ async function loadHealth() {
@@ -3193,7 +3508,7 @@ index 6c7d5184..e778acb8 100644
    poll();
    requestAnimationFrame(fitHeader);
 diff --git a/serve/web/index.html b/serve/web/index.html
-index 4de2fc44..e9a093e8 100644
+index 4de2fc446fd9c89c75cc397702fd3a8c7cb1dea5..e9a093e852c7ec5eded0178952752fccd1b04a50 100644
 --- a/serve/web/index.html
 +++ b/serve/web/index.html
 @@ -1,5 +1,5 @@
@@ -3222,7 +3537,7 @@ index 4de2fc44..e9a093e8 100644
  <script src="web/math.js"></script>
  <script src="web/math-adapter.js"></script>
 diff --git a/serve/web/locales/de.json b/serve/web/locales/de.json
-index 67a2c5cb..8a292193 100644
+index 67a2c5cbb0c5251e7536e1da7b765bf397564e81..8a29219324297b9def35201c6ba7a2322a43b363 100644
 --- a/serve/web/locales/de.json
 +++ b/serve/web/locales/de.json
 @@ -25,7 +25,10 @@
@@ -3291,7 +3606,7 @@ index 67a2c5cb..8a292193 100644
 +  "drawer.thinkAdaptive": "automatic author-mode selection"
  }
 diff --git a/serve/web/locales/en.json b/serve/web/locales/en.json
-index adcd6fd2..98d3f3a2 100644
+index adcd6fd22a17b2df29636ba47507bbd9b30bbdce..98d3f3a2fbc4d2ed155fece00fd64498684c672d 100644
 --- a/serve/web/locales/en.json
 +++ b/serve/web/locales/en.json
 @@ -48,6 +48,7 @@
@@ -3322,7 +3637,7 @@ index adcd6fd2..98d3f3a2 100644
    "file.big": "File too large",
    "file.bigText": "{name} is over 512 KB.",
 diff --git a/serve/web/locales/es.json b/serve/web/locales/es.json
-index 9f9a2429..9870c45a 100644
+index 9f9a2429373391f84ad7994558a0784f1d44666d..9870c45ad3073f118ccfb5a58760dfd1fcbb50f8 100644
 --- a/serve/web/locales/es.json
 +++ b/serve/web/locales/es.json
 @@ -25,7 +25,10 @@
@@ -3391,7 +3706,7 @@ index 9f9a2429..9870c45a 100644
 +  "drawer.thinkAdaptive": "automatic author-mode selection"
  }
 diff --git a/serve/web/locales/fr.json b/serve/web/locales/fr.json
-index 7bbb7616..c05e5937 100644
+index 7bbb761694e47404332476580c05571d25c24da7..c05e59370bcf72e7c73d65f35f61225ff20f2373 100644
 --- a/serve/web/locales/fr.json
 +++ b/serve/web/locales/fr.json
 @@ -260,5 +260,11 @@
@@ -3408,7 +3723,7 @@ index 7bbb7616..c05e5937 100644
 +  "drawer.thinkAdaptive": "automatic author-mode selection"
  }
 diff --git a/serve/web/locales/ja.json b/serve/web/locales/ja.json
-index 024050c1..41d8e5f5 100644
+index 024050c17e219b167c2b9448e1e465b6a0f32552..41d8e5f5bd9a808e1d4f79c1db1d2087fac719fc 100644
 --- a/serve/web/locales/ja.json
 +++ b/serve/web/locales/ja.json
 @@ -25,7 +25,9 @@
@@ -3472,7 +3787,7 @@ index 024050c1..41d8e5f5 100644
 +  "drawer.thinkAdaptive": "automatic author-mode selection"
  }
 diff --git a/serve/web/locales/ko.json b/serve/web/locales/ko.json
-index c14f4437..8a872c64 100644
+index c14f443719225c9580b8eaf1d0f10b5b5310993a..8a872c64854af6e38753d9fd8123ea5420bfd1bf 100644
 --- a/serve/web/locales/ko.json
 +++ b/serve/web/locales/ko.json
 @@ -25,7 +25,9 @@
@@ -3536,7 +3851,7 @@ index c14f4437..8a872c64 100644
 +  "drawer.thinkAdaptive": "automatic author-mode selection"
  }
 diff --git a/serve/web/locales/pt.json b/serve/web/locales/pt.json
-index bc343a61..0e36ffb9 100644
+index bc343a61c92eb7be88effefba2e2d9e65d67ff04..0e36ffb9df13c59ede157abd5d439c05ed57c9ec 100644
 --- a/serve/web/locales/pt.json
 +++ b/serve/web/locales/pt.json
 @@ -25,7 +25,10 @@
@@ -3605,7 +3920,7 @@ index bc343a61..0e36ffb9 100644
 +  "drawer.thinkAdaptive": "automatic author-mode selection"
  }
 diff --git a/serve/web/locales/ru.json b/serve/web/locales/ru.json
-index 7b83de91..d5d5e2d0 100644
+index 7b83de918868424a8cf99ee33843f1b508473b86..d5d5e2d06e111e68e053eb24445116d0de73778b 100644
 --- a/serve/web/locales/ru.json
 +++ b/serve/web/locales/ru.json
 @@ -25,7 +25,12 @@
@@ -3684,7 +3999,7 @@ index 7b83de91..d5d5e2d0 100644
 +  "drawer.thinkAdaptive": "автоматический выбор авторского режима"
  }
 diff --git a/serve/web/locales/zh.json b/serve/web/locales/zh.json
-index 773d5f60..38db1c75 100644
+index 773d5f60713f927b647b558c378399e4f1d110cb..38db1c7597ee76aec8c3ce5b48fbf3c5a44aaca1 100644
 --- a/serve/web/locales/zh.json
 +++ b/serve/web/locales/zh.json
 @@ -25,7 +25,9 @@
@@ -3749,7 +4064,7 @@ index 773d5f60..38db1c75 100644
  }
 diff --git a/serve/web/monitor-i18n.js b/serve/web/monitor-i18n.js
 new file mode 100644
-index 00000000..7b25b93d
+index 0000000000000000000000000000000000000000..7b25b93d9d42e38f081f9e43f600a7b07b22a0da
 --- /dev/null
 +++ b/serve/web/monitor-i18n.js
 @@ -0,0 +1,395 @@
@@ -4149,7 +4464,7 @@ index 00000000..7b25b93d
 +if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setup,{once:true});else setup();
 +})();
 diff --git a/serve/web/monitor.html b/serve/web/monitor.html
-index c1e87e7c..e9b54541 100644
+index c1e87e7c672947d81fd4d563b95b3a86d7411397..e9b545410da24bd74a812762f4862e5b70aa7e1d 100644
 --- a/serve/web/monitor.html
 +++ b/serve/web/monitor.html
 @@ -1,7 +1,8 @@
@@ -4163,8 +4478,37 @@ index c1e87e7c..e9b54541 100644
  <title>Strata API Monitor</title>
  <link rel="icon" href="/web/favicon.svg" type="image/svg+xml">
  <link rel="stylesheet" href="/web/tokens.css">
+diff --git a/src/artifact/gguf_reader_test.cpp b/src/artifact/gguf_reader_test.cpp
+index aab0003daf54e4df48dac1d2c3281ed88fbb1d56..4a8b2f0cf1ad8f73ac0180c11f7dc2d262fd8e2b 100644
+--- a/src/artifact/gguf_reader_test.cpp
++++ b/src/artifact/gguf_reader_test.cpp
+@@ -124,6 +124,24 @@ int main() {
+         check(err.find("data section starts past EOF") != std::string::npos,
+               "one tensor, ends before the aligned data start: refused at open");
+     }
++    {
++        std::vector<uint8_t> b;
++        put<uint32_t>(b, 0x46554747u);
++        put<uint32_t>(b, 3);
++        put<uint64_t>(b, 1);
++        put<uint64_t>(b, 0);
++        put<uint64_t>(b, UINT64_MAX - 15);
++        b.resize(64, 0);
++        const auto path = std::filesystem::temp_directory_path() / "strata_gguf_reader_test.gguf";
++        std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(b.data()), (std::streamsize)b.size());
++        std::string err;
++        try { strata::GgufFile g(path.string()); }
++        catch (const std::exception& e) { err = e.what(); }
++        std::filesystem::remove(path);
++        check(err.find("unexpected end of file in header") != std::string::npos,
++              "a name length near 2^64: refused as a truncated header");
++        if (err.find("unexpected end of file in header") == std::string::npos) std::printf("  (%s)\n", err.c_str());
++    }
+     std::printf(g_fail ? "gguf_reader_test: %d FAILED\n" : "gguf_reader_test: all passed\n", g_fail);
+     return g_fail ? 1 : 0;
+ }
 diff --git a/src/core/conversation_cache_test.cpp b/src/core/conversation_cache_test.cpp
-index 242e3760..fa17f156 100644
+index 7c4dba46dba66fbab573edc8ea562f7d29a99ffd..3bd482edc1c8a0a80b100ab4981ca1209d656bd5 100644
 --- a/src/core/conversation_cache_test.cpp
 +++ b/src/core/conversation_cache_test.cpp
 @@ -286,7 +286,7 @@ int main() {
@@ -4201,9 +4545,9 @@ index 242e3760..fa17f156 100644
      }
      {
          // what is NOT superseded: another conversation sharing only the root, an entry without checkpoints, the
-@@ -720,5 +729,56 @@ int main() {
-         check(tiny.put(std::move(p2)), "a pinned one fits an empty cache");
-         check(!tiny.put(image({7,8,9})) && tiny.size() == 1, "nothing else fits beside it: parking is refused, the pin stays");
+@@ -745,5 +754,56 @@ int main() {
+         check(cache.drop_superseded(slot_ids, {}, slot_chain, true) == 1 && cache.size() == 0,
+               "the slot's chain supersedes the richer copy");
      }
 +    {
 +        // STRATA_CKPT_PARK_REUSE: drop_superseded removes only the superseded parked image; live checkpoints belong to the
@@ -4260,7 +4604,7 @@ index 242e3760..fa17f156 100644
  }
 diff --git a/src/core/conversation_copy_lifetime_test.cpp b/src/core/conversation_copy_lifetime_test.cpp
 new file mode 100644
-index 00000000..7d6f4339
+index 0000000000000000000000000000000000000000..7d6f4339b28f841d871e7e09ee6e54c2dc52591e
 --- /dev/null
 +++ b/src/core/conversation_copy_lifetime_test.cpp
 @@ -0,0 +1,67 @@
@@ -4333,7 +4677,7 @@ index 00000000..7d6f4339
 +}
 diff --git a/src/core/conversation_reuse_identity_test.cpp b/src/core/conversation_reuse_identity_test.cpp
 new file mode 100644
-index 00000000..7083d7c0
+index 0000000000000000000000000000000000000000..7083d7c0dcc8b6bc00e3ccbb85ea98be565283af
 --- /dev/null
 +++ b/src/core/conversation_reuse_identity_test.cpp
 @@ -0,0 +1,223 @@
@@ -4561,7 +4905,7 @@ index 00000000..7083d7c0
 +    return 0;
 +}
 diff --git a/src/core/conversation_validation_test.cpp b/src/core/conversation_validation_test.cpp
-index c670ef13..e5f47acc 100644
+index c670ef138ed46ca058434d4b44dd17231fa65520..e5f47acc7aa71a42b0e104857f723cf619d0bda5 100644
 --- a/src/core/conversation_validation_test.cpp
 +++ b/src/core/conversation_validation_test.cpp
 @@ -26,6 +26,8 @@ extern "C" cudaError_t __wrap_cudaMemcpy(void* dst, const void* src, size_t n, c
@@ -4574,10 +4918,10 @@ index c670ef13..e5f47acc 100644
      *s = reinterpret_cast<cudaStream_t>(static_cast<uintptr_t>(1)); return cudaSuccess;
  }
 diff --git a/src/core/expert_source.cpp b/src/core/expert_source.cpp
-index 1b5b1155..59a2df45 100644
+index 583ee07f58f2041e9b3fbbcf804c07ea50a0e81c..68c05456178e8c674302527b1d5428efea5e09bf 100644
 --- a/src/core/expert_source.cpp
 +++ b/src/core/expert_source.cpp
-@@ -5163,7 +5163,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
+@@ -5194,7 +5194,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
      {
          const auto b0 = std::chrono::steady_clock::now();
          if (njobs > 0) {
@@ -4590,7 +4934,7 @@ index 1b5b1155..59a2df45 100644
              else d.pool->run_split_multi(d.jobs_multi.data(), njobs);
              ++d.cold_batches;
          }
-@@ -5208,7 +5212,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
+@@ -5239,7 +5243,11 @@ void expert_pool_dispatch_multi(ExpertDispatch& d, const float* x_f, const int32
      if (d.plan != nullptr) d.plan->cpu_jobs = njobs;
      pt("run", njobs);
      if (njobs > 0 && npend == 0) {
@@ -4603,7 +4947,7 @@ index 1b5b1155..59a2df45 100644
          else d.pool->run_split_multi(d.jobs_multi.data(), njobs);
      }
      if (d.remote_count > 0) {
-@@ -5716,12 +5724,29 @@ LoadStats load_experts_gguf(const std::string& gguf, uint8_t* dst, const strata:
+@@ -5747,12 +5755,29 @@ LoadStats load_experts_gguf(const std::string& gguf, uint8_t* dst, const strata:
      return st;
  }
  
@@ -4633,7 +4977,7 @@ index 1b5b1155..59a2df45 100644
      const std::string path = pack_dir + "/experts.bin";
      // plan v0.3 P6: the layout (canonical, or a native pack's per-layer blobs) was loaded by the driver
      const strata::kernels::cpu::ExpertLayout& lay = strata::kernels::cpu::expert_layout();
-@@ -5805,7 +5830,13 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -5836,7 +5861,13 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
      // engine still exiting) is only a warning - the OS may make room - per the recommend-not-force rule.
      ram_warning_.clear();
      // (a shared arena, --shared-expert-arena, may already be in RAM for another engine: not checked)
@@ -4647,7 +4991,7 @@ index 1b5b1155..59a2df45 100644
          const uint64_t need = want + (uint64_t) blob;
          const double gib = 1073741824.0;
          char buf[512];
-@@ -5905,11 +5936,33 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -5971,11 +6002,33 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
  #else
      const bool deferred = false;
  #endif
@@ -4681,7 +5025,7 @@ index 1b5b1155..59a2df45 100644
      if (!a->valid()) {
          const std::string why = a->note;
          delete a;
-@@ -5930,10 +5983,21 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -5996,10 +6049,21 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
      } else {
          files.push_back(path);
      }
@@ -4703,7 +5047,7 @@ index 1b5b1155..59a2df45 100644
      std::atomic<int> ready{0};
      std::thread reg;
      if (deferred) {
-@@ -5945,6 +6009,11 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -6011,6 +6075,11 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
          });
      }
      const std::atomic<int>* rp = deferred ? &ready : nullptr;
@@ -4715,7 +5059,7 @@ index 1b5b1155..59a2df45 100644
      if (from_gguf) {
          st = load_experts_gguf(gguf_, a->data(), lay, readers, unbuffered, rp, padded_ ? &pad_ : nullptr);
      } else {
-@@ -6049,8 +6118,95 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
+@@ -6115,8 +6184,95 @@ bool ArenaExpertSource::open(const std::string& pack_dir, int64_t n_layers, int6
      record_inputs(path, gguf_, lay, from_gguf);
      return true;
  }
@@ -4812,7 +5156,7 @@ index 1b5b1155..59a2df45 100644
      if (map_ != nullptr) munmap(map_, (size_t) map_bytes_);
  #endif
 diff --git a/src/core/native_dense.cpp b/src/core/native_dense.cpp
-index 25efb6f6..99e8d2f6 100644
+index 25efb6f6217991100c2a1a6599a17917cba49cea..99e8d2f6d11e097001656b5a58cfc9bf29326962 100644
 --- a/src/core/native_dense.cpp
 +++ b/src/core/native_dense.cpp
 @@ -22,6 +22,20 @@
@@ -5033,7 +5377,7 @@ index 25efb6f6..99e8d2f6 100644
          weights_.reserve(pending.size());
          uint64_t packed_bytes = 0;
 diff --git a/src/core/pinned.cu b/src/core/pinned.cu
-index 0c45c051..026059e8 100644
+index 0c45c051c5685a8581c1607f6d6f3bc7a7df2be5..026059e89e5623a861de524e1456af544ae8d945 100644
 --- a/src/core/pinned.cu
 +++ b/src/core/pinned.cu
 @@ -6,6 +6,10 @@
@@ -5146,7 +5490,7 @@ index 0c45c051..026059e8 100644
      // Register with CUDA BEFORE any page is touched: cudaHostRegister pins what is resident now, and a region
      // that has already been faulted in page by page is far more expensive to register and may fail outright.
 diff --git a/src/kernels/cpu/iq_avx1.cpp b/src/kernels/cpu/iq_avx1.cpp
-index f80cc652..d4e72de2 100644
+index f80cc652b05653a2e4080e19cfcfb49d918b8df0..d4e72de2c00cf1b0e524097e04c58dac69184b15 100644
 --- a/src/kernels/cpu/iq_avx1.cpp
 +++ b/src/kernels/cpu/iq_avx1.cpp
 @@ -31,6 +31,7 @@
@@ -5516,7 +5860,7 @@ index f80cc652..d4e72de2 100644
  
  void iq128_gu_rows(int type, const uint8_t* blob, size_t gu_row, size_t up_off, int n, const void* const* act,
 diff --git a/src/kernels/cpu/iq_avx1_parity.cpp b/src/kernels/cpu/iq_avx1_parity.cpp
-index 2f83251f..d268f214 100644
+index 2f83251f9b3b9db3fbd98b362763a66ed4630a79..d268f214f91044571063561117812c51e5f6c1b5 100644
 --- a/src/kernels/cpu/iq_avx1_parity.cpp
 +++ b/src/kernels/cpu/iq_avx1_parity.cpp
 @@ -223,6 +223,7 @@ void run_bench(int mb, const std::vector<int>& nts) {
@@ -5566,7 +5910,7 @@ index 2f83251f..d268f214 100644
      }
  }
 diff --git a/src/kernels/cpu/iq_avx2_parity.cpp b/src/kernels/cpu/iq_avx2_parity.cpp
-index 67544c9d..46641b9a 100644
+index 67544c9d028d391574ae4b2f390f4cc5f0152275..46641b9adc5d982430dbd8505303aa85b9123d82 100644
 --- a/src/kernels/cpu/iq_avx2_parity.cpp
 +++ b/src/kernels/cpu/iq_avx2_parity.cpp
 @@ -21,6 +21,7 @@
@@ -5586,7 +5930,7 @@ index 67544c9d..46641b9a 100644
      if (cpu_index < 0 || cpu_index >= 64) return false;
      return SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR) 1 << cpu_index) != 0;
 diff --git a/src/kernels/cpu/iq_avx512.cpp b/src/kernels/cpu/iq_avx512.cpp
-index 9ea01bf7..77a1b7fe 100644
+index 9ea01bf7c5495a63ed64020c1ac09bf7a4fc4f1c..77a1b7fe50695583ec31b5f3233f83175453f6a9 100644
 --- a/src/kernels/cpu/iq_avx512.cpp
 +++ b/src/kernels/cpu/iq_avx512.cpp
 @@ -628,11 +628,11 @@ static bool has_vpopcnt() {
@@ -5604,7 +5948,7 @@ index 9ea01bf7..77a1b7fe 100644
      }();
      return ok;
 diff --git a/src/kernels/cpu/pool.cpp b/src/kernels/cpu/pool.cpp
-index a43b5c6e..0f0868f3 100644
+index a43b5c6eb5d3f42ac08fdba9a3f7108fbeb85b89..0f0868f3e94a72ed4ff055f7b56d03e446f92cc8 100644
 --- a/src/kernels/cpu/pool.cpp
 +++ b/src/kernels/cpu/pool.cpp
 @@ -2,6 +2,7 @@
@@ -5828,7 +6172,7 @@ index a43b5c6e..0f0868f3 100644
      if (n <= 0) return;
      if (n_ == 1) {   // no workers: run inline, so a single-core machine still produces a token
 diff --git a/src/kernels/cpu/pool_affinity_win.hpp b/src/kernels/cpu/pool_affinity_win.hpp
-index 6f0e4020..c5ac8e15 100644
+index 6f0e4020227a576269a07d5449cb05f936c020f9..c5ac8e1571bc67bb909b5e4fde25178eb1c7352e 100644
 --- a/src/kernels/cpu/pool_affinity_win.hpp
 +++ b/src/kernels/cpu/pool_affinity_win.hpp
 @@ -9,13 +9,14 @@
@@ -5848,7 +6192,7 @@ index 6f0e4020..c5ac8e15 100644
      target.Group = (WORD) (core / 64);
      target.Mask = KAFFINITY(1) << (core & 63);
 diff --git a/src/kernels/cpu/q2_avx1.cpp b/src/kernels/cpu/q2_avx1.cpp
-index 6d5b9699..238e4d7b 100644
+index 6d5b96991bc5ac522e5ec22383e03f4121456ed3..238e4d7b13fd5362e6aab03ab7a2529430e9a342 100644
 --- a/src/kernels/cpu/q2_avx1.cpp
 +++ b/src/kernels/cpu/q2_avx1.cpp
 @@ -31,7 +31,17 @@ namespace strata::kernels::cpu {
@@ -5870,7 +6214,7 @@ index 6d5b9699..238e4d7b 100644
      uint32_t exp = (h >> 10) & 0x1Fu, man = h & 0x3FFu, f;
      if (exp == 0) {
 diff --git a/src/kernels/cuda/iq_kernels.cu b/src/kernels/cuda/iq_kernels.cu
-index 8262f566..3d0b7052 100644
+index 8262f5662182d4e3041ae67dea949e02bc2a6ade..3d0b705249550e6a766cfa2ea35120a828300320 100644
 --- a/src/kernels/cuda/iq_kernels.cu
 +++ b/src/kernels/cuda/iq_kernels.cu
 @@ -6454,10 +6454,15 @@ void native_expert_grouped(const NativeExpertLayout& L, const unsigned long long
@@ -5894,7 +6238,7 @@ index 8262f566..3d0b7052 100644
          const dim3 gl((unsigned) ((L.n_embd + LDS_RB - 1) / LDS_RB), (unsigned) cap_groups);
          const size_t sh = (size_t) LDS_NT * (size_t) (L.n_ff / 32) * sizeof(block_q8_1);
 diff --git a/src/kernels/cuda/ple.cu b/src/kernels/cuda/ple.cu
-index 89c54502..ef9fc380 100644
+index 89c54502e1c1a9ca2226e1f396910b7516face74..ef9fc38083edc5e38adb2a39b4814f90d7125976 100644
 --- a/src/kernels/cuda/ple.cu
 +++ b/src/kernels/cuda/ple.cu
 @@ -55,6 +55,8 @@ __global__ void history_advance_kernel(float* __restrict__ history, const float*
@@ -5907,7 +6251,7 @@ index 89c54502..ef9fc380 100644
      return (uint16_t) (i >> 16);
  }
 diff --git a/src/ngram/ple_reader.cpp b/src/ngram/ple_reader.cpp
-index 6e108ac3..6055a2fa 100644
+index 6e108ac352fdb1bcc6cd3325b0638e26441f044b..6055a2faaf5a44124fc23db54cf0f2c4ca0b5f9a 100644
 --- a/src/ngram/ple_reader.cpp
 +++ b/src/ngram/ple_reader.cpp
 @@ -347,12 +347,13 @@ bool PleReader::open(const std::string& path, uint64_t table_offset, uint64_t n_
@@ -5934,7 +6278,7 @@ index 6e108ac3..6055a2fa 100644
      m.threaded = false;
      m.stop = false;
 diff --git a/src/prefill/kernels.cu b/src/prefill/kernels.cu
-index 365d5a90..42bbddd3 100644
+index 365d5a906484e7312867d495f0e23da2587f92bd..42bbddd30cdc5887bf1806fbb8b83959dd6e99e5 100644
 --- a/src/prefill/kernels.cu
 +++ b/src/prefill/kernels.cu
 @@ -35,6 +35,8 @@ __device__ __forceinline__ float warp_max(float v) {
@@ -5947,7 +6291,7 @@ index 365d5a90..42bbddd3 100644
      return (uint16_t) (u >> 16);
  }
 diff --git a/src/prefill/prefill.cpp b/src/prefill/prefill.cpp
-index 16a609a5..ec5c2691 100644
+index 16a609a5ded1174115c54bef2564112e82b1c899..ec5c269134f2a1901c0380ed3e0e495ea5b15821 100644
 --- a/src/prefill/prefill.cpp
 +++ b/src/prefill/prefill.cpp
 @@ -1044,6 +1044,12 @@ struct Prefill::Impl {
@@ -6256,10 +6600,10 @@ index 16a609a5..ec5c2691 100644
                          out[(size_t) i] = (uint16_t) (u >> 16);
                      }
 diff --git a/src/program/generate.cpp b/src/program/generate.cpp
-index 824bd19d..c55b2ade 100644
+index 956d2c56254bee1754d0b1b7c7d91d73d680b58e..d168721cea27282ae05412ecf2fb7fb0de1f630f 100644
 --- a/src/program/generate.cpp
 +++ b/src/program/generate.cpp
-@@ -49,6 +49,7 @@
+@@ -50,6 +50,7 @@
  #include "strata/kernels/cpu/expert.hpp"
  #include "strata/kernels/cpu/pool.hpp"
  #include "strata/platform/aux_cpus.hpp"
@@ -6267,7 +6611,7 @@ index 824bd19d..c55b2ade 100644
  #include "strata/kernels/cpu/expert_layout.hpp"
  #include "strata/kernels/cpu/hadamard.hpp"
  #include "strata/kernels/ngram.hpp"
-@@ -259,6 +260,10 @@ bool admit_merge_first_env() {
+@@ -261,6 +262,10 @@ bool admit_merge_first_env() {
  // checkpoints it drops (evicted, pruned, a batch slot's old one) and saves the next checkpoint into them, so a save
  // resizes nothing (no zero-fill of ~118 MB of fresh vectors) and a slot's copy reuses their pages.  Every byte is
  // overwritten by the copy, so the checkpoints are the same
@@ -6278,7 +6622,7 @@ index 824bd19d..c55b2ade 100644
  bool park_async_env() {   // STRATA_PARK_ASYNC (strata/core/conversation_snapshot.hpp)
      static const bool on = [] { const char* v = std::getenv("STRATA_PARK_ASYNC"); return v != nullptr && v[0] == '1'; }();
      return on;
-@@ -4057,6 +4062,36 @@ int main(int argc, char** argv) {
+@@ -4066,6 +4071,36 @@ int main(int argc, char** argv) {
          }
      }
      const bool native_pack = strata::kernels::cpu::expert_layout().native;
@@ -6315,7 +6659,7 @@ index 824bd19d..c55b2ade 100644
      // STRATA_MMQ_DIRECT: the room each sized expert slot keeps after its blob (0 unless it is on: the slot costs and
      // the arena are then today's, byte for byte)
      const int64_t slot_guard = native_pack ? (int64_t) strata::prefill::Prefill::slot_guard_bytes() : 0;
-@@ -6452,7 +6487,11 @@ int main(int argc, char** argv) {
+@@ -6465,7 +6500,11 @@ int main(int argc, char** argv) {
              return 1;
          }
      }
@@ -6327,7 +6671,7 @@ index 824bd19d..c55b2ade 100644
      strata::core::ExpertSource* srcp = nullptr;
      if (o.mmap_experts) {
          // FileExpertSource maps the pack's experts.bin: a canonical pack has it; a native (IQ) pack has it when
-@@ -6716,6 +6755,8 @@ int main(int argc, char** argv) {
+@@ -6729,6 +6768,8 @@ int main(int argc, char** argv) {
          }
      }
  #endif
@@ -6336,7 +6680,7 @@ index 824bd19d..c55b2ade 100644
      if (o.pool_measure)
          o.pool_affinity = measure_pool_affinity(srcp, o.pool_workers, !o.no_host_worker, o.pool_tasks);
      strata::kernels::cpu::ExpertPool pool(o.pool_workers, /*pin=*/true, /*host_works=*/!o.no_host_worker,
-@@ -10296,7 +10337,7 @@ int main(int argc, char** argv) {
+@@ -10324,7 +10365,7 @@ int main(int argc, char** argv) {
          strata::prefill::KvaFloorRegistry kva_floors;
          // STRATA_CKPT_POOL: the dropped checkpoints' storage, reused.  STRATA_SLOT_CKPT_MOVE turns it on too: a moved
          // checkpoint frees nothing at the next prune, so every save would fault in fresh pages (17 -> 40-60 ms)
@@ -6345,7 +6689,20 @@ index 824bd19d..c55b2ade 100644
          uint64_t check_clock = 0;   // the checkpoints' LRU clock; creation and every use advance it
          int64_t tail_ckpt_len = -1;   // --prompt-cache-tail: the length of the one tail checkpoint alive (-1 = none)
          // --prefill-pipe: the plan of the prompt segment being read (read_part sets it around its runs), for the
-@@ -14206,7 +14247,7 @@ int main(int argc, char** argv) {
+@@ -11124,10 +11165,10 @@ int main(int argc, char** argv) {
+         // PcieAuto after a decode window (the serial loop, and 0.1.44 the pipelined one at every verdict): the share, refined from
+         // the CPU pool's speed.  A layer split: every later stage takes the share its own probed link gives against the same pool
+         // rate, on both parities' routing (the pipelined loop's second verifier).
+-        auto pcie_auto_step = [&](double& req_pcie_frac) {
++        auto pcie_auto_step = [&](double& req_pcie_frac, bool req_pcie_set) {
+             if (!pcie_auto.on) return;
+             double tc_us = 0.0, rate = 0.0;
+-            const double nf = req_pcie_frac == o.pcie_frac
++            const double nf = !req_pcie_set
+                                   ? pcie_auto.window(drive.d.ms_run, drive.d.multi_misses, o.pcie_frac, &tc_us, &rate)
+                                   : (pcie_auto.mark(drive.d.ms_run, drive.d.multi_misses), -1.0);
+             if (nf < 0.0) return;
+@@ -14281,7 +14322,7 @@ int main(int argc, char** argv) {
                  std::function<bool(const ConvCheckpoint&)>& f;
                  ~ParkDrops() { f = nullptr; }
              } park_drops_reset{park_drops};
@@ -6354,7 +6711,7 @@ index 824bd19d..c55b2ade 100644
                  const bool drops_all = incoming.has_value() || borrow || slot_source >= 0 || want_cvec != cvec_cached;
                  park_drops = [&, drops_all](const ConvCheckpoint& c) {
                      return drops_all || (int64_t) c.ids.size() > resume || !starts_with(c.ids, c.imgs);
-@@ -15103,7 +15144,7 @@ int main(int argc, char** argv) {
+@@ -15178,7 +15219,7 @@ int main(int argc, char** argv) {
                          return v == nullptr || std::atoi(v) != 0;
                      }();
  #if defined(_WIN32)
@@ -6363,7 +6720,7 @@ index 824bd19d..c55b2ade 100644
                      std::vector<ULONG> host_cpu_sets;
                      if (conc_on_host) {
                          const HANDLE self = GetCurrentThread();
-@@ -15131,6 +15172,7 @@ int main(int argc, char** argv) {
+@@ -15206,6 +15247,7 @@ int main(int argc, char** argv) {
                              std::fprintf(stderr, "strata batch: %d threads that ran on the host thread's core moved off "
                                                   "it, for reads beside the slots\n", moved);
                      auto conc_thread_cpus = [&] {
@@ -6371,11 +6728,38 @@ index 824bd19d..c55b2ade 100644
                          strata::aux_cpus::pin_current_thread();
  #if defined(_WIN32)
                          const HANDLE self = GetCurrentThread();
+@@ -15559,7 +15601,7 @@ int main(int argc, char** argv) {
+             drive.d.pcie_num = std::max(0, std::min(256, (int) (req_pcie_frac * 256.0 + 0.5)));
+             // a layer split: CUDA0's share as asked; a later GPU keeps its own (its link) unless the request sets one
+             for (int st = 0; st < split_drive.n; ++st)
+-                split_drive.pcie_num[st] = (st == 0 || split_same || req_pcie_frac != o.pcie_frac)
++                split_drive.pcie_num[st] = (st == 0 || split_same || req_pcie_set)
+                                                ? drive.d.pcie_num : pcie_num_of(stages[(size_t) st - 1]->pcie_frac);
+             if (pipe) for (int st = 0; st < split_drive.n; ++st) split_drive_b.pcie_num[st] = split_drive.pcie_num[st];
+             const int hist_n = std::min(req_sp.penalty_last_n, kPenaltyWindowCap);
+@@ -16376,7 +16418,7 @@ int main(int argc, char** argv) {
+                     }
+                     x = outp[(size_t) a];
+                     p = A.p + a + 1;
+-                    pcie_auto_step(req_pcie_frac);   // 0.1.44: the measured share in the pipelined loop too (STRATA_PCIE_AUTO_SPLIT=1 on a split)
++                    pcie_auto_step(req_pcie_frac, req_pcie_set);   // 0.1.44: the measured share in the pipelined loop too (STRATA_PCIE_AUTO_SPLIT=1 on a split)
+                     if (!last && !ajob && !pl_adapt()) return die("an adaptive refill failed");
+                     if (on && !last) {
+                         ++pl_on;
+@@ -16819,7 +16861,7 @@ int main(int argc, char** argv) {
+                     dt_run += msd(tw0, tw1); dt_commit += msd(tw1, tw2); dt_draft += msd(tw2, tw3);
+                     ++dec_windows; dec_T += merged ? 1 : T;   // a merged window's prompt rows are not decode rows
+                 }
+-                pcie_auto_step(req_pcie_frac);   // the default share, refined from the CPU pool's speed (PcieAuto); a request's own share is left alone
++                pcie_auto_step(req_pcie_frac, req_pcie_set);   // the default share, refined from the CPU pool's speed (PcieAuto); a request's own share is left alone
+                 if (adapt_thr.joinable()) {
+                     const Clock::time_point taj0 = Clock::now();
+                     adapt_thr.join();
 diff --git a/strata_control/procs.py b/strata_control/procs.py
-index 7050064b..fb4e1087 100644
+index 6c62031448793f988a515e8b6911e7dc2a1b6f08..51ffca545148ec69e14b6b6837ce52d17e1e3b1a 100644
 --- a/strata_control/procs.py
 +++ b/strata_control/procs.py
-@@ -362,21 +362,27 @@ def orphans_of(engine_exe: str) -> list[Ident]:
+@@ -370,21 +370,27 @@ def orphans_of(engine_exe: str) -> list[Ident]:
      except psutil.Error:
          pass
      found = []
@@ -6408,7 +6792,7 @@ index 7050064b..fb4e1087 100644
                      pass
 diff --git a/tests/cuda/bf16_nan_parity.cpp b/tests/cuda/bf16_nan_parity.cpp
 new file mode 100644
-index 00000000..39188efe
+index 0000000000000000000000000000000000000000..39188efefb740c88aeaaac98ddc3d9a0c1c63157
 --- /dev/null
 +++ b/tests/cuda/bf16_nan_parity.cpp
 @@ -0,0 +1,55 @@
@@ -6469,7 +6853,7 @@ index 00000000..39188efe
 +}
 diff --git a/tests/cuda/pascallama_mmq_screen.cpp b/tests/cuda/pascallama_mmq_screen.cpp
 new file mode 100644
-index 00000000..3d28f93d
+index 0000000000000000000000000000000000000000..3d28f93d165ca49e159a74979ca475e3c3e15439
 --- /dev/null
 +++ b/tests/cuda/pascallama_mmq_screen.cpp
 @@ -0,0 +1,182 @@
@@ -6657,7 +7041,7 @@ index 00000000..3d28f93d
 +}
 diff --git a/tests/cuda/prefill_group_scratch_parity.cpp b/tests/cuda/prefill_group_scratch_parity.cpp
 new file mode 100644
-index 00000000..97bfd706
+index 0000000000000000000000000000000000000000..97bfd7068bb500f4edcb9829a810feded3279f2f
 --- /dev/null
 +++ b/tests/cuda/prefill_group_scratch_parity.cpp
 @@ -0,0 +1,92 @@
@@ -6755,7 +7139,7 @@ index 00000000..97bfd706
 +}
 diff --git a/tests/cuda/sm61_graph_parity.cu b/tests/cuda/sm61_graph_parity.cu
 new file mode 100644
-index 00000000..ab1c4842
+index 0000000000000000000000000000000000000000..ab1c48426abceabd838348a7bf71140bc403c092
 --- /dev/null
 +++ b/tests/cuda/sm61_graph_parity.cu
 @@ -0,0 +1,25 @@
@@ -6786,7 +7170,7 @@ index 00000000..ab1c4842
 +}
 diff --git a/tests/platform/cpu_format_parity.cpp b/tests/platform/cpu_format_parity.cpp
 new file mode 100644
-index 00000000..3d43a868
+index 0000000000000000000000000000000000000000..3d43a868f80daa99d196d34cc4637a3b2a245099
 --- /dev/null
 +++ b/tests/platform/cpu_format_parity.cpp
 @@ -0,0 +1,181 @@
@@ -6973,7 +7357,7 @@ index 00000000..3d43a868
 +}
 diff --git a/tests/platform/cpu_pool_fused_parity.cpp b/tests/platform/cpu_pool_fused_parity.cpp
 new file mode 100644
-index 00000000..dbac7de2
+index 0000000000000000000000000000000000000000..dbac7de23701175894f414854caf48a610e0f00c
 --- /dev/null
 +++ b/tests/platform/cpu_pool_fused_parity.cpp
 @@ -0,0 +1,98 @@
@@ -7077,7 +7461,7 @@ index 00000000..dbac7de2
 +}
 diff --git a/tests/platform/cpu_pool_guided_parity.cpp b/tests/platform/cpu_pool_guided_parity.cpp
 new file mode 100644
-index 00000000..35d88740
+index 0000000000000000000000000000000000000000..35d887401a8c5102516d7d68c7fc828ff3c55931
 --- /dev/null
 +++ b/tests/platform/cpu_pool_guided_parity.cpp
 @@ -0,0 +1,106 @@
@@ -7189,7 +7573,7 @@ index 00000000..35d88740
 +}
 diff --git a/tests/platform/no_cpu_pin_test.cpp b/tests/platform/no_cpu_pin_test.cpp
 new file mode 100644
-index 00000000..631691ca
+index 0000000000000000000000000000000000000000..631691ca42eb516e58a957e5b4e0399e570db7e2
 --- /dev/null
 +++ b/tests/platform/no_cpu_pin_test.cpp
 @@ -0,0 +1,245 @@
@@ -7440,7 +7824,7 @@ index 00000000..631691ca
 +}
 diff --git a/tests/platform/ple_reader_lifecycle.cpp b/tests/platform/ple_reader_lifecycle.cpp
 new file mode 100644
-index 00000000..1f78f556
+index 0000000000000000000000000000000000000000..1f78f55613ab3c579a54a816703b40c0190162ba
 --- /dev/null
 +++ b/tests/platform/ple_reader_lifecycle.cpp
 @@ -0,0 +1,127 @@
@@ -7573,7 +7957,7 @@ index 00000000..1f78f556
 +}
 diff --git a/tests/platform/windows_numa_arena_test.cpp b/tests/platform/windows_numa_arena_test.cpp
 new file mode 100644
-index 00000000..8f24a8d8
+index 0000000000000000000000000000000000000000..8f24a8d815cbc1ed5e172fba23b1561c1d1a7ee3
 --- /dev/null
 +++ b/tests/platform/windows_numa_arena_test.cpp
 @@ -0,0 +1,49 @@
@@ -7627,7 +8011,7 @@ index 00000000..8f24a8d8
 +    return 0;
 +}
 diff --git a/tests/terminal/test_launch_engine_first.py b/tests/terminal/test_launch_engine_first.py
-index 397249c5..b2ce2cb2 100644
+index 397249c55029519586e58ef3cea0f6eaf64f8c98..b2ce2cb2e5b46786e01a2e6c9567e4d119b722c6 100644
 --- a/tests/terminal/test_launch_engine_first.py
 +++ b/tests/terminal/test_launch_engine_first.py
 @@ -49,6 +49,12 @@ def update_events(status: str, note: str = "", code: int = 0) -> list[dict]:
@@ -7644,7 +8028,7 @@ index 397249c5..b2ce2cb2 100644
      r = Runner(S.LaunchSettings(family="qwen", model="Q2_0", context=32768), catalog=qwen_catalog(), emit=lambda e: None)
      r.check_cancel = lambda: None
 diff --git a/tools/strata_tokenizer.py b/tools/strata_tokenizer.py
-index 33452af8..b5fe5fe3 100644
+index 33452af86ef072766a105655872e0235562db97c..b5fe5fe3558c17fb65546f9a99400dc80b10eb95 100644
 --- a/tools/strata_tokenizer.py
 +++ b/tools/strata_tokenizer.py
 @@ -77,6 +77,9 @@ DEEPSEEK3_PATTERNS = (
@@ -7748,7 +8132,7 @@ index 33452af8..b5fe5fe3 100644
                      cache[piece] = got
              out.extend(got)
 diff --git a/tools/test_strata_tokenizer.py b/tools/test_strata_tokenizer.py
-index e3cb498c..797a8f7f 100644
+index e3cb498c2ffe75aa4b77133f8594912bc2ad5fcd..797a8f7fa3171326dc215e5226680a074707f474 100644
 --- a/tools/test_strata_tokenizer.py
 +++ b/tools/test_strata_tokenizer.py
 @@ -1,6 +1,6 @@

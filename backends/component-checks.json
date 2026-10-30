@@ -4,7 +4,7 @@
   "native_source_sha": "41cf05a06a25dd29103b7b27a2279a3f60c21876",
   "binaries": {
     "cpu": {
-      "sha256": "4b96b711855391a67b277839cc0de5cdf8257631c8d52b39e3be69a947daa538",
+      "sha256": "bc1fdde4158a90e03f8a809f273c5dc5c64b825ab240e4a71d9a07806cdfb2fa",
       "imports": [
         "ADVAPI32.dll",
         "KERNEL32.dll",
@@ -46,10 +46,10 @@
         "glm5_next": true,
         "library_pin": "b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea"
       },
-      "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending"
+      "qualification": "New CPU SET_ROWS workspace and model-bounded cvec loader; actual CPU scratch/tensor/cvec/grammar regressions passed. GPU/device objects unchanged by byte proof; no new GPU or trained-model qualification, no speed claim."
     },
     "cuda": {
-      "sha256": "ccc9f2708065e83fba7e66ba1058515d4647fea804d1138654b5a1e12e28c417",
+      "sha256": "724999664ea56f42576478c44fb970d113720a4a96be9cac455946d2176b63d8",
       "imports": [
         "ADVAPI32.dll",
         "KERNEL32.dll",
@@ -94,10 +94,10 @@
         "glm5_next": true,
         "library_pin": "b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea"
       },
-      "qualification": "protocol/security plus18 synthetic tensor cases; trained models pending"
+      "qualification": "New CPU SET_ROWS workspace and model-bounded cvec loader; actual CPU scratch/tensor/cvec/grammar regressions passed. GPU/device objects unchanged by byte proof; no new GPU or trained-model qualification, no speed claim."
     },
     "vulkan": {
-      "sha256": "eb12ee13656bc6bb002587fb29a194cd7a3ceb7ae5483543359d52e13215480e",
+      "sha256": "43153402d6df28ee6ee82dd7b5b95b57ed68d1beed41bcc4c3a6472c353b7ad3",
       "imports": [
         "ADVAPI32.dll",
         "KERNEL32.dll",
@@ -140,7 +140,7 @@
         "glm5_next": true,
         "library_pin": "b9acf138a1e28ce1fc23b5a4fc4b12444b50f7ea"
       },
-      "qualification": "protocol/security/CPU fixtures; Vulkan hardware pending"
+      "qualification": "New CPU SET_ROWS workspace and model-bounded cvec loader; actual CPU scratch/tensor/cvec/grammar regressions passed. GPU/device objects unchanged by byte proof; no new GPU or trained-model qualification, no speed claim."
     },
     "poly": {
       "sha256": "a0512e20205eacc1babfb1b4bda024ad272e095b11564f7d1dc7f49879335a7f",
@@ -249,5 +249,13 @@
   "vulkan_GPU_available": false,
   "models_downloaded": false,
   "speed_benchmark": false,
-  "limits": "Component evidence only; RX580 and trained new-model checks remain pending. Native Qwen has a separate25-run/loaded owner qualification."
+  "limits": "Component evidence only; RX580 and trained new-model checks remain pending. Native Qwen has a separate25-run/loaded owner qualification.",
+  "CPU_delta_20261030": {
+    "scratch_tensor_cases": 108,
+    "cvec_cases": 24,
+    "grammar_JSON_cases": 30,
+    "GPU_requests": 0,
+    "model_requests": 0,
+    "qualification_evidence_sha256": "acf309da8709912a9232bec12df24f1d4b9c2753aff98cbeef64b06570459a35"
+  }
 }

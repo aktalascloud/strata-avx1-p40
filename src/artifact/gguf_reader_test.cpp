@@ -124,6 +124,24 @@ int main() {
         check(err.find("data section starts past EOF") != std::string::npos,
               "one tensor, ends before the aligned data start: refused at open");
     }
+    {
+        std::vector<uint8_t> b;
+        put<uint32_t>(b, 0x46554747u);
+        put<uint32_t>(b, 3);
+        put<uint64_t>(b, 1);
+        put<uint64_t>(b, 0);
+        put<uint64_t>(b, UINT64_MAX - 15);
+        b.resize(64, 0);
+        const auto path = std::filesystem::temp_directory_path() / "strata_gguf_reader_test.gguf";
+        std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(b.data()), (std::streamsize)b.size());
+        std::string err;
+        try { strata::GgufFile g(path.string()); }
+        catch (const std::exception& e) { err = e.what(); }
+        std::filesystem::remove(path);
+        check(err.find("unexpected end of file in header") != std::string::npos,
+              "a name length near 2^64: refused as a truncated header");
+        if (err.find("unexpected end of file in header") == std::string::npos) std::printf("  (%s)\n", err.c_str());
+    }
     std::printf(g_fail ? "gguf_reader_test: %d FAILED\n" : "gguf_reader_test: all passed\n", g_fail);
     return g_fail ? 1 : 0;
 }

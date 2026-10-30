@@ -1,10 +1,11 @@
 # Current build
 
-Official source `46c152a1310f77cd2f0ce2c7cd213962df14fe83`.
+Official source `870aedd9e1ebe1c91f94da93b59af17729f6c5c0`.
 
-- Native engine 0.1.53 with a real upstream merge; GB10/sm121 default/tile branches retained without selecting them on P40.
-- Upstream ARM/Metal and Mac DeepSeek packaging improvements retained as source-only; not new P40 model qualification.
-- Ivy Bridge O3, CUDA 12.9/sm61/L1-ca and the existing Pascal/control fixes preserved.
-- Selected P40 Pascal Q8 main-only opt-in; MTP Q2 remains enabled. Latest pinned real API measurement 55.15 engine tokens/s, with warmed-workload limits.
+- Official0.1.54, CUDA window8 explicit for legacyGPU footprint; widerHIP/SYCL changes retain their backend guards
+- Conversation/expert cache late-allocation headroom and policy PLE lock handling; explicit PLE RAM preserved
+- Quoted XML tool argument handling, family-specific end tokens and default declared-tool recovery; recovery remains bounded to declared names
+- LocalUnicode UTF16pair correctness fix for damagedJSON containers; strictvalidJSON behavior unchanged
+- RetainedAVX1/no-pin/Pascal/PCIeoverride/GGUFbounds/portableOpenAIID patches;3optionalcomponentCPU workspace/cvec fixes independentlyqualified
 
 Measured performance is independently source-pinned in BENCHMARKS.md.

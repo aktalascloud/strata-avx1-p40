@@ -33,4 +33,4 @@ Measured P40 setting: `STRATA_Q8_SM60=1`, `STRATA_MTP_Q8_SM60=0`; the latter lea
 [Patches](p40/PATCHES.md) · [Checks](p40/INSTALLATION-VERIFICATION.md) · [Licenses](THIRD_PARTY_NOTICES.md) · [Upstream Strata](https://github.com/Niko1221/Strata)
 [Xolotl](https://github.com/Indras-Mirror/Xolotl) · [PolyStrata](https://github.com/VecSzn/PolyStrata) · [Maya](https://github.com/mw00/project-maya) · [Polaris source](https://github.com/AvilaCarlosDev/polaris-local-ai)
 
-Native engine **0.1.53**, official base [46c152a1310f](https://github.com/Niko1221/Strata/commit/46c152a1310f77cd2f0ce2c7cd213962df14fe83). No keys, private settings, logs, caches or SDKs in the ZIP. Trained GLM/DeepSeek and RX580 results are not claimed.
+Native engine **0.1.54**, official base [870aedd9e1eb](https://github.com/Niko1221/Strata/commit/870aedd9e1ebe1c91f94da93b59af17729f6c5c0). No keys, private settings, logs, caches or SDKs in the ZIP. Trained GLM/DeepSeek and RX580 results are not claimed.

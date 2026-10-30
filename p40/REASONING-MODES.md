@@ -1,5 +1,7 @@
 # Отдельные режимы рассуждений / Explicit reasoning modes
 
+Авторские Ultra и Adaptive/Auto, включая описанный ниже default Auto, доступны только конкретной DavidAU. Swift использует штатные High/XHigh; Auto/Adaptive/Ultra для неё скрыты в UI и отклоняются API. / Author Ultra and Adaptive/Auto, including the default below, are restricted to the specific DavidAU model. Swift keeps native High/XHigh and rejects these author modes.
+
 High и XHigh используют исходный шаблон Qwen. В текущем upstream High является совместимым именем XHigh; авторский Ultra больше их не подменяет.
 
 По умолчанию выбран **Adaptive / Auto**. Явный выбор High/XHigh или Ultra имеет приоритет. / **Adaptive / Auto** is the default; an explicit High/XHigh or Ultra choice takes precedence.
